@@ -388,6 +388,10 @@ register("utf8.buried-symbol", "[]")
 register("utf8.cremated-symbol", "⚱")
 register("utf8.killed-symbol", "x")
 
+register("familysearch.server", 0)  # beta
+register("familysearch.app-key", "b0022SQD4ZBM0AODHZWY")
+register("familysearch.redirect", "http://127.0.0.1:57938/familysearch-auth")
+
 if __debug__:  # enable a simple CLI test to see if the datestrings exist
     register("test.january", _("January", "localized lexeme inflections"))
 
