@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -588,7 +588,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                     gr_tag = int(event.type) or event.type
 
                     if (
-                        (ged_tag == EventType.MARR_ALT or ged_tag == EventType.MARRIAGE)
+                        (ged_tag in (EventType.MARR_ALT, EventType.MARRIAGE))
                         and fs_fact.attribution
                         and fs_fact.attribution.changeMessage
                     ):

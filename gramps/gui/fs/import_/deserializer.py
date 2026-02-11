@@ -1,7 +1,8 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2023,2024,2025  Gabriel Rios
+# Copyright (C) 2023-2024  Jean Michault
+# Copyright (C) 2023-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +21,11 @@
 from collections import ChainMap
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
+import logging
 from typing import Any, Optional, get_args, get_origin
+
+logger = logging.getLogger(__name__)
+
 
 
 # =====================================
@@ -529,7 +534,7 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
             for item in (raw_value or []):
                 child = _construct_object(elem_type_obj, item, obj)
                 if child is None:
-                    print("deserialize_json:error :  k=" + raw_key + "; x=" + str(item))
+                    logger.debug("deserialize_json: child construction failed k=%s; x=%r", raw_key, item)
                     continue
 
                 if hasattr(elem_type_obj, "iseq"):

@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 #
-
 from __future__ import annotations
 
 import os
@@ -32,9 +31,16 @@ from gi.repository import Gtk, Gdk, GLib
 
 from gramps.gui.fs import ui as fs_ui
 
+try:
+    from gramps.gen.constfunc import is_windows as _is_windows
+except Exception:
+    def _is_windows() -> bool:
+        return sys.platform.startswith("win")
+
+
 WebKit2 = None
 try:
-    if not sys.platform.startswith("win"):
+    if not _is_windows():
         gi.require_version("WebKit2", "4.0")
         from gi.repository import WebKit2 as _WebKit2
         WebKit2 = _WebKit2
@@ -42,21 +48,16 @@ except Exception:
     WebKit2 = None
 
 
-def _is_windows() -> bool:
-    return sys.platform.startswith("win")
-
-
 def _canonicalize_fs_web_url(url: str) -> str:
     """
     - If session exists and has canonical_web_url(), use it
-    - Else rewrite beta/familysearch to www.familysearch.org (safe default)
+    - else rewrite beta/familysearch to www.familysearch.org
     """
     if not url:
         return "about:blank"
     u = str(url).strip()
     if not u.startswith(("http://", "https://")):
         return u
-
     try:
         from gramps.gui.fs import tree
         sess = getattr(tree, "_fs_session", None)
@@ -64,7 +65,6 @@ def _canonicalize_fs_web_url(url: str) -> str:
             return sess.canonical_web_url(u)
     except Exception:
         pass
-
     try:
         p = urlparse(u)
         host = (p.netloc or "").lower()
@@ -86,16 +86,13 @@ def _canonicalize_fs_web_url(url: str) -> str:
 
 class SourceImageBrowser:
     """
-    Modal browser for grabbing image files from a source page.
+    browser for grabbing image files from a source page.
 
-    Behavior:
     - Linux with WebKit2 available: embedded WebView, intercept downloads.
     - Windows (or no WebKit2): open system browser and let user pick files from disk.
     - Lets user choose a download folder (optional) and also pick local files.
     - Tracks all saved files and returns them on close.
     """
-
-    _CSS_KEY = "fs.source_image_browser"
 
     def __init__(
         self,
@@ -110,7 +107,6 @@ class SourceImageBrowser:
         self.saved_files: List[str] = []
         self._handlers: list[tuple[object, int]] = []
         self._ctx = None
-
         self._use_webkit = (not _is_windows()) and (WebKit2 is not None)
 
         self.dialog = Gtk.Dialog(
@@ -121,7 +117,9 @@ class SourceImageBrowser:
         self.dialog.add_button("Close", Gtk.ResponseType.CLOSE)
         self.dialog.set_default_size(1040, 820)
 
+        # keep UI CSS centralized 
         self._install_css()
+
         try:
             self.dialog.get_style_context().add_class("fs-srcimg-window")
         except Exception:
@@ -186,9 +184,8 @@ class SourceImageBrowser:
         except Exception:
             pass
 
-        # Embedded browser or emptyt
+        # embedded browser or empty
         self.webview = None
-
         if self._use_webkit:
             self.webview = WebKit2.WebView()
             sc = Gtk.ScrolledWindow()
@@ -244,6 +241,7 @@ class SourceImageBrowser:
             files_frame.get_style_context().add_class("fs-srcimg-frame")
         except Exception:
             pass
+
         files_sc = Gtk.ScrolledWindow()
         files_sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         try:
@@ -252,7 +250,6 @@ class SourceImageBrowser:
             pass
         files_sc.add(self._tree)
         files_frame.add(files_sc)
-
         body.pack_end(files_frame, False, False, 0)
 
         # Footer info label
@@ -274,7 +271,6 @@ class SourceImageBrowser:
 
         # Wire downloads webkit
         self._wire_downloads()
-
         self._refresh_dir_label()
 
         if self._use_webkit and self.webview is not None:
@@ -285,47 +281,19 @@ class SourceImageBrowser:
         else:
             self._open_external_browser()
 
-    # ---- public API ---
-
+    # public APi
     def run(self) -> List[str]:
         self.dialog.show_all()
         self.dialog.run()
         self._teardown()
         return self.saved_files
 
-    # ---- style helpers ----
-
+    #  old 
     def _install_css(self) -> None:
-        css = b"""
-        .fs-srcimg-window { }
-
-        .fs-srcimg-header {
-            padding: 6px 8px;
-            border-radius: 10px;
-            border: 1px solid rgba(0,0,0,0.10);
-            background-color: rgba(0,0,0,0.03);
-        }
-
-        .fs-srcimg-info {
-            padding: 4px 10px 10px 10px;
-            opacity: 0.95;
-        }
-
-        .fs-srcimg-frame { border-radius: 10px; }
-
-        .fs-srcimg-web { border-radius: 12px; }
-
-        .fs-srcimg-empty {
-            padding: 14px;
-            border-radius: 12px;
-            border: 1px solid rgba(0,0,0,0.10);
-            background-color: rgba(0,0,0,0.02);
-        }
-        """
-        fs_ui.install_css_once(self._CSS_KEY, css)
-
-    # ---- internals -------
-
+        # pass
+        return
+        
+    # internals
     def _reload(self, *_a) -> None:
         if self._use_webkit and self.webview is not None:
             try:
@@ -341,7 +309,9 @@ class SourceImageBrowser:
             return
         try:
             webbrowser.open(self.url, new=1, autoraise=True)
-            self.info.set_text("Opened system browser. Download images there, then use 'Choose file...'.")
+            self.info.set_text(
+                "Opened system browser. Download images there, then use 'Choose file...'."
+            )
         except Exception:
             self.info.set_text("Could not open system browser.")
 
@@ -365,7 +335,6 @@ class SourceImageBrowser:
                 except Exception:
                     pass
                 return
-
         try:
             download.connect("decide-destination", self._on_decide_destination)
             download.connect("finished", self._on_finished)
@@ -406,10 +375,11 @@ class SourceImageBrowser:
             path = getattr(download, "_dest_path", None)
         except Exception:
             path = None
-
         if path and os.path.exists(path):
             self._add_saved_file(path)
-            self.info.set_text("Saved: %s (total: %d)" % (os.path.basename(path), len(self.saved_files)))
+            self.info.set_text(
+                "Saved: %s (total: %d)" % (os.path.basename(path), len(self.saved_files))
+            )
 
     def _on_failed(self, _download, _error) -> None:
         self.info.set_text("Download failed.")
@@ -429,7 +399,6 @@ class SourceImageBrowser:
                 dlg.set_current_folder(self.download_dir)
             except Exception:
                 pass
-
         resp = dlg.run()
         if resp == Gtk.ResponseType.OK:
             self.download_dir = dlg.get_filename()
@@ -450,7 +419,6 @@ class SourceImageBrowser:
             dlg.set_select_multiple(True)
         except Exception:
             pass
-
         try:
             flt = Gtk.FileFilter()
             flt.set_name("Images")
@@ -462,13 +430,11 @@ class SourceImageBrowser:
             dlg.add_filter(flt2)
         except Exception:
             pass
-
         if self.download_dir and os.path.isdir(self.download_dir):
             try:
                 dlg.set_current_folder(self.download_dir)
             except Exception:
                 pass
-
         resp = dlg.run()
         paths: List[str] = []
         if resp == Gtk.ResponseType.OK:
@@ -481,10 +447,8 @@ class SourceImageBrowser:
                 except Exception:
                     paths = []
         dlg.destroy()
-
         if not paths:
             return
-
         if self.download_dir and os.path.isdir(self.download_dir):
             for src in paths:
                 try:
@@ -497,9 +461,10 @@ class SourceImageBrowser:
         else:
             for src in paths:
                 self._add_saved_file(src)
-
         self._refresh_dir_label()
-        self.info.set_text("Selected %d file(s) (total: %d)" % (len(paths), len(self.saved_files)))
+        self.info.set_text(
+            "Selected %d file(s) (total: %d)" % (len(paths), len(self.saved_files))
+        )
 
     def _refresh_dir_label(self) -> None:
         path = self.download_dir or "(no folder selected)"
@@ -533,7 +498,6 @@ class SourceImageBrowser:
             except Exception:
                 pass
         self._handlers = []
-
         try:
             self.dialog.destroy()
         except Exception:
@@ -547,10 +511,9 @@ def pick_images(
     title: str = "Add Source Image",
 ) -> List[str]:
     """
-    Convenience wrapper: launches the modal browser and returns saved file paths.
-
-    - Opens the system browser (no WebKit).
-    - User downloads images and then 'Choose file...' to select them.
+    launches browser and returns saved file paths.
+    - Opens the system browser w/o WebKit
+    - User downloads images and then Choose file to select them
     """
     b = SourceImageBrowser(url, parent_window=parent_window, start_dir=start_dir, title=title)
     return b.run()

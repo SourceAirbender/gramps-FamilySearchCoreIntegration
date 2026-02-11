@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,13 +19,18 @@
 
 from __future__ import annotations
 
+import logging
+import re
+from typing import Any, Iterator
+from urllib.parse import urljoin, urlparse, urlunparse
+
 from gramps.gen.lib import (
     Citation,
     Note,
     NoteType,
+    StyledText,
     StyledTextTag,
     StyledTextTagType,
-    StyledText,
     Source,
     SrcAttribute,
     Repository,
@@ -37,15 +42,101 @@ from gramps.gen.lib import (
 )
 
 from . import _
+from . import deserializer as deserialize
 
 import gramps.gui.fs.utilities as fs_utilities
 from gramps.gui.fs import tree
-from . import deserializer as deserialize
 
-import re
-from urllib.parse import urlparse, urlunparse, urljoin
+LOG = logging.getLogger(__name__)
 
 _URL_RE = re.compile(r"https?://[^\s)\]\">]+")
+
+
+# (no db.dbapi)
+
+def _yield_handles(db, kind: str) -> Iterator[str]:
+    """
+    Yield handles for a primary object type in a backend-portable way.
+    kind: "repository", "source", ...
+    """
+    fn = getattr(db, f"iter_{kind}_handles", None)
+    if callable(fn):
+        try:
+            for h in fn():
+                if h:
+                    yield h
+            return
+        except Exception:
+            LOG.debug("iter_%s_handles failed", kind, exc_info=True)
+
+    fn = getattr(db, f"get_{kind}_handles", None)
+    if callable(fn):
+        try:
+            for h in fn():
+                if h:
+                    yield h
+            return
+        except Exception:
+            LOG.debug("get_%s_handles failed", kind, exc_info=True)
+
+
+def _db_cache_get(db, attr: str) -> dict:
+    try:
+        d = getattr(db, attr, None)
+        if isinstance(d, dict):
+            return d
+    except Exception:
+        pass
+    d = {}
+    try:
+        setattr(db, attr, d)
+    except Exception:
+        pass
+    return d
+
+
+def _find_repository_handle_by_name(db, name: str) -> str | None:
+    name = (name or "").strip()
+    if not name:
+        return None
+
+    cache = _db_cache_get(db, "_grampsfs_repo_by_name_cache")
+    if name in cache:
+        return cache[name]
+
+    for h in _yield_handles(db, "repository"):
+        try:
+            r = db.get_repository_from_handle(h)
+        except Exception:
+            r = None
+        if r and getattr(r, "name", None) == name:
+            cache[name] = h
+            return h
+
+    cache[name] = None
+    return None
+
+
+def _find_source_handle_by_title(db, title: str) -> str | None:
+    title = (title or "").strip()
+    if not title:
+        return None
+
+    cache = _db_cache_get(db, "_grampsfs_source_by_title_cache")
+    if title in cache:
+        return cache[title]
+
+    for h in _yield_handles(db, "source"):
+        try:
+            s = db.get_source_from_handle(h)
+        except Exception:
+            s = None
+        if s and getattr(s, "title", None) == title:
+            cache[title] = h
+            return h
+
+    cache[title] = None
+    return None
 
 
 def _canon_fs_web(url: str) -> str:
@@ -71,7 +162,8 @@ def _canon_fs_web(url: str) -> str:
                 p.fragment or "",
             ))
     except Exception:
-        pass
+        # keep behavior: ignore parse errors and return original
+        LOG.debug("Failed to canonicalize FamilySearch URL: %s", url, exc_info=True)
     return u
 
 
@@ -92,7 +184,9 @@ def _looks_like_record_page(u: str) -> bool:
 
 def _extract_fs_record_url(sd) -> str:
     """
-    try to pull a usable record/source page URL from a GEDCOMX SourceDescription prefers ark/Persistent/Primary identifiers, then URLs in citations, then sd.about. 
+    try to pull a usable record/source page URL from a GEDCOMX SourceDescription
+    prefers ark/Persistent/Primary identifiers, then URLs in citations, then sd.about.
+
     returns www.familysearch.org URL when possible
     """
     if not sd:
@@ -152,7 +246,7 @@ def _extract_fs_record_url(sd) -> str:
 def _safe_json(resp):
     try:
         return resp.json()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return None
 
 
@@ -182,6 +276,9 @@ def _hydrate_source_description(fs_tree, sdid: str) -> None:
             f"/platform/sources/descriptions/{sdid}",
             {"Accept": "application/x-gedcomx-v1+json"},
         )
+    except Exception:
+        LOG.debug("Failed to fetch SourceDescription hydration for %s", sdid, exc_info=True)
+        return
 
     if not r or getattr(r, "status_code", None) != 200:
         return
@@ -193,6 +290,8 @@ def _hydrate_source_description(fs_tree, sdid: str) -> None:
     try:
         deserialize.deserialize_json(fs_tree, data)
     except Exception:
+        # keep behavior: hydration is best-effort
+        LOG.debug("Failed to deserialize hydrated SourceDescription %s", sdid, exc_info=True)
         return
 
 
@@ -235,6 +334,7 @@ def fetch_source_dates(fs_tree):
                 r = sess.get_url(links_url, {"Accept": "application/json"})
             except Exception:
                 r = None
+                LOG.debug("Failed to fetch /service/tree/links/source/%s", sd.id, exc_info=True)
             finally:
                 sd._fs_links_fetched = True
 
@@ -251,21 +351,22 @@ def fetch_source_dates(fs_tree):
                             d.formal = deserialize.DateFormal(str_formal)
                             sd._date = d
                         except Exception:
-                            pass
+                            LOG.debug("Failed to parse eventDate for %s", sd.id, exc_info=True)
 
                 sd._collectionUri = data.get("fsCollectionUri")
                 if sd._collectionUri and isinstance(sd._collectionUri, str):
+                    prefix = "https://www.familysearch.org/platform/records/collections/"
                     try:
-                        sd._collection = sd._collectionUri.removeprefix(
-                            "https://www.familysearch.org/platform/records/collections/"
-                        )
-                    except Exception:
-                        prefix = "https://www.familysearch.org/platform/records/collections/"
+                        # Py3.9+ has removeprefix
+                        sd._collection = sd._collectionUri.removeprefix(prefix)
+                    except AttributeError:
                         sd._collection = (
                             sd._collectionUri[len(prefix):]
                             if sd._collectionUri.startswith(prefix)
                             else None
                         )
+                    except Exception:
+                        sd._collection = None
 
                 t = data.get("title")
                 if t and isinstance(t, str):
@@ -277,7 +378,7 @@ def fetch_source_dates(fs_tree):
                             tv.value = t
                             sd.titles.add(tv)
                     except Exception:
-                        pass
+                        LOG.debug("Failed to set title for %s", sd.id, exc_info=True)
 
                 uri_val = (
                     data.get("uri")
@@ -296,7 +397,7 @@ def fetch_source_dates(fs_tree):
                     try:
                         sd.about = cand
                     except Exception:
-                        pass
+                        LOG.debug("Failed to set sd.about for %s", sd.id, exc_info=True)
 
                 n = data.get("notes")
                 note_txt = ""
@@ -313,7 +414,7 @@ def fetch_source_dates(fs_tree):
                             fn.text = note_txt
                             sd.notes.add(fn)
                     except Exception:
-                        pass
+                        LOG.debug("Failed to set notes for %s", sd.id, exc_info=True)
 
         if (not getattr(sd, "about", "")) and (not sd._fs_api_hydrated):
             _hydrate_source_description(fs_tree, sd.id)
@@ -332,8 +433,7 @@ def fetch_source_dates(fs_tree):
                 if not getattr(sd, "about", ""):
                     sd.about = best_url
             except Exception:
-                pass
-
+                LOG.debug("Failed to set best_url for %s", sd.id, exc_info=True)
 
 
 class IntermediateSource:
@@ -345,7 +445,7 @@ class IntermediateSource:
     page_or_position: str | None = None
     confidence_label: str | None = None
     url: str | None = None
-    date: any = None
+    date: Any = None
     note_text: str | None = None
     collection: str | None = None
     collection_url: str | None = None
@@ -377,7 +477,7 @@ class IntermediateSource:
             fs_citation_value = next(iter(fs_sd.citations)).value
 
         if fs_sd.resourceType not in ("FSREADONLY", "LEGACY", "DEFAULT", "IGI"):
-            print("Unknown resourceType !!! :", str(fs_sd.resourceType))
+            LOG.warning("Unknown FS SourceDescription resourceType: %s", str(fs_sd.resourceType))
         if fs_sd.resourceType == "LEGACY":
             self.source_title = "Legacy NFS Sources"
 
@@ -396,19 +496,30 @@ class IntermediateSource:
             lines = fs_citation_value.split("\n")
             for line in lines:
                 if line.startswith(_("Repository")):
-                    self.repository_name = line.removeprefix(
-                        _("Repository") + " :"
-                    ).strip()
+                    # removeprefix exists in newer python; keep compatibility
+                    try:
+                        self.repository_name = line.removeprefix(_("Repository") + " :").strip()
+                    except AttributeError:
+                        prefix = _("Repository") + " :"
+                        self.repository_name = line[len(prefix):].strip() if line.startswith(prefix) else line.strip()
                 elif line.startswith(_("Source:")):
-                    self.source_title = line.removeprefix(_("Source:")).strip()
+                    try:
+                        self.source_title = line.removeprefix(_("Source:")).strip()
+                    except AttributeError:
+                        prefix = _("Source:")
+                        self.source_title = line[len(prefix):].strip() if line.startswith(prefix) else line.strip()
                 elif line.startswith(_("Volume/Page:")):
-                    self.page_or_position = line.removeprefix(
-                        _("Volume/Page:")
-                    ).strip()
+                    try:
+                        self.page_or_position = line.removeprefix(_("Volume/Page:")).strip()
+                    except AttributeError:
+                        prefix = _("Volume/Page:")
+                        self.page_or_position = line[len(prefix):].strip() if line.startswith(prefix) else line.strip()
                 elif line.startswith(_("Confidence:")):
-                    self.confidence_label = line.removeprefix(
-                        _("Confidence:")
-                    ).strip()
+                    try:
+                        self.confidence_label = line.removeprefix(_("Confidence:")).strip()
+                    except AttributeError:
+                        prefix = _("Confidence:")
+                        self.confidence_label = line[len(prefix):].strip() if line.startswith(prefix) else line.strip()
             if not self.source_title and len(lines) >= 1:
                 self.source_title = lines[0]
 
@@ -474,13 +585,9 @@ class IntermediateSource:
     def to_gramps(self, db, txn, obj):
         repo_handle = None
         if self.repository_name:
-            db.dbapi.execute(
-                "select handle from repository where name=?", [self.repository_name]
-            )
-            row = db.dbapi.fetchone()
-            if row and row[0]:
-                repo_handle = row[0]
-            else:
+            repo_handle = _find_repository_handle_by_name(db, self.repository_name)
+
+            if not repo_handle:
                 r = Repository()
                 r.set_name(self.repository_name)
                 rtype = RepositoryType()
@@ -495,16 +602,23 @@ class IntermediateSource:
                 db.commit_repository(r, txn)
                 repo_handle = r.handle
 
+                # update cache
+                try:
+                    _db_cache_get(db, "_grampsfs_repo_by_name_cache")[self.repository_name] = repo_handle
+                except Exception:
+                    pass
+
         src = None
         if self.source_title and not src and self.collection:
             src = db.get_source_from_gramps_id("FS_coll_" + self.collection)
+
         if not src and self.source_title:
-            db.dbapi.execute(
-                "select handle from source where title=?", [self.source_title]
-            )
-            row = db.dbapi.fetchone()
-            if row and row[0]:
-                src = db.get_source_from_handle(row[0])
+            h = _find_source_handle_by_title(db, self.source_title)
+            if h:
+                try:
+                    src = db.get_source_from_handle(h)
+                except Exception:
+                    src = None
 
         if not src and self.source_title:
             src = Source()
@@ -525,6 +639,12 @@ class IntermediateSource:
                 src.add_repo_reference(rr)
             db.commit_source(src, txn)
 
+            # update cache
+            try:
+                _db_cache_get(db, "_grampsfs_source_by_title_cache")[self.source_title] = src.handle
+            except Exception:
+                pass
+
         found = False
         citation = None
         for ch in db.get_citation_handles():
@@ -533,13 +653,13 @@ class IntermediateSource:
                 if attr.get_type() == "_FSFTID" and attr.get_value() == self.id:
                     found = True
                     citation = c
-                    print(" citation found _FSFTID=" + self.id)
+                    LOG.debug("Citation found for _FSFTID=%s", self.id)
                     break
             if found:
                 break
 
         if not citation:
-            print(" citation not found _FSFTID=" + self.id)
+            LOG.debug("Citation not found for _FSFTID=%s; creating", self.id)
             citation = Citation()
             attr = SrcAttribute()
             attr.set_type("_FSFTID")

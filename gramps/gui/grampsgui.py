@@ -4,7 +4,7 @@
 # Copyright (C) 2000-2006  Donald N. Allingham
 # Copyright (C) 2009 Benny Malengier
 # Copyright (C) 2018 Paul Culley
-#
+
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -79,7 +79,7 @@ UIDEFAULT = (
       <section groups='RO RW'>
         <item groups='RW'>
           <attribute name="action">win.Login</attribute>
-          <attribute name="label" translatable="yes">_FamilySearch Login...</attribute>
+          <attribute name="label" translatable="yes">_FamilySearch Sign in...</attribute>
         </item>
       </section>
       <section groups='RO RW'>

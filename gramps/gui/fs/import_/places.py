@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2025  Gabriel Rios
+# Copyright (C) 2025-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,33 +16,46 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 #
-
 from __future__ import annotations
+
+import logging
 
 from gramps.gen.lib import Place, PlaceName, PlaceType, Url, UrlType, PlaceRef
 
 from . import _
-
 import gramps.gui.fs.utilities as fs_utilities
 from gramps.gui.fs import tree
 from gramps.gui.fs.constants import GEDCOMX_TO_GRAMPS_PLACES
-
 from . import deserializer as deserialize
+
+logger = logging.getLogger(__name__)
+
+
+def _pt(symbol_name: str, fallback_value: int) -> PlaceType:
+    return getattr(PlaceType, symbol_name, PlaceType(fallback_value))
+
+
+PT_COUNTRY = _pt("COUNTRY", 1)
+PT_STATE = _pt("STATE", 9)
+PT_COUNTY = _pt("COUNTY", 10)
+PT_CITY = _pt("CITY", 14)
+PT_PARISH = _pt("PARISH", 20)
 
 
 def create_place(db, txn, fs_place, parent):
     # Create a Gramps Place from a FamilySearch PlaceDescription (fs_place),
     # link to its parent (if any), add FS URLs, set coordinates and type, commit
     place = Place()
+
     # Two URLs: FS description API and human page
     u1 = Url()
-    u1.path = (
-        f"https://api.familysearch.org/platform/places/description/{fs_place.id}"
-    )
+    u1.path = f"https://api.familysearch.org/platform/places/description/{fs_place.id}"
     u1.type = UrlType("FamilySearch")
+
     u2 = Url()
     u2.path = fs_place.links["place"].href.removesuffix("?flag=fsh")
     u2.type = UrlType("FamilySearch")
+
     tmp = Place()
     tmp.add_url(u1)
     tmp.add_url(u2)
@@ -66,16 +79,16 @@ def create_place(db, txn, fs_place, parent):
     # Fallback type inference by hierarchy if not mapped
     if not ptype:
         if not parent:
-            ptype = PlaceType(1)
+            ptype = PT_COUNTRY
         else:
-            if parent.place_type == PlaceType(1):
-                ptype = PlaceType(9)
-            elif parent.place_type == PlaceType(9):
-                ptype = PlaceType(10)
-            elif parent.place_type == PlaceType(10):
-                ptype = PlaceType(14)
-            elif parent.place_type == PlaceType(14):
-                ptype = PlaceType(20)
+            if parent.place_type == PT_COUNTRY:
+                ptype = PT_STATE
+            elif parent.place_type == PT_STATE:
+                ptype = PT_COUNTY
+            elif parent.place_type == PT_COUNTY:
+                ptype = PT_CITY
+            elif parent.place_type == PT_CITY:
+                ptype = PT_PARISH
 
     if parent:
         pref = PlaceRef()
@@ -90,6 +103,7 @@ def create_place(db, txn, fs_place, parent):
     if fs_utilities.FS_INDEX_PLACES:
         fs_utilities.FS_INDEX_PLACES[u1.path] = place.handle
         fs_utilities.FS_INDEX_PLACES[u2.path] = place.handle
+
     return place
 
 
@@ -101,12 +115,11 @@ def get_place_by_id(db, fs_place):
         and fs_place.description[:1] == "#"
     ):
         fs_place.id = fs_place.description[1:]
+
     if not getattr(fs_place, "id", None):
         return None
 
-    api_url = (
-        f"https://api.familysearch.org/platform/places/description/{fs_place.id}"
-    )
+    api_url = f"https://api.familysearch.org/platform/places/description/{fs_place.id}"
     if hasattr(fs_place, "links") and fs_place.links and fs_place.links.get("place"):
         human_url = fs_place.links["place"].href.removesuffix("?flag=fsh")
     else:
@@ -127,7 +140,7 @@ def get_place_by_id(db, fs_place):
 
     # build FSID map on first use
     if not fs_utilities.FS_INDEX_PLACES:
-        print(_("Building FSID list for places"))
+        logger.debug("%s", _("Building FSID list for places"))
         fs_utilities.FS_INDEX_PLACES = {}
         for handle in db.get_place_handles():
             place = db.get_place_from_handle(handle)
@@ -142,6 +155,7 @@ def get_place_by_id(db, fs_place):
 def add_place(db, txn, fs_place):
     if not hasattr(fs_place, "_handle"):
         fs_place._handle = None
+
     if fs_place._handle:
         try:
             return db.get_place_from_handle(fs_place._handle)
@@ -156,19 +170,23 @@ def add_place(db, txn, fs_place):
     if not getattr(fs_place, "id", None):
         return None
 
-    print("add_place:" + fs_place.id)
+    logger.debug("add_place: %s", fs_place.id)
     endpoint = f"/platform/places/description/{fs_place.id}"
     r = tree._fs_session.get_url(endpoint, {"Accept": "application/json,*/*"})
+
     if not (r and r.status_code == 200):
         if r:
-            print("WARNING: Status code:", r.status_code)
+            logger.warning("WARNING: Status code: %s", r.status_code)
         return None
 
     try:
         data = r.json()
     except Exception as e:
-        print(f"WARNING: corrupted file from {endpoint}, error: {e}")
-        print(r.content)
+        logger.warning("WARNING: corrupted file from %s, error: %s", endpoint, e)
+        try:
+            logger.debug("Response content: %r", r.content)
+        except Exception:
+            pass
         return None
 
     if "places" not in data:
@@ -176,9 +194,10 @@ def add_place(db, txn, fs_place):
 
     g = deserialize.Gedcomx()
     deserialize.deserialize_json(g, data)
-    fs_place_id = data["places"][0]["id"]
 
+    fs_place_id = data["places"][0]["id"]
     fs_desc = deserialize.PlaceDescription._index.get(fs_place_id)
+
     if fs_desc.jurisdiction:
         parent_id = fs_desc.jurisdiction.resourceId
         fs_parent = deserialize.PlaceDescription._index.get(parent_id)
@@ -190,21 +209,24 @@ def add_place(db, txn, fs_place):
         existing = get_place_by_id(db, fs_desc)
         if not existing:
             existing = add_place(db, txn, fs_desc)
+
         u1 = Url()
-        u1.path = (
-            f"https://api.familysearch.org/platform/places/description/{fs_place.id}"
-        )
+        u1.path = f"https://api.familysearch.org/platform/places/description/{fs_place.id}"
         u1.type = UrlType("FamilySearch")
+
         u2 = Url()
         u2.path = fs_desc.links["place"].href.removesuffix("?flag=fsh")
         u2.type = UrlType("FamilySearch")
+
         tmp = Place()
         tmp.add_url(u1)
         tmp.add_url(u2)
         existing._merge_url_list(tmp)
+
         if fs_utilities.FS_INDEX_PLACES:
             fs_utilities.FS_INDEX_PLACES[u1.path] = existing.handle
             fs_utilities.FS_INDEX_PLACES[u2.path] = existing.handle
+
         db.commit_place(existing, txn)
         return existing
 

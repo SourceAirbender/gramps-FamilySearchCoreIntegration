@@ -23,3 +23,78 @@ paned>separator {
 label.error {
   color: @error_color;
 }
+
+/* FamilySearch - relatives import dialog */
+.fs-rel-import-dialog { }
+
+.fs-rel-import-wrap {
+  padding: 10px;
+}
+
+.fs-rel-import-panel {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background-color: rgba(0,0,0,0.03);
+}
+
+.fs-rel-import-legend {
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background-color: rgba(0,0,0,0.03);
+}
+
+.fs-rel-import-treeview header button {
+  font-weight: 700;
+}
+
+/* FamilySearch - compare window */
+@define-color fs_compare_match_bg #D8F3DC;
+@define-color fs_compare_different_bg #FFE8CC;
+@define-color fs_compare_only_gramps_bg #FFF3BF;
+@define-color fs_compare_only_fs_bg #D0EBFF;
+@define-color fs_compare_critical_bg #FFE3E3;
+
+.fs-compare-window { }
+
+.fs-compare-wrap {
+  padding: 10px;
+}
+
+.fs-compare-legend {
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background-color: rgba(0,0,0,0.03);
+}
+
+.fs-legend-pill {
+  border-radius: 999px;
+  padding: 2px 10px;
+  border: 1px solid rgba(0,0,0,0.10);
+}
+
+.fs-legend-pill.fs-match       { background-color: @fs_compare_match_bg; }
+.fs-legend-pill.fs-different   { background-color: @fs_compare_different_bg; }
+.fs-legend-pill.fs-only-gramps { background-color: @fs_compare_only_gramps_bg; }
+.fs-legend-pill.fs-only-fs     { background-color: @fs_compare_only_fs_bg; }
+.fs-legend-pill.fs-critical    { background-color: @fs_compare_critical_bg; }
+
+.fs-legend-label {
+  font-weight: 600;
+  opacity: 0.92;
+}
+
+.fs-compare-notebook {
+  border-radius: 12px;
+}
+
+.fs-compare-treeview {
+  border-radius: 10px;
+}
+
+.fs-compare-treeview header button {
+  font-weight: 700;
+}
+

@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -75,16 +75,17 @@ def _ui_row(row):
 
 def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=False):
     """
-    Compare a FamilySearch person vs a Gramps person and (optionally) populate
-    a GTK model with color-coded comparison rows.
-
+    stores comparison timestamps/flags on the Person
+    via datab_familysearch.FSStatusDB (JSON attribute blob).
     """
     db_state = datab_familysearch.FSStatusDB(db, gr_person.handle)
     db_state.get()
 
+    # if we already compared after both FS + Gramps changes, skip.
     if (
         model is None
         and hasattr(fs_person, "_datmod")
+        and db_state.status_ts
         and db_state.status_ts > fs_person._datmod
         and db_state.status_ts > gr_person.change
     ):
@@ -144,17 +145,15 @@ def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=Fa
     connected = bool(FSG_Sync.FSG_Sync.fs_Tree)
     hdr_gr = _("Gramps")
     hdr_fs = _("FamilySearch") if connected else _("Not connected to FamilySearch")
-    em = "_"
 
     def add_section(title: str, semantic_color: str, node_key: str, children):
         """
-        Adds  header row + children rows to the tree model.
+        Adds header row + children rows to the tree model.
         The header row uses the color column as a section badge tint.
         """
         if not model or not children:
             return
 
-        # Header row: put "Gramps / FamilySearch" labels in the value columns.
         header = [
             semantic_color,
             title,
@@ -261,26 +260,39 @@ def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=Fa
                 else:
                     FS_Dok = False
             except Exception as e:
-                logger.warning(
-                    "WARNING: corrupted file from %s, error: %s", path, e
-                )
-                logger.debug(
-                    "Response content: %s", getattr(r, "content", b"")
-                )
+                logger.warning("WARNING: corrupted file from %s, error: %s", path, e)
+                logger.debug("Response content: %s", getattr(r, "content", b""))
 
-    db_state.status_ts = int(time.time())
+    # Update persistent status store
+    now = int(time.time())
+    db_state.status_ts = now
+
+    # Track what we compared against (optional but useful)
+    try:
+        db_state.gramps_modified_ts = int(getattr(gr_person, "change", 0) or 0)
+    except Exception:
+        pass
+    try:
+        db_state.fs_modified_ts = int(getattr(fs_person, "_last_modified", 0) or 0)
+    except Exception:
+        pass
+
+    # Conflict flags
+    db_state.essential_conflict = bool(FS_Essentials)
+    db_state.conflict = bool(not FS_Identical)
+
+    # "confirmed" means identical as of now and newer than last confirmed baseline
     if FS_Identical and (
         not db_state.confirmed_ts
         or (gr_person.change > db_state.confirmed_ts)
         or (fs_person._last_modified > db_state.confirmed_ts)
     ):
-        db_state.confirmed_ts = db_state.status_ts
+        db_state.confirmed_ts = now
 
-    FS_GrampsNewer = bool(
-        db_state.confirmed_ts and gr_person.change > db_state.confirmed_ts
-    )
-    FS_RemoteNewer = bool(
-        db_state.confirmed_ts and fs_person._last_modified > db_state.confirmed_ts
-    )
+    # Persist the updated db_state
+    try:
+        db_state.commit()
+    except Exception:
+        pass
 
     return []

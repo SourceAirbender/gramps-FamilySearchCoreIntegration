@@ -2,7 +2,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2025  Gabriel Rios
+# Copyright (C) 2025-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,11 +32,7 @@ from gi.repository import Gtk, GLib, Gdk, GdkPixbuf
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.display.name import displayer as name_displayer
 
-try:
-    from gramps.gen.const import IMAGE_DIR as _GRAMPS_IMAGE_DIR
-except Exception:
-    _GRAMPS_IMAGE_DIR = None
-
+from gramps.gen.const import IMAGE_DIR as _GRAMPS_IMAGE_DIR
 
 from . import ui as fs_ui
 
@@ -46,11 +42,8 @@ except Exception:
     _trans = glocale.translation
 _ = _trans.gettext
 
-try:
-    from gramps.gui.dialog import ErrorDialog
-except Exception:
-    ErrorDialog = None
-
+from gramps.gui.dialog import ErrorDialog
+from .tags import build_tag_color_note_widget
 
 _SINGLETON: Optional["FamilySearchToolsWindow"] = None
 _EDITPERSON_HOOK_INSTALLED = False
@@ -305,16 +298,14 @@ def present_tools_window(session, dbstate=None, uistate=None) -> None:
 
 
 class FamilySearchToolsWindow:
-    # --- UI tuning knobs ---
-    _BANNER_MAX_HEIGHT = 120  # px
-    _BANNER_MIN_HEIGHT = 64   # px
+    _BANNER_MAX_HEIGHT = 120 #px
+    _BANNER_MIN_HEIGHT = 64
     _BANNER_SIDE_PAD = 10
 
     def __init__(self, session):
         self.session = session
         self._tick_id = None
 
-        # banner scaling state
         self._logo_pixbuf_orig: Optional[GdkPixbuf.Pixbuf] = None
         self._logo_last_width: int = 0
 
@@ -328,7 +319,7 @@ class FamilySearchToolsWindow:
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.window.add(outer)
 
-        # --- Banner (FS logo) ---
+        # FS logo emerging solution
         banner = self._build_banner()
         if banner is not None:
             outer.pack_start(banner, False, False, 0)
@@ -363,12 +354,23 @@ class FamilySearchToolsWindow:
 
         self.btn_link = Gtk.Button(label=_("Link FamilySearch ID"))
         self.btn_cmp = Gtk.Button(label=_("Compare"))
-        self.btn_sync = Gtk.Button(label=_("Sync This Person"))
+
+        self.btn_sync = Gtk.Button(label=_("Sync from FamilySearch"))
         self.btn_sync.get_style_context().add_class("suggested-action")
+
+        # push sync button:
+        self.btn_sync_to = Gtk.Button(label=_("Sync to FamilySearch..."))
+        try:
+            self.btn_sync_to.set_tooltip_text(
+                _("Overwrite selected FamilySearch fields with Gramps values (no deletes).")
+            )
+        except Exception:
+            pass
 
         self._add_btn(box_person, self.btn_link)
         self._add_btn(box_person, self.btn_cmp)
         self._add_btn(box_person, self.btn_sync)
+        self._add_btn(box_person, self.btn_sync_to)
 
         sec_import, box_import = self._make_section(_("Import relatives"), "fs-sec-import")
         outer.pack_start(sec_import, False, False, 0)
@@ -391,10 +393,26 @@ class FamilySearchToolsWindow:
         self._add_btn(box_util, self.btn_tags)
         self._add_btn(box_util, self.btn_clear_cache)
 
+        # uinote: Tag colors are configurable via Edit -> Tags
+        try:
+            note = build_tag_color_note_widget()
+            try:
+                note.set_margin_top(6)
+            except Exception:
+                pass
+
+            util_inner = sec_util.get_child()  # Gtk.EventBox -> Gtk.Box
+            if isinstance(util_inner, Gtk.Box):
+                util_inner.pack_start(note, False, False, 0)
+        except Exception as e:
+            _dbg(f"Tag color note add failed: {e}")
+
         # --- signals ---
         self.btn_link.connect("clicked", self._on_link)
         self.btn_cmp.connect("clicked", self._on_compare)
-        self.btn_sync.connect("clicked", self._on_sync)
+        self.btn_sync.connect("clicked", self._on_sync)          # pull
+        self.btn_sync_to.connect("clicked", self._on_sync_to)    # push
+
         self.btn_imp_par.connect("clicked", self._on_import_parents)
         self.btn_imp_spo.connect("clicked", self._on_import_spouse)
         self.btn_imp_chi.connect("clicked", self._on_import_children)
@@ -540,13 +558,13 @@ class FamilySearchToolsWindow:
 
     def _load_logo_pixbuf(self) -> Optional[GdkPixbuf.Pixbuf]:
         candidates = []
-    
+
         try:
             if _GRAMPS_IMAGE_DIR:
                 candidates.append(os.path.join(_GRAMPS_IMAGE_DIR, "fs_logo.png"))
         except Exception:
             pass
-    
+
         try:
             repo_root = os.path.abspath(
                 os.path.join(os.path.dirname(__file__), "..", "..", "..")
@@ -554,12 +572,12 @@ class FamilySearchToolsWindow:
             candidates.append(os.path.join(repo_root, "images", "fs_logo.png"))
         except Exception:
             pass
-    
+
         try:
             candidates.append(os.path.join(os.path.dirname(__file__), "fs_logo.png"))
         except Exception:
             pass
-    
+
         for path in candidates:
             try:
                 if path and os.path.exists(path) and os.path.isfile(path):
@@ -567,9 +585,8 @@ class FamilySearchToolsWindow:
                     return GdkPixbuf.Pixbuf.new_from_file(path)
             except Exception as e:
                 _dbg(f"Logo load failed ({path}): {e}")
-    
-        return None
 
+        return None
 
     def _on_banner_size_allocate(self, _widget, allocation) -> None:
         try:
@@ -611,7 +628,6 @@ class FamilySearchToolsWindow:
             self._logo_image.set_from_pixbuf(scaled)
         except Exception as e:
             _dbg(f"Logo scale failed: {e}")
-
 
     def is_alive(self) -> bool:
         try:
@@ -700,7 +716,15 @@ class FamilySearchToolsWindow:
 
         self._update_label()
 
-        for b in (self.btn_link, self.btn_cmp, self.btn_sync, self.btn_imp_par, self.btn_imp_spo, self.btn_imp_chi):
+        for b in (
+            self.btn_link,
+            self.btn_cmp,
+            self.btn_sync,
+            self.btn_sync_to,
+            self.btn_imp_par,
+            self.btn_imp_spo,
+            self.btn_imp_chi,
+        ):
             try:
                 b.set_sensitive(have_person_ctx)
             except Exception:
@@ -808,13 +832,46 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
-            actions.sync_this_person(
+            fn = getattr(actions, "sync_from_familysearch", None)
+            if not callable(fn):
+                fn = getattr(actions, "sync_this_person", None)
+
+            if not callable(fn):
+                raise AttributeError("No pull-sync function found in actions.py (expected sync_from_familysearch or sync_this_person)")
+
+            fn(
                 ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
                 ctx["session"], ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Sync failed: {e}")
+
+    def _on_sync_to(self, *_args):
+        ctx = self._ctx()
+        if not ctx:
+            return
+        try:
+            from . import actions
+            fn = getattr(actions, "sync_to_familysearch", None)
+
+            if callable(fn):
+                fn(
+                    ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
+                    ctx["session"], ctx["parent"],
+                    editor=ctx["editor"],
+                )
+                return
+
+            from . import sync_directions as fs_syncdir
+            fs_syncdir.sync_to_familysearch(
+                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
+                ctx["session"], ctx["parent"],
+                editor=ctx["editor"],
+            )
+        except Exception as e:
+            _try_error(self.window, "FamilySearch", f"Sync to FamilySearch failed: {e}")
+
 
     def _on_import_parents(self, *_args):
         ctx = self._ctx()

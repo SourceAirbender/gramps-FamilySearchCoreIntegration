@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2023, 2024, 2025  Gabriel Rios
+# Copyright (C) 2023-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -43,98 +43,87 @@ _ = _trans.gettext
 
 
 class CompareGtkMixin:
-    """
-    GTK compare window (per-person) - refreshed aesthetics:
-      - HeaderBar + legend
-      - Scrolled tabs
-      - Better table styling (grid lines, padding, ellipsize/wrap)
-      - Removes ASCII ruler separators from UI
-      - FamilySearch-ish palette via soft tints
-    """
-
-    _UI = {
-        # semantic -> display background tint
-        "green":  "#D8F3DC",  # match (mint)
-        "red":    "#FFE3E3",  # critical mismatch
-        "orange": "#FFE8CC",  # warning mismatch
-        "yellow": "#FFF3BF",  # only in Gramps
-        "yellow3":"#D0EBFF",  # only in FamilySearch (blue tint)
-        "white":  "#F8F9FA",  # neutral / header
-        "gray":   "#E9ECEF",
+    # Color tokens produced by compare code:
+    #   green   -> match
+    #   orange  -> different
+    #   yellow  -> only in Gramps
+    #   yellow3 -> only in FamilySearch
+    #   red     -> critical mismatch
+    _TINT_COLOR_NAME = {
+        "green": "fs_compare_match_bg",
+        "orange": "fs_compare_different_bg",
+        "yellow": "fs_compare_only_gramps_bg",
+        "yellow3": "fs_compare_only_fs_bg",
+        "red": "fs_compare_critical_bg",
     }
 
-    _CSS_INSTALLED = False
+    _TINT_FALLBACK_HEX = {
+        "green": "#D8F3DC",
+        "orange": "#FFE8CC",
+        "yellow": "#FFF3BF",
+        "yellow3": "#D0EBFF",
+        "red": "#FFE3E3",
+    }
+
+
+    _CSS_INSTALLED = True
 
     def _ui_color(self, semantic: str) -> str:
         return self._UI.get((semantic or "").strip(), semantic or "")
-
+                
     def _ui_row(self, row):
         if not row:
             return row
         try:
-            r = list(row)
-            r[0] = self._ui_color(r[0])
-            return r
+            return list(row)
         except Exception:
             return row
 
-    def _install_compare_css(self) -> None:
-        if getattr(self.__class__, "_CSS_INSTALLED", False):
-            return
+    def _tint_rgba_from_css(self, color_name: str) -> Optional[Gdk.RGBA]:
+        try:
+            win = getattr(getattr(self, "uistate", None), "window", None)
+            if win is None:
+                return None
+            ok, rgba = win.get_style_context().lookup_color(color_name)
+            if ok:
+                return rgba
+        except Exception:
+            return None
+        return None
 
-        css = b"""
-        .fs-compare-window {
-            /* local-only class; keep theme-friendly */
-        }
+    def _resolve_tint_rgba(self, token: str) -> Optional[Gdk.RGBA]:
+        token = (token or "").strip()
+        if not token:
+            return None
 
-        .fs-compare-wrap {
-            padding: 10px;
-        }
+        css_name = self._TINT_COLOR_NAME.get(token)
+        if css_name:
+            rgba = self._tint_rgba_from_css(css_name)
+            if rgba is not None:
+                return rgba
 
-        .fs-compare-legend {
-            padding: 6px 8px;
-            border-radius: 10px;
-            border: 1px solid rgba(0,0,0,0.10);
-            background-color: rgba(0,0,0,0.03);
-        }
-
-        .fs-legend-pill {
-            border-radius: 999px;
-            padding: 2px 10px;
-            border: 1px solid rgba(0,0,0,0.10);
-        }
-
-        .fs-legend-label {
-            font-weight: 600;
-            opacity: 0.92;
-        }
-
-        .fs-compare-notebook {
-            border-radius: 12px;
-        }
-
-        /* TreeView polish */
-        .fs-compare-treeview {
-            border-radius: 10px;
-        }
-
-        /* Give headers a little presence (theme still wins) */
-        .fs-compare-treeview header button {
-            font-weight: 700;
-        }
-        """
+        fallback = self._TINT_FALLBACK_HEX.get(token)
+        if fallback:
+            try:
+                rgba = Gdk.RGBA()
+                if rgba.parse(fallback):
+                    return rgba
+            except Exception:
+                pass
 
         try:
-            provider = Gtk.CssProvider()
-            provider.load_from_data(css)
-            screen = Gdk.Screen.get_default()
-            if screen is not None:
-                Gtk.StyleContext.add_provider_for_screen(
-                    screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-                )
-            self.__class__._CSS_INSTALLED = True
+            rgba = Gdk.RGBA()
+            if rgba.parse(token):
+                return rgba
         except Exception:
             pass
+
+        return None
+
+    def _install_compare_css(self) -> None:
+        # CSS is loaded globally from data/gramps.css by ViewManager.load_css()
+        return
+
 
     def _wrap_scroller(self, child: Gtk.Widget, min_h: int = 420) -> Gtk.Widget:
         sw = Gtk.ScrolledWindow()
@@ -183,14 +172,12 @@ class CompareGtkMixin:
             except Exception:
                 pass
 
-            # Renderer tuning (ellipsize + optional wrap)
             try:
                 renderers = col.get_cells() or []
             except Exception:
                 renderers = []
 
             for r in renderers:
-                # Only affects text renderers; ignore toggles/etc
                 if not isinstance(r, Gtk.CellRendererText):
                     continue
 
@@ -200,7 +187,6 @@ class CompareGtkMixin:
                 except Exception:
                     pass
 
-                # Wrap the big text columns a bit to reduce horizontal scrolling
                 try:
                     if kind == "overview" and i in (3, 5):
                         # 2 == Pango.WrapMode.WORD_CHAR
@@ -223,25 +209,26 @@ class CompareGtkMixin:
         try:
             if v is None:
                 return False
-            if isinstance(v, str):
-                s = v.strip()
-            else:
-                s = str(v).strip()
+    
+            s = v.strip() if isinstance(v, str) else str(v).strip()
             if not s:
                 return False
+    
             if s.startswith("#") and len(s) in (4, 7, 9):
                 return True
-            if s in self._UI:
+    
+            if s in self._TINT_COLOR_NAME:
                 return True
+    
+            if s in self._TINT_FALLBACK_HEX:
+                return True
+    
             return False
         except Exception:
             return False
 
+
     def _guess_color_model_col(self, model: Gtk.TreeModel) -> int:
-        """
-        Tries to locate the model column index that contains the color token.
-        We do this once per TreeView so we do not guess wrong (ListModel internals vary).
-        """
         try:
             n = model.get_n_columns()
         except Exception:
@@ -291,17 +278,18 @@ class CompareGtkMixin:
             model = None
         if model is None:
             return
-
+    
         color_col = self._guess_color_model_col(model)
-
+        tv_ctx = tv.get_style_context()
+    
         def make_func(is_indicator_col: bool):
             def _func(column, cell, model2, it, _data):
                 try:
                     token = model2.get_value(it, color_col)
                 except Exception:
                     token = None
-
-                # Normalize to a color string
+    
+                s = ""
                 try:
                     if token is None:
                         s = ""
@@ -311,26 +299,29 @@ class CompareGtkMixin:
                         s = str(token).strip()
                 except Exception:
                     s = ""
-
+    
                 if not s:
                     try:
                         cell.set_property("cell-background-set", False)
                     except Exception:
                         pass
                     return
-
-                s2 = self._UI.get(s, s)
-
-                # Try RGBA (best), then fall back to string background.
+    
+                # 1) Prefer the named CSS colors
                 rgba = None
-                try:
-                    rgba = Gdk.RGBA()
-                    ok = rgba.parse(s2)
-                    if not ok:
+                css_name = self._TINT_COLOR_NAME.get(s)
+                if css_name:
+                    try:
+                        ok, rgba2 = tv_ctx.lookup_color(css_name)
+                        if ok:
+                            rgba = rgba2
+                    except Exception:
                         rgba = None
-                except Exception:
-                    rgba = None
-
+    
+                # 2) Fall back to hardcoded hex 
+                if rgba is None:
+                    rgba = self._resolve_tint_rgba(s)
+    
                 painted = False
                 if rgba is not None:
                     try:
@@ -339,23 +330,22 @@ class CompareGtkMixin:
                         painted = True
                     except Exception:
                         painted = False
-
+    
                 if not painted:
                     try:
-                        cell.set_property("cell-background", s2)
+                        cell.set_property("cell-background", self._TINT_FALLBACK_HEX.get(s, s))
                         cell.set_property("cell-background-set", True)
                     except Exception:
                         pass
-
-                # indicator column: keep text empty so it looks like a color bar
+    
                 if is_indicator_col and isinstance(cell, Gtk.CellRendererText):
                     try:
                         cell.set_property("text", "")
                     except Exception:
                         pass
-
+    
             return _func
-
+    
         cols = tv.get_columns() or []
         for idx, col in enumerate(cols):
             is_indicator = (idx == 0)
@@ -370,7 +360,7 @@ class CompareGtkMixin:
                     col.set_cell_data_func(cell, make_func(is_indicator), None)
                 except Exception:
                     pass
-
+    
         try:
             if cols:
                 cols[0].set_sizing(Gtk.TreeViewColumnSizing.FIXED)
@@ -378,32 +368,28 @@ class CompareGtkMixin:
         except Exception:
             pass
 
+
     def _build_legend(self) -> Gtk.Widget:
         wrap = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         wrap.get_style_context().add_class("fs-compare-legend")
 
-        def pill(bg_hex: str, text: str) -> Gtk.Widget:
+        def pill(css_class: str, text: str) -> Gtk.Widget:
             eb = Gtk.EventBox()
             eb.set_visible_window(True)
-            eb.get_style_context().add_class("fs-legend-pill")
-
-            try:
-                rgba = Gdk.RGBA()
-                rgba.parse(bg_hex)
-                eb.override_background_color(Gtk.StateFlags.NORMAL, rgba)
-            except Exception:
-                pass
+            ctx = eb.get_style_context()
+            ctx.add_class("fs-legend-pill")
+            ctx.add_class(css_class)
 
             lbl = Gtk.Label(label=text)
             lbl.get_style_context().add_class("fs-legend-label")
             eb.add(lbl)
             return eb
 
-        wrap.pack_start(pill(self._UI["green"],  _("Match")), False, False, 0)
-        wrap.pack_start(pill(self._UI["orange"], _("Different")), False, False, 0)
-        wrap.pack_start(pill(self._UI["yellow"], _("Only in Gramps")), False, False, 0)
-        wrap.pack_start(pill(self._UI["yellow3"], _("Only in FamilySearch")), False, False, 0)
-        wrap.pack_start(pill(self._UI["red"], _("Critical mismatch")), False, False, 0)
+        wrap.pack_start(pill("fs-match", _("Match")), False, False, 0)
+        wrap.pack_start(pill("fs-different", _("Different")), False, False, 0)
+        wrap.pack_start(pill("fs-only-gramps", _("Only in Gramps")), False, False, 0)
+        wrap.pack_start(pill("fs-only-fs", _("Only in FamilySearch")), False, False, 0)
+        wrap.pack_start(pill("fs-critical", _("Critical mismatch")), False, False, 0)
 
         hint = Gtk.Label(
             label=_("Tip: resize columns by dragging headers | scroll inside tabs | refresh to re-check FamilySearch")
@@ -414,8 +400,8 @@ class CompareGtkMixin:
         except Exception:
             pass
         wrap.pack_end(hint, True, True, 0)
-
         return wrap
+
 
     def _on_compare(self, _btn):
         active = self.get_active("Person")
@@ -453,8 +439,6 @@ class CompareGtkMixin:
         self._ensure_person_cached(fsid, with_relatives=True)
 
         # ---- Window ----
-        self._install_compare_css()
-
         win = Gtk.Window()
         win.set_title(_("FamilySearch Compare"))
         win.set_transient_for(self.uistate.window)
@@ -677,6 +661,26 @@ class CompareGtkMixin:
         note_handles = gr.get_note_list()
         fs_notes_remaining = fs_person.notes.copy()
 
+        def _take_matching_note(notes, note_id: Optional[str], subject: str):
+            match = None
+            if note_id:
+                for fs_note in notes:
+                    if getattr(fs_note, "id", None) == note_id:
+                        match = fs_note
+                        break
+            if match is None:
+                for fs_note in notes:
+                    if getattr(fs_note, "subject", None) == subject:
+                        match = fs_note
+                        break
+            if match is not None:
+                try:
+                    notes.remove(match)
+                except Exception:
+                    pass
+            return match
+
+
         # person notes
         for nh in note_handles:
             n = self.dbstate.db.get_note_from_handle(nh)
@@ -693,20 +697,8 @@ class CompareGtkMixin:
             except Exception:
                 pass
 
-            found = None
-            if gr_note_id:
-                for x in fs_notes_remaining:
-                    if x.id == gr_note_id:
-                        found = x
-                        break
-            if not found:
-                for x in fs_notes_remaining:
-                    if x.subject == title:
-                        found = x
-                        break
-
+            found = _take_matching_note(fs_notes_remaining, gr_note_id, title)
             if found:
-                fs_notes_remaining.remove(found)
                 fs_title = found.subject or ""
                 fs_text = found.text or ""
                 color = "green" if (
@@ -718,8 +710,8 @@ class CompareGtkMixin:
             model.add(self._ui_row([color, _("Person"), title, note_text, fs_title or em, fs_text or em]))
 
         # FS-only person notes
-        for x in fs_notes_remaining:
-            model.add(self._ui_row(["yellow3", _("Person"), _("(missing in Gramps)"), em, x.subject or "", x.text or ""]))
+        for fs_note in fs_notes_remaining:
+            model.add(self._ui_row(["yellow3", _("Person"), _("(missing in Gramps)"), em, fs_note.subject or "", fs_note.text or ""]))
 
         # family (spouse) notes
         fs_couples_remaining = fs_person._spouses.copy()
@@ -758,20 +750,8 @@ class CompareGtkMixin:
                 except Exception:
                     pass
 
-                found = None
-                if gr_note_id:
-                    for x in rel_notes:
-                        if x.id == gr_note_id:
-                            found = x
-                            break
-                if not found:
-                    for x in rel_notes:
-                        if x.subject == title:
-                            found = x
-                            break
-
+                found = _take_matching_note(rel_notes, gr_note_id, title)
                 if found:
-                    rel_notes.remove(found)
                     fs_title = found.subject or ""
                     fs_text = found.text or ""
                     color = "green" if (
@@ -782,12 +762,12 @@ class CompareGtkMixin:
 
                 model.add(self._ui_row([color, _("Family"), title, note_text, fs_title or em, fs_text or em]))
 
-            for x in rel_notes:
-                model.add(self._ui_row(["yellow3", _("Family"), _("(missing in Gramps)"), em, x.subject or "", x.text or ""]))
+            for fs_note in rel_notes:
+                model.add(self._ui_row(["yellow3", _("Family"), _("(missing in Gramps)"), em, fs_note.subject or "", fs_note.text or ""]))
 
         for rel in fs_couples_remaining:
-            for x in rel.notes:
-                model.add(self._ui_row(["yellow3", _("Family"), _("(missing in Gramps)"), em, x.subject or "", x.text or ""]))
+            for fs_note in rel.notes:
+                model.add(self._ui_row(["yellow3", _("Family"), _("(missing in Gramps)"), em, fs_note.subject or "", fs_note.text or ""]))
 
     def _fill_sources(self, model: Any, gr: Person, fsid: str):
         self._ensure_sources_cached(fsid)

@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -44,10 +44,8 @@ except ValueError:
 _ = _trans.gettext
 
 
-# -----------------------------------------------------------------------------
-# Person compare windowused by View-Person actions.py
-# -----------------------------------------------------------------------------
 
+# Person compare window used by actions.py
 
 class CompareWindow:
     def __init__(
@@ -73,14 +71,7 @@ class CompareWindow:
         self._open()
 
     def _open(self):
-        # ensure schema exists (aggregate.compare_fs_to_gramps reads it)
-        try:
-            datab_familysearch.create_status_schema(self.dbstate.db)
-        except Exception:
-            try:
-                datab_familysearch.create_status_schema(self.dbstate.get_database())
-            except Exception:
-                pass
+        # no schema/table  generated
 
         # ensure a session exists + wire it into tree._fs_session
         sess = self.session
@@ -220,7 +211,6 @@ class CompareWindow:
             WarningDialog(_("Could not open compare window:\n{e}").format(e=str(e)))
 
 
-
 class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
     """
     The main batch window that iterates through filtered persons and compares
@@ -258,9 +248,6 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
 
         self.db = self.dbstate.get_database()
 
-        # prepare DB schema
-        datab_familysearch.create_status_schema(self.db)
-
         # Build ordered list of persons to process
         filter_ = self.options.menu.get_option_by_name("Person").get_filter()
         days = self.options.menu.get_option_by_name("gui_days").get_value()
@@ -282,14 +269,18 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
             fsid = fs_utilities.get_fsftid(person)
             if fsid == "":
                 continue
-            self.db.dbapi.execute(
-                "select status_ts from statistics_grampsfs_sync where p_handle=?",
-                [handle],
-            )
-            row = self.db.dbapi.fetchone()
-            if row and row[0]:
-                if force or row[0] < max_date:
-                    ordered.append([row[0], handle, fsid])
+
+            status_ts = 0
+            try:
+                st = datab_familysearch.FSStatusDB(self.db, handle)
+                st.get()
+                status_ts = int(st.status_ts or 0)
+            except Exception:
+                status_ts = 0
+
+            if status_ts:
+                if force or status_ts < max_date:
+                    ordered.append([status_ts, handle, fsid])
             else:
                 ordered.append([0, handle, fsid])
 

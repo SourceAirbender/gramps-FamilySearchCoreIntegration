@@ -157,7 +157,7 @@ class SourcesDialogMixin:
             color_token = detect_color_for_sdid(sdid)
             store.append([
                 True,
-                fs_ui.ui_color(color_token),
+                color_token,   # <-- store token like "green"/"orange"/"yellow3"
                 "",
                 auto_kind or "",
                 "Auto",
@@ -171,6 +171,7 @@ class SourcesDialogMixin:
                 True,
             ])
 
+
         treeview = Gtk.TreeView(model=store)
         treeview.set_activate_on_single_click(True)
         treeview.get_style_context().add_class("fs-sources-treeview")
@@ -183,7 +184,24 @@ class SourcesDialogMixin:
 
         # color indicator column
         color_cell = Gtk.CellRendererText()
-        color_col = Gtk.TreeViewColumn(_(""), color_cell, text=2, cell_background=1)
+        color_col = Gtk.TreeViewColumn(_(""), color_cell)
+        
+        def _color_cell_data_func(_col, cell, model, itr, _data=None):
+            token = model.get_value(itr, 1) or ""
+            fs_ui.set_cell_bg(cell, token, widget=treeview)
+            try:
+                cell.set_property("text", "")
+            except Exception:
+                pass
+        
+        color_col.set_cell_data_func(color_cell, _color_cell_data_func)
+        
+        try:
+            color_col.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
+            color_col.set_fixed_width(20)
+        except Exception:
+            pass
+
         try:
             color_col.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
             color_col.set_fixed_width(20)
