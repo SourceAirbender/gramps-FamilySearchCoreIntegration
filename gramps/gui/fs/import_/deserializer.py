@@ -229,7 +229,7 @@ class SimpleDate:
         return out
 
     def datetime(self) -> datetime:
-        # datetime() can’t accept 0 month/day
+        # datetime() can't accept 0 month/day
         month = self.month or 1
         day = self.day or 1
 
@@ -1187,3 +1187,4 @@ class Gedcomx(HypermediaEnabledData):
 
         data2 = _unwrap_fs_envelope(data)
         deserialize_json(self, data2, required=True)
+
