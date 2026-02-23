@@ -205,7 +205,7 @@ def resolve_fs_bg_color(token_or_color: str, *, widget: Optional[Gtk.Widget] = N
 
 
 # ----------------------------------------------------------------------
-# Cell renderer background (TreeView) — needs concrete colors
+# Cell renderer background (TreeView) needs concrete colors
 # ----------------------------------------------------------------------
 
 def set_cell_bg(cell: Gtk.CellRenderer, color_token: str, *, widget: Optional[Gtk.Widget] = None) -> None:
@@ -368,3 +368,4 @@ def error_dialog(parent: Optional[Gtk.Window], title: str, body: str) -> None:
 
 def warn_dialog(parent: Optional[Gtk.Window], title: str, body: str) -> None:
     WarningDialog(title or "", body or "", parent=parent)
+
