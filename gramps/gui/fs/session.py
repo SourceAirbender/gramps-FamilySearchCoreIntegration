@@ -319,7 +319,7 @@ class FSStatusIndicator:
         cx = w / 2.0
         cy = h / 2.0
 
-        (rr, gg, bb) = self._state_color()
+        rr, gg, bb = self._state_color()
         cr.set_source_rgb(rr, gg, bb)
         cr.arc(cx, cy, r, 0, 2 * math.pi)
         cr.fill()
@@ -906,9 +906,11 @@ class Session(requests.Session):
 
         self._set_status(
             "PROBING",
-            f"{reason}: GET platform/users/current"
-            if reason
-            else "GET platform/users/current",
+            (
+                f"{reason}: GET platform/users/current"
+                if reason
+                else "GET platform/users/current"
+            ),
         )
         try:
             r = self.get("platform/users/current")

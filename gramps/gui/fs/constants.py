@@ -34,7 +34,6 @@ _ = _trans.gettext
 from gramps.gen.lib import EventType
 from gramps.gen.lib import PlaceType
 
-
 # --- Fact mappings ------
 GEDCOMX_TO_GRAMPS_FACTS = {
     # direct mappings to Gramps predefined event types

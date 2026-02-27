@@ -363,9 +363,11 @@ def _prompt(
         field = Gtk.Label(label=str(it.get("label") or ""))
         fs = Gtk.Label(label=_fmt(it.get("fs_date", ""), it.get("fs_val", "")))
         gr = Gtk.Label(
-            label=_fmt(it.get("gr_date", ""), it.get("gr_val", ""))
-            if it.get("kind") == "fact"
-            else (it.get("gr_val") or "")
+            label=(
+                _fmt(it.get("gr_date", ""), it.get("gr_val", ""))
+                if it.get("kind") == "fact"
+                else (it.get("gr_val") or "")
+            )
         )
         for w in (field, fs, gr):
             w.set_xalign(0.0)

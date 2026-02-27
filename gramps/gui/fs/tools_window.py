@@ -44,7 +44,6 @@ _ = _trans.gettext
 
 from gramps.gui.dialog import ErrorDialog
 
-
 _SINGLETON: Optional["FamilySearchToolsWindow"] = None
 _EDITPERSON_HOOK_INSTALLED = False
 

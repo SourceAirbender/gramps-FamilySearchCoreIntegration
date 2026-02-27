@@ -31,7 +31,6 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gui.fs import tree
 from gramps.gui.fs.import_ import deserializer as deserialize
 
-
 try:
     _trans = glocale.get_addon_translator(__file__)
 except ValueError:

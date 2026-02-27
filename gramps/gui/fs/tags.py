@@ -78,6 +78,7 @@ EXCLUSIVE_SETS: Tuple[Tuple[str, str], Tuple[str, str]] = (
     (TAG_SYNCED, TAG_OUT_OF_SYNC),
 )
 
+
 # no nested DbTxn
 @contextmanager
 def _txn(db, title: str) -> Iterator[DbTxn]:

@@ -63,13 +63,11 @@ class HelpersMixin:
 
     if TYPE_CHECKING:
         # provided by CacheMixin at runtime
-        def _ensure_sources_cached(self, fsid: str) -> None:
-            ...
+        def _ensure_sources_cached(self, fsid: str) -> None: ...
 
         def _ensure_person_cached(
             self, fsid: str, *, with_relatives: bool, force: bool = False
-        ) -> Any:
-            ...
+        ) -> Any: ...
 
     def _pretty_tags(self, tags: List[str]) -> str:
         labs = []

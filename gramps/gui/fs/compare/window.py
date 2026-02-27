@@ -228,11 +228,11 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
 
         # Ensure FamilySearch session
         if not FSG_Sync.FSG_Sync.ensure_session(self):
-            WarningDialog(_(u"Not connected to FamilySearch"))
+            WarningDialog(_("Not connected to FamilySearch"))
             return
 
         progress = ProgressMeter(
-            _(u"FamilySearch: Compare"),
+            _("FamilySearch: Compare"),
             _trans.gettext("Starting"),
             can_cancel=True,
             parent=self.uistate.window,
@@ -257,7 +257,7 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
         person_handles = set(filter_.apply(self.db, self.db.iter_person_handles()))
         ordered = []
 
-        progress.set_pass(_(u"Building ordered list (1/2)"), len(person_handles))
+        progress.set_pass(_("Building ordered list (1/2)"), len(person_handles))
         logger.debug("Filtered list size: %d", len(person_handles))
 
         for handle in person_handles:
@@ -287,7 +287,7 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
         ordered.sort(key=lambda item: item[0])
 
         # process
-        progress.set_pass(_(u"Processing list (2/2)"), len(ordered))
+        progress.set_pass(_("Processing list (2/2)"), len(ordered))
         logger.debug("Sorted list size: %d", len(ordered))
 
         def _prime_fetch(pair):
@@ -324,7 +324,7 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
                 fs_person = FSG_Sync.FSG_Sync.fs_Tree._persons.get(fsid_local)
 
             if not fs_person:
-                logger.warning(_(u"FS ID %s not found"), fsid_local)
+                logger.warning(_("FS ID %s not found"), fsid_local)
                 return
             fs_person._datemod = date_mod
             fs_person._etag = etag

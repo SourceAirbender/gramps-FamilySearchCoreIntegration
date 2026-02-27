@@ -28,7 +28,6 @@ from gi.repository import Gtk, Gdk, Pango  # noqa: E402
 
 from gramps.gui.dialog import ErrorDialog, OkDialog, WarningDialog
 
-
 # ----------------------------------------------------------------------
 # CSS install
 # ----------------------------------------------------------------------
@@ -60,8 +59,7 @@ def install_css_once(key: str, css: bytes) -> bool:
 
 
 class _HasTitlebar(Protocol):
-    def set_titlebar(self, titlebar: Gtk.Widget) -> None:
-        ...
+    def set_titlebar(self, titlebar: Gtk.Widget) -> None: ...
 
 
 def set_headerbar(widget: _HasTitlebar, title: str, subtitle: str = "") -> None:

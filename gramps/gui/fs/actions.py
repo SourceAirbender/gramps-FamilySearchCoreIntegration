@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from gi.repository import Gtk, Gdk  # noqa: F401 (Gdk used in some UI flows)
 
@@ -76,25 +76,30 @@ def _bind_global_session(session) -> None:
         pass
 
 
-def _info(parent, title: str, body: str) -> None:
+def _info(parent: Any, title: str, body: str) -> None:
+    OkDialogFn: Optional[Callable[..., Any]]
     try:
-        from gramps.gui.dialog import OkDialog  # type: ignore
-    except Exception:
-        OkDialog = None  # type: ignore
+        from gramps.gui.dialog import OkDialog as _OkDialog  # type: ignore
 
-    if OkDialog:
+        OkDialogFn = _OkDialog
+    except Exception:
+        OkDialogFn = None
+
+    if OkDialogFn is not None:
         try:
-            OkDialog(title, body, parent=parent)
+            OkDialogFn(title, body, parent=parent)
             return
         except TypeError:
+            # older Gramps sometimes used positional parent
             try:
-                OkDialog(title, body, parent)
+                OkDialogFn(title, body, parent)
                 return
             except Exception:
                 pass
         except Exception:
             pass
 
+    # fallback
     try:
         fs_ui.info_dialog(parent, title, body)
     except Exception:
@@ -110,25 +115,29 @@ def _info(parent, title: str, body: str) -> None:
         dlg.destroy()
 
 
-def _error(parent, title: str, body: str) -> None:
+def _error(parent: Any, title: str, body: str) -> None:
+    ErrorDialogFn: Optional[Callable[..., Any]]
     try:
-        from gramps.gui.dialog import ErrorDialog  # type: ignore
-    except Exception:
-        ErrorDialog = None  # type: ignore
+        from gramps.gui.dialog import ErrorDialog as _ErrorDialog  # type: ignore
 
-    if ErrorDialog:
+        ErrorDialogFn = _ErrorDialog
+    except Exception:
+        ErrorDialogFn = None
+
+    if ErrorDialogFn is not None:
         try:
-            ErrorDialog(title, body, parent=parent)
+            ErrorDialogFn(title, body, parent=parent)
             return
         except TypeError:
             try:
-                ErrorDialog(title, body, parent)
+                ErrorDialogFn(title, body, parent)
                 return
             except Exception:
                 pass
         except Exception:
             pass
 
+    # fallback
     try:
         fs_ui.error_dialog(parent, title, body)
     except Exception:
