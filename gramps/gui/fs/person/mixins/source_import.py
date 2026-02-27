@@ -2,7 +2,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026 Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,14 +20,14 @@
 
 from __future__ import annotations
 
-from typing import List, Tuple
 from collections import defaultdict
+from typing import Any, List, Optional, Tuple
 
 from gi.repository import GLib
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.db import DbTxn
-from gramps.gen.lib import Citation, NoteType, Media, MediaRef
+from gramps.gen.lib import Citation, Media, MediaRef, NoteType
 from gramps.gen.mime import get_type
 from gramps.gen.utils.file import expand_media_path, relative_path
 from gramps.gui.dialog import WarningDialog
@@ -50,7 +50,7 @@ def _is_fs_web_url(url: str) -> bool:
     return u.startswith(("http://", "https://")) and ("familysearch.org" in u)
 
 
-def _get_sd_about_url(sd) -> str:
+def _get_sd_about_url(sd: Any) -> str:
     """
     return a usable FamilySearch *web* URL for a SourceDescription
     """
@@ -75,7 +75,7 @@ def _get_sd_about_url(sd) -> str:
     return ""
 
 
-def _ensure_citation_has_source_and_link(db, txn, cit, title: str, url: str) -> None:
+def _ensure_citation_has_source_and_link(db: Any, txn: Any, cit: Any, title: str, url: str) -> None:
     """
     Ensure citation is not 'empty':
       - it references a Source
@@ -88,10 +88,12 @@ def _ensure_citation_has_source_and_link(db, txn, cit, title: str, url: str) -> 
     # 1) ensure a Source exists
     src_handle = None
     try:
-        if hasattr(cit, "get_reference_handle"):
-            src_handle = cit.get_reference_handle()
-        elif hasattr(cit, "get_source_handle"):
-            src_handle = cit.get_source_handle()
+        get_ref = getattr(cit, "get_reference_handle", None)
+        get_src = getattr(cit, "get_source_handle", None)
+        if callable(get_ref):
+            src_handle = get_ref()
+        elif callable(get_src):
+            src_handle = get_src()
         else:
             src_handle = getattr(cit, "source_handle", None)
     except Exception:
@@ -112,12 +114,14 @@ def _ensure_citation_has_source_and_link(db, txn, cit, title: str, url: str) -> 
         db.commit_source(src, txn)
 
         try:
-            if hasattr(cit, "set_reference_handle"):
-                cit.set_reference_handle(src.handle)
-            elif hasattr(cit, "set_source_handle"):
-                cit.set_source_handle(src.handle)
+            set_ref = getattr(cit, "set_reference_handle", None)
+            set_src = getattr(cit, "set_source_handle", None)
+            if callable(set_ref):
+                set_ref(src.handle)
+            elif callable(set_src):
+                set_src(src.handle)
             else:
-                cit.source_handle = src.handle
+                setattr(cit, "source_handle", src.handle)
         except Exception:
             pass
 
@@ -143,16 +147,30 @@ def _ensure_citation_has_source_and_link(db, txn, cit, title: str, url: str) -> 
                 a = SrcAttribute()
                 a.set_type("Internet Address")
                 a.set_value(url)
-                cit.add_attribute(a)
+                add_attr = getattr(cit, "add_attribute", None)
+                if callable(add_attr):
+                    add_attr(a)
         except Exception:
             pass
 
 
 class SourceImportMixin:
+    """
+    Mypy notes:
+    - This mixin expects to be combined into a host object that provides:
+        self.dbstate, self.uistate, and sometimes get_active/set_active.
+    - To keep runtime behavior unchanged and satisfy mypy, we:
+        * annotate dbstate/uistate as Any
+        * call get_active/set_active via getattr(callable) instead of direct access
+    """
+
+    dbstate: Any
+    uistate: Any
+
     def _normalize_attr_name(self, s: str) -> str:
         return (s or "").strip().lower().replace("_", " ")
 
-    def _set_attr_on_citation(self, cit: Citation, key: str, val: str):
+    def _set_attr_on_citation(self, cit: Citation, key: str, val: str) -> None:
         if not val:
             return
         key_norm = self._normalize_attr_name(key)
@@ -161,9 +179,12 @@ class SourceImportMixin:
             for a in list(cit.get_attribute_list()):
                 try:
                     t = a.get_type()
-                    name_forms = []
+                    name_forms: List[str] = []
                     if hasattr(t, "xml_str"):
-                        name_forms.append(t.xml_str())
+                        try:
+                            name_forms.append(t.xml_str())
+                        except Exception:
+                            pass
                     if t is not None:
                         name_forms.append(str(t))
                     if any(self._normalize_attr_name(n) == key_norm for n in name_forms if n):
@@ -176,10 +197,10 @@ class SourceImportMixin:
             if not updated:
                 from gramps.gen.lib import SrcAttribute
 
-                a = SrcAttribute()
-                a.set_type(key)
-                a.set_value(val)
-                cit.add_attribute(a)
+                a2 = SrcAttribute()
+                a2.set_type(key)
+                a2.set_value(val)
+                cit.add_attribute(a2)
         except Exception as e:
             print(f"Failed to set citation attribute '{key}': {e}")
 
@@ -189,27 +210,29 @@ class SourceImportMixin:
             return
 
         uis = getattr(self, "uistate", None)
+        if uis is not None:
+            fn = getattr(uis, "set_active", None)
+            if callable(fn):
+                try:
+                    fn(handle, "Person")
+                    return
+                except Exception:
+                    pass
+                try:
+                    fn("Person", handle)
+                    return
+                except Exception:
+                    pass
 
-        if uis is not None and hasattr(uis, "set_active"):
+        fn2 = getattr(self, "set_active", None)
+        if callable(fn2):
             try:
-                uis.set_active(handle, "Person")
+                fn2("Person", handle)
                 return
             except Exception:
                 pass
             try:
-                uis.set_active("Person", handle)
-                return
-            except Exception:
-                pass
-
-        if hasattr(self, "set_active"):
-            try:
-                self.set_active("Person", handle)
-                return
-            except Exception:
-                pass
-            try:
-                self.set_active(handle, "Person")
+                fn2(handle, "Person")
                 return
             except Exception:
                 pass
@@ -220,21 +243,25 @@ class SourceImportMixin:
 
         deadline = GLib.get_monotonic_time() + (ms * 1000)  # microseconds
 
-        def _tick():
-            cur = None
-            if hasattr(self, "get_active"):
+        def _tick() -> bool:
+            cur: Optional[str] = None
+
+            fn = getattr(self, "get_active", None)
+            if callable(fn):
                 try:
-                    cur = self.get_active("Person")
+                    cur = fn("Person")
                 except Exception:
                     cur = None
 
             if cur is None:
                 uis = getattr(self, "uistate", None)
-                if uis is not None and hasattr(uis, "get_active"):
-                    try:
-                        cur = uis.get_active("Person")
-                    except Exception:
-                        cur = None
+                if uis is not None:
+                    fn2 = getattr(uis, "get_active", None)
+                    if callable(fn2):
+                        try:
+                            cur = fn2("Person")
+                        except Exception:
+                            cur = None
 
             if cur != handle:
                 self._try_set_active_person(handle)
@@ -244,11 +271,12 @@ class SourceImportMixin:
         self._try_set_active_person(handle)
         GLib.timeout_add(interval_ms, _tick)
 
-    def _get_restore_person_handle(self, gr) -> str | None:
+    def _get_restore_person_handle(self, gr: Any) -> Optional[str]:
         # 1) self.get_active('Person')
-        if hasattr(self, "get_active"):
+        fn = getattr(self, "get_active", None)
+        if callable(fn):
             try:
-                h = self.get_active("Person")
+                h = fn("Person")
                 if h:
                     return h
             except Exception:
@@ -256,23 +284,25 @@ class SourceImportMixin:
 
         # 2) uistate.get_active('Person')
         uis = getattr(self, "uistate", None)
-        if uis is not None and hasattr(uis, "get_active"):
-            try:
-                h = uis.get_active("Person")
-                if h:
-                    return h
-            except Exception:
-                pass
+        if uis is not None:
+            fn2 = getattr(uis, "get_active", None)
+            if callable(fn2):
+                try:
+                    h = fn2("Person")
+                    if h:
+                        return h
+                except Exception:
+                    pass
 
         # 3) passed person handle
-        h = getattr(gr, "handle", None) or gr
-        return h or None
+        h3 = getattr(gr, "handle", None) or gr
+        return h3 or None
 
     # ------------------------------------------------------------------
     # Main import
     # ------------------------------------------------------------------
 
-    def _import_fs_sources(self, gr, items: List[Tuple]) -> int:
+    def _import_fs_sources(self, gr: Any, items: List[Tuple[Any, ...]]) -> int:
         """
         Import/attach selected FS SourceDescriptions to the current Gramps person.
 
@@ -283,7 +313,7 @@ class SourceImportMixin:
 
         target_handle = self._get_restore_person_handle(gr)
 
-        def _cluster_citation_handles(person_obj) -> set[str]:
+        def _cluster_citation_handles(person_obj: Any) -> set[str]:
             cl: set[str] = set(person_obj.get_citation_list() or [])
 
             for er in person_obj.get_event_ref_list() or []:
@@ -296,10 +326,10 @@ class SourceImportMixin:
                 if not fam:
                     continue
                 cl.update(fam.get_citation_list() or [])
-                for er in fam.get_event_ref_list() or []:
-                    ev = db.get_event_from_handle(er.ref)
-                    if ev:
-                        cl.update(ev.get_citation_list() or [])
+                for er2 in fam.get_event_ref_list() or []:
+                    ev2 = db.get_event_from_handle(er2.ref)
+                    if ev2:
+                        cl.update(ev2.get_citation_list() or [])
 
             return cl
 
@@ -311,19 +341,19 @@ class SourceImportMixin:
             if not person:
                 return 0
 
-            sdid_to_cits = defaultdict(list)
+            sdid_to_cits: dict[str, list[str]] = defaultdict(list)
             for ch in _cluster_citation_handles(person):
                 c = db.get_citation_from_handle(ch)
                 if not c:
                     continue
-                sdid = fs_utilities.get_fsftid(c)
-                if sdid:
-                    sdid_to_cits[sdid].append(ch)
+                sdid0 = fs_utilities.get_fsftid(c)
+                if sdid0:
+                    sdid_to_cits[sdid0].append(ch)
 
             for tup in items:
                 if len(tup) == 4:
                     sdid, fs_modified, contributor, final_kind = tup
-                    image_paths = []
+                    image_paths: List[str] = []
                     add_to_person = False
                 elif len(tup) == 5:
                     sdid, fs_modified, contributor, final_kind, image_paths = tup
@@ -341,14 +371,14 @@ class SourceImportMixin:
 
                     if existing_handles:
                         for h in existing_handles:
-                            c = db.get_citation_from_handle(h)
-                            if c:
-                                target_citations.append(c)
+                            c2 = db.get_citation_from_handle(h)
+                            if c2:
+                                target_citations.append(c2)
 
-                        for c in target_citations:
-                            if c.handle not in (person.get_citation_list() or []):
+                        for c2 in target_citations:
+                            if c2.handle not in (person.get_citation_list() or []):
                                 try:
-                                    person.add_citation(c.handle)
+                                    person.add_citation(c2.handle)
                                 except Exception:
                                     pass
                     else:
@@ -376,17 +406,17 @@ class SourceImportMixin:
                         target_citations = [cit]
                         sdid_to_cits[sdid].append(cit.handle)
 
-                    all_created_media = []
-                    for cit in target_citations:
-                        self._set_attr_on_citation(cit, "FS Modified", fs_modified or "")
-                        self._set_attr_on_citation(cit, "FS Contributor", contributor or "")
-                        self._set_attr_on_citation(cit, "FS Kind", final_kind or "")
+                    all_created_media: List[str] = []
+                    for cit2 in target_citations:
+                        self._set_attr_on_citation(cit2, "FS Modified", (fs_modified or ""))
+                        self._set_attr_on_citation(cit2, "FS Contributor", (contributor or ""))
+                        self._set_attr_on_citation(cit2, "FS Kind", (final_kind or ""))
 
                         if image_paths:
-                            created = self._attach_images_to_citation(cit, image_paths, txn)
+                            created = self._attach_images_to_citation(cit2, image_paths, txn)
                             all_created_media.extend(created)
 
-                        db.commit_citation(cit, txn)
+                        db.commit_citation(cit2, txn)
 
                     if add_to_person and all_created_media:
                         self._attach_media_to_person_by_handles(person, all_created_media, txn)
@@ -403,16 +433,18 @@ class SourceImportMixin:
         except Exception:
             pass
 
-        if target_handle:
-            self._pin_active_person(target_handle, ms=15000, interval_ms=150)
-
-            def _late_pin():
+        if target_handle is not None and target_handle != "":
+            handle = target_handle  # mypy: narrow Optional[str] -> str
+        
+            self._pin_active_person(handle, ms=15000, interval_ms=150)
+        
+            def _late_pin() -> bool:
                 try:
-                    self._pin_active_person(target_handle, ms=15000, interval_ms=150)
+                    self._pin_active_person(handle, ms=15000, interval_ms=150)
                 except Exception:
                     pass
                 return False
-
+        
             GLib.timeout_add(400, _late_pin)
 
         if errors:
@@ -425,7 +457,7 @@ class SourceImportMixin:
         return imported
 
     # --------------------------
-    # Media attachment helpers 
+    # Media attachment helpers
     # --------------------------
 
     def _attach_images_to_citation(self, cit: Citation, image_paths: List[str], txn: DbTxn) -> List[str]:
@@ -438,10 +470,11 @@ class SourceImportMixin:
         except Exception:
             base = None
 
-        src = None
+        src: Any = None
         try:
-            if getattr(cit, "source_handle", None):
-                src = self.dbstate.db.get_source_from_handle(cit.source_handle)
+            sh = getattr(cit, "source_handle", None)
+            if sh:
+                src = self.dbstate.db.get_source_from_handle(sh)
         except Exception:
             src = None
 
@@ -474,7 +507,8 @@ class SourceImportMixin:
                     for nh in getattr(cit, "note_list", []) or []:
                         n = self.dbstate.db.get_note_from_handle(nh)
                         if n and n.type == NoteType.CITATION:
-                            title = (n.get() or "").splitlines()[0][:120] if n.get() else None
+                            txt = n.get() or ""
+                            title = txt.splitlines()[0][:120] if txt else None
                             break
                     if title:
                         m.set_description(title)
@@ -488,28 +522,43 @@ class SourceImportMixin:
                 mr.ref = m.handle
 
                 attached = False
-                try:
-                    if hasattr(cit, "add_media_reference"):
-                        cit.add_media_reference(mr)
-                        attached = True
-                    elif hasattr(cit, "add_media_ref"):
-                        cit.add_media_ref(mr)
-                        attached = True
-                except Exception:
-                    attached = False
 
-                if not attached and src:
+                # Citation attach (use getattr so mypy doesn't require stubbed methods)
+                fn = getattr(cit, "add_media_reference", None)
+                if callable(fn):
                     try:
-                        if hasattr(src, "add_media_reference"):
-                            src.add_media_reference(mr)
-                            self.dbstate.db.commit_source(src, txn)
-                            attached = True
-                        elif hasattr(src, "add_media_ref"):
-                            src.add_media_ref(mr)
-                            self.dbstate.db.commit_source(src, txn)
-                            attached = True
+                        fn(mr)
+                        attached = True
                     except Exception:
-                        pass
+                        attached = False
+                if not attached:
+                    fn2 = getattr(cit, "add_media_ref", None)
+                    if callable(fn2):
+                        try:
+                            fn2(mr)
+                            attached = True
+                        except Exception:
+                            attached = False
+
+                # Source attach fallback
+                if not attached and src:
+                    fn3 = getattr(src, "add_media_reference", None)
+                    if callable(fn3):
+                        try:
+                            fn3(mr)
+                            self.dbstate.db.commit_source(src, txn)
+                            attached = True
+                        except Exception:
+                            pass
+                    if not attached:
+                        fn4 = getattr(src, "add_media_ref", None)
+                        if callable(fn4):
+                            try:
+                                fn4(mr)
+                                self.dbstate.db.commit_source(src, txn)
+                                attached = True
+                            except Exception:
+                                pass
 
                 if not attached:
                     print("WARN: Could not attach media to citation or source; leaving Media unattached.")
@@ -521,7 +570,7 @@ class SourceImportMixin:
 
         return created_handles
 
-    def _attach_media_to_person_by_handles(self, person, media_handles: List[str], txn: DbTxn):
+    def _attach_media_to_person_by_handles(self, person: Any, media_handles: List[str], txn: DbTxn) -> None:
         if not media_handles:
             return
         try:
@@ -535,10 +584,13 @@ class SourceImportMixin:
             mr = MediaRef()
             mr.ref = mh
             try:
-                if hasattr(person, "add_media_reference"):
-                    person.add_media_reference(mr)
-                elif hasattr(person, "add_media_ref"):
-                    person.add_media_ref(mr)
+                fn = getattr(person, "add_media_reference", None)
+                if callable(fn):
+                    fn(mr)
+                else:
+                    fn2 = getattr(person, "add_media_ref", None)
+                    if callable(fn2):
+                        fn2(mr)
             except Exception:
                 continue
 

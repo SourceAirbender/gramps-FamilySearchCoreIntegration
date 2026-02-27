@@ -1011,11 +1011,15 @@ def clear_cache(dbstate, uistate, track, person, session, parent, editor=None) -
             fs_tree._fs_session = session
         except Exception:
             pass
-        FSG_Sync.FSG_Sync.fs_Tree = fs_tree.Tree()
+        # mypy fs_Tree is a runtime-initialized singleton; treat as Any here
+        new_tree: Any = fs_tree.Tree()
         try:
-            FSG_Sync.FSG_Sync.fs_Tree._getsources = False
+            setattr(new_tree, "_getsources", False)
         except Exception:
             pass
+
+        # assign using setattr to avoid "Tree into None" type narrowing
+        setattr(FSG_Sync.FSG_Sync, "fs_Tree", new_tree)
     except Exception as e:
         _dbg(f"clear_cache: fs_Tree reset failed: {e}")
 

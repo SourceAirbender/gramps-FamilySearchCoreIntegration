@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
@@ -22,14 +23,13 @@ from collections import ChainMap
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
 import logging
-from typing import Any, Optional, get_args, get_origin
+from typing import Any, ClassVar, Optional, get_args, get_origin
 
 logger = logging.getLogger(__name__)
 
 
-
 # =====================================
-# Annotation utilities 
+# Annotation utilities
 # ====================================
 
 @lru_cache(maxsize=None)
@@ -314,7 +314,7 @@ class DateFormal:
 
 def serialize_json(obj: Any):
     """
-    convert an object graph to JSON-serializable Python types 
+    convert an object graph to JSON-serializable Python types
     empty containers become None
     """
     if hasattr(obj, "serialize_json"):
@@ -333,15 +333,15 @@ def serialize_json(obj: Any):
     if isinstance(obj, dict):
         if not obj:
             return
-        out = {}
+        out_dict: dict[Any, Any] = {}
         for k, v in obj.items():
             sk = serialize_json(k)
             sv = serialize_json(v)
             if sv:
-                out[sk] = sv
-        return out
+                out_dict[sk] = sv
+        return out_dict
 
-    out = {}
+    out_obj: dict[str, Any] = {}
     for name in dir(obj):
         if name.startswith("_"):
             continue
@@ -355,8 +355,8 @@ def serialize_json(obj: Any):
             continue
 
         key = name.replace("_", "-")
-        out[key] = serialize_json(value)
-    return out
+        out_obj[key] = serialize_json(value)
+    return out_obj
 
 
 def _json_key_to_attr(key: str) -> str:
@@ -369,7 +369,10 @@ def _json_key_to_attr(key: str) -> str:
     return key.replace("-", "_")
 
 
-def _reuse_by_id_if_nonindexed(type_obj: type, data: dict[str, Any], parent: Any):
+def _reuse_by_id_if_nonindexed(type_obj: type, data: Any, parent: Any):
+    if not isinstance(data, dict):
+        return None
+
     obj_id = data.get("id")
     if not obj_id:
         return None
@@ -406,7 +409,6 @@ def _construct_object(target_type_obj: Any, data: Any, parent: Any):
     target_type_obj = _unwrap_optional(target_type_obj)
     target_type_obj = _resolve_type_ref(target_type_obj)
 
-    # If the annotation was just "str"
     if target_type_obj is str:
         return str(data)
 
@@ -501,34 +503,42 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
             setattr(obj, attr_name, raw_value)
             continue
 
+        # dict[str, T] special handling (including dict[str, set[...]])
         if origin is dict and args and len(args) == 2 and args[0] is str:
             value_type_obj = _unwrap_optional(args[1])
             value_type_obj = _resolve_type_ref(value_type_obj)
+            value_origin = get_origin(value_type_obj)
 
-            current = getattr(obj, attr_name, None) or {}
+            current_any = getattr(obj, attr_name, None)
+            current_dict: dict[str, Any] = dict(current_any) if isinstance(current_any, dict) else {}
+
             if isinstance(raw_value, dict):
                 for k2, v2 in raw_value.items():
-                    if value_type_obj is set:
+                    if value_type_obj is set or value_origin is set:
                         if isinstance(v2, (list, tuple, set)):
-                            current[k2] = set(v2)
+                            current_dict[k2] = set(v2)
                         else:
-                            current[k2] = {v2}
+                            current_dict[k2] = {v2}
                     else:
-                        current[k2] = _construct_object(value_type_obj, v2, obj)
-            setattr(obj, attr_name, current)
+                        current_dict[k2] = _construct_object(value_type_obj, v2, obj)
+
+            setattr(obj, attr_name, current_dict)
             continue
 
+        # containers: set
         if declared is set or origin is set:
-            current = getattr(obj, attr_name, None) or set()
+            current_any_set = getattr(obj, attr_name, None)
+            current_set: set[Any] = set(current_any_set) if isinstance(current_any_set, set) else set()
+
             elem_type_obj = _unwrap_optional(args[0]) if args else None
             elem_type_obj = _resolve_type_ref(elem_type_obj)
 
             if elem_type_obj in (bool, str, int, float, type(None)) or elem_type_obj is None:
                 try:
-                    current.update(raw_value)
+                    current_set.update(raw_value)
                 except TypeError:
-                    current.add(raw_value)
-                setattr(obj, attr_name, current)
+                    current_set.add(raw_value)
+                setattr(obj, attr_name, current_set)
                 continue
 
             for item in (raw_value or []):
@@ -539,35 +549,46 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
 
                 if hasattr(elem_type_obj, "iseq"):
                     dup = False
-                    for existing in current:
-                        if existing.iseq(child):
-                            dup = True
-                            break
+                    for existing in current_set:
+                        try:
+                            if existing.iseq(child):
+                                dup = True
+                                break
+                        except Exception:
+                            pass
                     if not dup:
-                        current.add(child)
+                        current_set.add(child)
                 else:
-                    current.add(child)
+                    current_set.add(child)
 
-            setattr(obj, attr_name, current)
+            setattr(obj, attr_name, current_set)
             continue
 
         # containers: list
         if declared is list or origin is list:
-            current = getattr(obj, attr_name, None) or []
+            current_any_list = getattr(obj, attr_name, None)
+            current_list: list[Any] = list(current_any_list) if isinstance(current_any_list, list) else []
+
             if isinstance(raw_value, list):
-                current.extend(raw_value)
+                current_list.extend(raw_value)
             else:
-                current.append(raw_value)
-            setattr(obj, attr_name, current)
+                current_list.append(raw_value)
+
+            setattr(obj, attr_name, current_list)
             continue
 
+        # containers: dict (untyped)
         if declared is dict or origin is dict:
-            current = getattr(obj, attr_name, None) or {}
+            current_any_map = getattr(obj, attr_name, None)
+            current_map: dict[Any, Any] = dict(current_any_map) if isinstance(current_any_map, dict) else {}
+
             if isinstance(raw_value, dict):
-                current.update(raw_value)
-            setattr(obj, attr_name, current)
+                current_map.update(raw_value)
+
+            setattr(obj, attr_name, current_map)
             continue
 
+        # nested object
         if isinstance(declared, type) or (declared is not None and not isinstance(declared, str)):
             try:
                 child = _construct_object(declared, raw_value, obj)
@@ -576,7 +597,6 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
                 print("deserialize_json:error : k=" + raw_key + "; d[k]=" + str(raw_value))
             continue
 
-        # store raw last resort
         setattr(obj, attr_name, raw_value)
 
     if not required:
@@ -603,22 +623,25 @@ class ExtensibleData:
     Base for Gedcom objects. Some classes index instances by id (global cache),
     others do not because their ids are only unique within a parent.
     """
-    _index = None
+    _index: ClassVar[Optional[dict[str, Any]]] = None
     id: str
 
     def __new__(cls, id: Optional[str] = None, tree: Any = None):
-        if id and isinstance(getattr(cls, "_index", None), dict):
-            existing = cls._index.get(id)
-            if existing is not None:
-                return existing
+        if id:
+            index = getattr(cls, "_index", None)
+            if isinstance(index, dict):
+                existing = index.get(id)
+                if existing is not None:
+                    return existing
         return super().__new__(cls)
 
     def __init__(self, id: Optional[str] = None, tree: Any = None):
         init_class(self)
         if id:
             self.id = id
-            if isinstance(getattr(self.__class__, "_index", None), dict):
-                self.__class__._index[id] = self
+            index = getattr(self.__class__, "_index", None)
+            if isinstance(index, dict):
+                index[id] = self
 
 
 class HypermediaEnabledData(ExtensibleData):
@@ -692,11 +715,11 @@ class TextValue:
 
 
 class Agent(HypermediaEnabledData):
-    identifiers: dict[str, set]
-    names: set[TextValue]
+    identifiers: dict[str, set[Any]]
+    names: set["TextValue"]
     homepage: ResourceReference
     openid: ResourceReference
-    accounts: set[OnlineAccount]
+    accounts: set["OnlineAccount"]
     emails: set[ResourceReference]
     phones: set[ResourceReference]
     addresses: set[ResourceReference]
@@ -902,7 +925,7 @@ class EvidenceReference(HypermediaEnabledData):
 class Subject(Conclusion):
     evidence: set[EvidenceReference]
     media: set[SourceReference]
-    identifiers: dict[str, set]
+    identifiers: dict[str, set[Any]]
     extracted: bool
 
 
@@ -921,8 +944,8 @@ class PersonInfo:
 
 
 class Relationship(Subject):
-    _index: dict = dict()
-    identifiers: dict[str, str]
+    _index: ClassVar[dict[str, "Relationship"]] = {}
+    identifiers: dict[str, set[Any]]
     person1: ResourceReference
     person2: ResourceReference
     facts: set[Fact]
@@ -950,7 +973,7 @@ class Relationship(Subject):
 
 
 class ChildAndParentsRelationship(Subject):
-    _index: dict = dict()
+    _index: ClassVar[dict[str, "ChildAndParentsRelationship"]] = {}
     parent1: ResourceReference
     parent2: ResourceReference
     child: ResourceReference
@@ -982,7 +1005,7 @@ class Field:
 
 
 class Person(Subject):
-    _index: dict = dict()
+    _index: ClassVar[dict[str, "Person"]] = {}
     private: bool
     living: bool
     gender: Gender
@@ -1028,14 +1051,14 @@ class artifactMetadata:
 
 
 class SourceDescription(Conclusion):
-    _index: dict = dict()
+    _index: ClassVar[dict[str, "SourceDescription"]] = {}
     citations: set[SourceCitation]
     mediator: ResourceReference
     publisher: ResourceReference
     authors: set[str]
     componentOf: SourceReference
     titles: set[TextValue]
-    identifiers: dict[str, set]
+    identifiers: dict[str, set[Any]]
     rights: set[str]
     replacedBy: str
     replaces: set[str]
@@ -1116,7 +1139,7 @@ class PlaceDescriptionInfo:
 
 
 class PlaceDescription(Subject):
-    _index: dict = dict()
+    _index: ClassVar[dict[str, "PlaceDescription"]] = {}
     names: set[TextValue]
     temporalDescription: Date
     latitude: float
@@ -1187,4 +1210,3 @@ class Gedcomx(HypermediaEnabledData):
 
         data2 = _unwrap_fs_envelope(data)
         deserialize_json(self, data2, required=True)
-

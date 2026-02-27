@@ -1,7 +1,8 @@
+# -*- coding: utf-8 -*-
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +19,8 @@
 #
 
 from __future__ import annotations
-from typing import Optional
+
+from typing import Any, Optional, Union
 
 from gramps.gen.db import DbTxn
 from gramps.gen.lib import Attribute, SrcAttribute, Person, Event, Citation
@@ -30,14 +32,13 @@ except ValueError:
     _trans = glocale.translation
 _ = _trans.gettext
 
-# import indexes so we can keep them in sync when a Person is updated
 from .index import FS_INDEX_PEOPLE
 
 
-def link_gramps_fs_id(db, gr_object, fsid: str) -> None:
+def link_gramps_fs_id(db: Any, gr_object: Any, fsid: str) -> None:
     """
-    attach or update the _FSFTID attribute on a Gramps object and commi
-    updates global FS_INDEX_PEOPLE if the object is a Person
+    Attach or update the _FSFTID attribute on a Gramps object and commit.
+    Updates global FS_INDEX_PEOPLE if the object is a Person.
     """
     if not fsid or gr_object is None:
         return
@@ -49,8 +50,7 @@ def link_gramps_fs_id(db, gr_object, fsid: str) -> None:
         internal_txn = True
         txn = DbTxn(_("FamilySearch tags"), db)
 
-    # find existing attribute or create a new one
-    existing_attr: Optional[Attribute] = None
+    existing_attr: Optional[Union[Attribute, SrcAttribute]] = None
     for a in gr_object.get_attribute_list():
         if a.get_type() == "_FSFTID":
             existing_attr = a
@@ -59,6 +59,7 @@ def link_gramps_fs_id(db, gr_object, fsid: str) -> None:
             break
 
     if existing_attr is None:
+        attr: Union[Attribute, SrcAttribute]
         if isinstance(gr_object, Citation):
             attr = SrcAttribute()
         else:
@@ -67,10 +68,8 @@ def link_gramps_fs_id(db, gr_object, fsid: str) -> None:
         attr.set_value(fsid)
         gr_object.add_attribute(attr)
 
-    # Commit
     if isinstance(gr_object, Person):
         db.commit_person(gr_object, txn)
-        # index sync
         FS_INDEX_PEOPLE[fsid] = gr_object.get_handle()
     elif isinstance(gr_object, Event):
         db.commit_event(gr_object, txn)

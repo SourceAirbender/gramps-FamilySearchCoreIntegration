@@ -105,7 +105,11 @@ def compare_fact(
     if fs_fact and getattr(fs_fact, "place", None):
         fs_place = fs_fact.place.original or ""
 
-    color = "red" if (gr_event == EventType.BIRTH or gr_event == EventType.DEATH) else "orange"
+    color = (
+        "red"
+        if (gr_event == EventType.BIRTH or gr_event == EventType.DEATH)
+        else "orange"
+    )
     if gr_date == fs_date:
         color = "green"
 
@@ -242,7 +246,11 @@ def compare_parents(db, gr_person: Person, fs_person) -> List[Tuple]:
             parent_ids.add(couple.person1.resourceId)
             parent_ids.add(couple.person2.resourceId)
         parent_ids.remove(fs_person.id)
-        FSG_Sync.FSG_Sync.fs_Tree.add_persons(parent_ids)
+
+        # fs_Tree can be None (per typing); guard it
+        fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+        if fs_tree is not None:
+            fs_tree.add_persons(parent_ids)
 
         fs_father_id = ""
         fs_father = None
@@ -383,11 +391,9 @@ def compare_spouse_notes(db, gr_person: Person, fs_person) -> List[Tuple]:
             if spouse_handle is None and fs_spouse_id == "":
                 color = "green"
 
-            if FSG_Sync.FSG_Sync.fs_Tree:
-                fs_spouse = (
-                    FSG_Sync.FSG_Sync.fs_Tree._persons.get(fs_spouse_id)
-                    or deserialize.Person()
-                )
+            fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+            if fs_tree is not None:
+                fs_spouse = fs_tree._persons.get(fs_spouse_id) or deserialize.Person()
             else:
                 fs_spouse = deserialize.Person()
 
@@ -422,26 +428,37 @@ def compare_spouse_notes(db, gr_person: Person, fs_person) -> List[Tuple]:
 
     color = "yellow3"
     for couple in fs_spouses:
+        # keep this ALWAYS str (never None) so mypy is happy
         if couple.person1 and couple.person1.resourceId == fsid:
             fs_spouse_id = couple.person2.resourceId
         elif couple.person1:
             fs_spouse_id = couple.person1.resourceId
         else:
-            fs_spouse_id = None
-        fs_spouse = FSG_Sync.FSG_Sync.fs_Tree._persons.get(fs_spouse_id)
-        fs_name = fs_spouse.preferred_name() if fs_spouse else deserialize.Name()
+            fs_spouse_id = ""
+
+        fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+        fs_spouse_opt = None
+        if fs_tree is not None:
+            fs_spouse_opt = fs_tree._persons.get(fs_spouse_id)
+
+        # mypy-proof: never call preferred_name() on an Optional
+        fs_spouse_for_name = (
+            fs_spouse_opt if fs_spouse_opt is not None else deserialize.Person()
+        )
+        fs_name = fs_spouse_for_name.preferred_name()
+
         res.append(
             (
                 color,
                 _trans.gettext("Spouse"),
                 "",
                 "",
-                fs_person_dates_str(db, fs_spouse),
+                fs_person_dates_str(db, fs_spouse_opt),
                 fs_name.akSurname()
                 + ", "
                 + fs_name.akGiven()
                 + " ["
-                + str(fs_spouse_id)
+                + fs_spouse_id
                 + "]",
                 "",
                 False,
@@ -511,11 +528,9 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
             if spouse_handle is None and fs_spouse_id == "":
                 color = "green"
 
-            if FSG_Sync.FSG_Sync.fs_Tree:
-                fs_spouse = (
-                    FSG_Sync.FSG_Sync.fs_Tree._persons.get(fs_spouse_id)
-                    or deserialize.Person()
-                )
+            fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+            if fs_tree is not None:
+                fs_spouse = fs_tree._persons.get(fs_spouse_id) or deserialize.Person()
             else:
                 fs_spouse = deserialize.Person()
 
@@ -649,9 +664,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                     title = unquote(fs_fact.type[6:])
                 else:
                     title = fs_fact.type
-                fs_date = (
-                    str(fs_fact.date or "") if hasattr(fs_fact, "date") else ""
-                )
+                fs_date = (str(fs_fact.date or "") if hasattr(fs_fact, "date") else "")
                 fs_place = (
                     fs_fact.place.original or ""
                     if getattr(fs_fact, "place", None)
@@ -694,7 +707,10 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                             triple.parent1
                             and triple.parent1.resourceId == fsid
                             and (
-                                (triple.parent2 and triple.parent2.resourceId == fs_spouse_id)
+                                (
+                                    triple.parent2
+                                    and triple.parent2.resourceId == fs_spouse_id
+                                )
                                 or (not triple.parent2 and fs_spouse_id == "")
                             )
                         )
@@ -702,7 +718,10 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                             triple.parent2
                             and triple.parent2.resourceId == fsid
                             and (
-                                (triple.parent1 and triple.parent1.resourceId == fs_spouse_id)
+                                (
+                                    triple.parent1
+                                    and triple.parent1.resourceId == fs_spouse_id
+                                )
                                 or (not triple.parent1 and fs_spouse_id == "")
                             )
                         )
@@ -715,13 +734,12 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 if fs_child_id != "" and fs_child_id == child_fsid:
                     color = "green"
 
-                if FSG_Sync.FSG_Sync.fs_Tree:
-                    fs_child = (
-                        FSG_Sync.FSG_Sync.fs_Tree._persons.get(fs_child_id)
-                        or deserialize.Person()
-                    )
+                fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+                if fs_tree is not None:
+                    fs_child = fs_tree._persons.get(fs_child_id) or deserialize.Person()
                 else:
                     fs_child = deserialize.Person()
+
                 fs_name = fs_child.preferred_name()
                 res.append(
                     (
@@ -743,7 +761,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                         + "]",
                         "",
                         False,
-                        "child", 
+                        "child",
                         child_ref.ref,
                         fs_child_id,
                         family.handle,
@@ -769,15 +787,25 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 ):
                     fs_child_id = triple.child.resourceId
                     color = "yellow3"
-                    fs_child = FSG_Sync.FSG_Sync.fs_Tree._persons.get(fs_child_id)
-                    fs_name = fs_child.preferred_name() if fs_child else deserialize.Name()
+
+                    fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+                    fs_child_opt = None
+                    if fs_tree is not None:
+                        fs_child_opt = fs_tree._persons.get(fs_child_id)
+
+                    # mypy-proof
+                    fs_child_for_name = (
+                        fs_child_opt if fs_child_opt is not None else deserialize.Person()
+                    )
+                    fs_name = fs_child_for_name.preferred_name()
+
                     res.append(
                         (
                             color,
                             "    " + _trans.gettext("Child"),
                             "",
                             "",
-                            fs_person_dates_str(db, fs_child),
+                            fs_person_dates_str(db, fs_child_opt),
                             fs_name.akSurname()
                             + ", "
                             + fs_name.akGiven()
@@ -800,26 +828,37 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
 
     color = "yellow3"
     for couple in fs_spouses:
+        # keep ALWAYS str
         if couple.person1 and couple.person1.resourceId == fsid:
             fs_spouse_id = couple.person2.resourceId
         elif couple.person1:
             fs_spouse_id = couple.person1.resourceId
         else:
-            fs_spouse_id = None
-        fs_spouse = FSG_Sync.FSG_Sync.fs_Tree._persons.get(fs_spouse_id)
-        fs_name = fs_spouse.preferred_name() if fs_spouse else deserialize.Name()
+            fs_spouse_id = ""
+
+        fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+        fs_spouse_opt = None
+        if fs_tree is not None:
+            fs_spouse_opt = fs_tree._persons.get(fs_spouse_id)
+
+        # mypy-proof
+        fs_spouse_for_name = (
+            fs_spouse_opt if fs_spouse_opt is not None else deserialize.Person()
+        )
+        fs_name = fs_spouse_for_name.preferred_name()
+
         res.append(
             (
                 color,
                 _trans.gettext("Spouse"),
                 "",
                 "",
-                fs_person_dates_str(db, fs_spouse),
+                fs_person_dates_str(db, fs_spouse_opt),
                 fs_name.akSurname()
                 + ", "
                 + fs_name.akGiven()
                 + " ["
-                + str(fs_spouse_id)
+                + fs_spouse_id
                 + "]",
                 "",
                 False,
@@ -848,15 +887,25 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 )
             ):
                 fs_child_id = triple.child.resourceId
-                fs_child = FSG_Sync.FSG_Sync.fs_Tree._persons.get(fs_child_id)
-                fs_name = fs_child.preferred_name() if fs_child else deserialize.Name()
+
+                fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+                fs_child_opt = None
+                if fs_tree is not None:
+                    fs_child_opt = fs_tree._persons.get(fs_child_id)
+
+                # mypy-proof
+                fs_child_for_name = (
+                    fs_child_opt if fs_child_opt is not None else deserialize.Person()
+                )
+                fs_name = fs_child_for_name.preferred_name()
+
                 res.append(
                     (
                         color,
                         "    " + _trans.gettext("Child"),
                         "",
                         "",
-                        fs_person_dates_str(db, fs_child),
+                        fs_person_dates_str(db, fs_child_opt),
                         fs_name.akSurname()
                         + ", "
                         + fs_name.akGiven()
@@ -878,15 +927,25 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
 
     for triple in fs_children:
         fs_child_id = triple.child.resourceId
-        fs_child = FSG_Sync.FSG_Sync.fs_Tree._persons.get(fs_child_id)
-        fs_name = fs_child.preferred_name() if fs_child else deserialize.Name()
+
+        fs_tree = FSG_Sync.FSG_Sync.fs_Tree
+        fs_child_opt = None
+        if fs_tree is not None:
+            fs_child_opt = fs_tree._persons.get(fs_child_id)
+
+        # mypy-proof
+        fs_child_for_name = (
+            fs_child_opt if fs_child_opt is not None else deserialize.Person()
+        )
+        fs_name = fs_child_for_name.preferred_name()
+
         res.append(
             (
                 color,
                 _trans.gettext("Child"),
                 "",
                 "",
-                fs_person_dates_str(db, fs_child),
+                fs_person_dates_str(db, fs_child_opt),
                 fs_name.akSurname()
                 + ", "
                 + fs_name.akGiven()

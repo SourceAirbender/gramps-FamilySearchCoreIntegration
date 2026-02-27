@@ -356,7 +356,16 @@ class FSToGrampsImporter:
             print(_("Downloading notes and sources…"))
 
             def _fetch_into_tree(url_path: str) -> None:
-                payload = tree._fs_session.get_jsonurl(url_path)
+                # mypy: tree._fs_session is Optional at type-check time
+                sess = getattr(tree, "_fs_session", None)
+                if sess is None:
+                    return
+            
+                fn = getattr(sess, "get_jsonurl", None) or getattr(sess, "get_json", None)
+                if not callable(fn):
+                    return
+            
+                payload = fn(url_path)
                 self._strip_unknowns(payload)
                 deserialize.deserialize_json(self.fs_TreeImp, payload)
 

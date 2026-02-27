@@ -20,7 +20,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional, TYPE_CHECKING
 
 from gi.repository import Gtk, Gdk, GLib
 
@@ -43,6 +43,34 @@ _ = _trans.gettext
 
 
 class CompareGtkMixin:
+    # --- mypy-facing declarations for mixin-heavy runtime design ---
+    # Initialized at runtime by the addon/session:
+    fs_Tree: ClassVar[Any] = None
+    _UI: ClassVar[dict[str, str]] = {}
+
+    # Provided by the owning instance (tool/window) at runtime:
+    dbstate: Any
+    uistate: Any
+
+    if TYPE_CHECKING:
+        from gramps.gen.lib import Person as _GrPerson
+
+        def get_active(self, category: str) -> Any: ...
+        def _toggle_noop(self, *args: Any, **kwargs: Any) -> None: ...
+
+        def _ensure_person_cached(
+            self, fsid: str, *, with_relatives: bool, force: bool = False
+        ) -> Any: ...
+
+        def _ensure_notes_cached(self, fsid: str) -> None: ...
+        def _ensure_sources_cached(self, fsid: str) -> None: ...
+
+        def _gather_sr_meta(self, fsid: str) -> dict[str, Any]: ...
+        def _pretty_tags(self, tags: Any) -> str: ...
+
+        def _import_sources_dialog(self, gr: Optional[_GrPerson], fsid: str) -> None: ...
+        def _build_compare_json(self, gr: _GrPerson, fsid: str) -> dict[str, Any]: ...
+
     # Color tokens produced by compare code:
     #   green   -> match
     #   orange  -> different
@@ -65,13 +93,12 @@ class CompareGtkMixin:
         "red": "#FFE3E3",
     }
 
-
     _CSS_INSTALLED = True
 
     def _ui_color(self, semantic: str) -> str:
         return self._UI.get((semantic or "").strip(), semantic or "")
-                
-    def _ui_row(self, row):
+
+    def _ui_row(self, row: Any) -> Any:
         if not row:
             return row
         try:
@@ -123,7 +150,6 @@ class CompareGtkMixin:
     def _install_compare_css(self) -> None:
         # CSS is loaded globally from data/gramps.css by ViewManager.load_css()
         return
-
 
     def _wrap_scroller(self, child: Gtk.Widget, min_h: int = 420) -> Gtk.Widget:
         sw = Gtk.ScrolledWindow()
@@ -209,24 +235,23 @@ class CompareGtkMixin:
         try:
             if v is None:
                 return False
-    
+
             s = v.strip() if isinstance(v, str) else str(v).strip()
             if not s:
                 return False
-    
+
             if s.startswith("#") and len(s) in (4, 7, 9):
                 return True
-    
+
             if s in self._TINT_COLOR_NAME:
                 return True
-    
+
             if s in self._TINT_FALLBACK_HEX:
                 return True
-    
+
             return False
         except Exception:
             return False
-
 
     def _guess_color_model_col(self, model: Gtk.TreeModel) -> int:
         try:
@@ -234,7 +259,7 @@ class CompareGtkMixin:
         except Exception:
             return 0
 
-        def scan_iter(it) -> Optional[int]:
+        def scan_iter(it: Any) -> Optional[int]:
             if it is None:
                 return None
             for ci in range(n):
@@ -278,17 +303,17 @@ class CompareGtkMixin:
             model = None
         if model is None:
             return
-    
+
         color_col = self._guess_color_model_col(model)
         tv_ctx = tv.get_style_context()
-    
+
         def make_func(is_indicator_col: bool):
-            def _func(column, cell, model2, it, _data):
+            def _func(column: Any, cell: Any, model2: Any, it: Any, _data: Any) -> None:
                 try:
                     token = model2.get_value(it, color_col)
                 except Exception:
                     token = None
-    
+
                 s = ""
                 try:
                     if token is None:
@@ -299,14 +324,14 @@ class CompareGtkMixin:
                         s = str(token).strip()
                 except Exception:
                     s = ""
-    
+
                 if not s:
                     try:
                         cell.set_property("cell-background-set", False)
                     except Exception:
                         pass
                     return
-    
+
                 # 1) Prefer the named CSS colors
                 rgba = None
                 css_name = self._TINT_COLOR_NAME.get(s)
@@ -317,11 +342,11 @@ class CompareGtkMixin:
                             rgba = rgba2
                     except Exception:
                         rgba = None
-    
-                # 2) Fall back to hardcoded hex 
+
+                # 2) Fall back to hardcoded hex
                 if rgba is None:
                     rgba = self._resolve_tint_rgba(s)
-    
+
                 painted = False
                 if rgba is not None:
                     try:
@@ -330,22 +355,22 @@ class CompareGtkMixin:
                         painted = True
                     except Exception:
                         painted = False
-    
+
                 if not painted:
                     try:
                         cell.set_property("cell-background", self._TINT_FALLBACK_HEX.get(s, s))
                         cell.set_property("cell-background-set", True)
                     except Exception:
                         pass
-    
+
                 if is_indicator_col and isinstance(cell, Gtk.CellRendererText):
                     try:
                         cell.set_property("text", "")
                     except Exception:
                         pass
-    
+
             return _func
-    
+
         cols = tv.get_columns() or []
         for idx, col in enumerate(cols):
             is_indicator = (idx == 0)
@@ -360,14 +385,13 @@ class CompareGtkMixin:
                     col.set_cell_data_func(cell, make_func(is_indicator), None)
                 except Exception:
                     pass
-    
+
         try:
             if cols:
                 cols[0].set_sizing(Gtk.TreeViewColumnSizing.FIXED)
                 cols[0].set_fixed_width(18)
         except Exception:
             pass
-
 
     def _build_legend(self) -> Gtk.Widget:
         wrap = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -402,8 +426,7 @@ class CompareGtkMixin:
         wrap.pack_end(hint, True, True, 0)
         return wrap
 
-
-    def _on_compare(self, _btn):
+    def _on_compare(self, _btn: Any) -> None:
         active = self.get_active("Person")
         if not active:
             WarningDialog(_("Select a person first."))
@@ -523,7 +546,7 @@ class CompareGtkMixin:
 
         outer.pack_end(action_box, False, False, 0)
 
-        def do_fill_all(force: bool = False):
+        def do_fill_all(force: bool = False) -> None:
             if force:
                 self._ensure_person_cached(fsid, with_relatives=True, force=True)
 
@@ -548,7 +571,7 @@ class CompareGtkMixin:
             except Exception:
                 pass
 
-        def do_import_sources(_btn):
+        def do_import_sources(_btn: Any) -> None:
             self._import_sources_dialog(_get_gr(), fsid)
             model_sources.clear()
             self._fill_sources(model_sources, _get_gr(), fsid)
@@ -576,7 +599,9 @@ class CompareGtkMixin:
 
         win.show_all()
 
-    def _canon_fs_web(self, url: str) -> str:
+    def _canon_fs_web(self, url: Optional[str]) -> str:
+        if not url:
+            return ""
         try:
             from gramps.gui.fs import tree
             sess = getattr(tree, "_fs_session", None)
@@ -584,7 +609,7 @@ class CompareGtkMixin:
                 return sess.canonical_web_url(url)
         except Exception:
             pass
-        return (url or "")
+        return url
 
     # ------------------ models / columns ------------------
 
@@ -661,7 +686,7 @@ class CompareGtkMixin:
         note_handles = gr.get_note_list()
         fs_notes_remaining = fs_person.notes.copy()
 
-        def _take_matching_note(notes, note_id: Optional[str], subject: str):
+        def _take_matching_note(notes: Any, note_id: Optional[str], subject: str):
             match = None
             if note_id:
                 for fs_note in notes:
@@ -679,7 +704,6 @@ class CompareGtkMixin:
                 except Exception:
                     pass
             return match
-
 
         # person notes
         for nh in note_handles:
@@ -702,7 +726,10 @@ class CompareGtkMixin:
                 fs_title = found.subject or ""
                 fs_text = found.text or ""
                 color = "green" if (
-                    fs_title == title and (fs_text == note_text or (note_text.startswith("\ufeff") and fs_text == note_text[1:]))
+                    fs_title == title and (
+                        fs_text == note_text
+                        or (note_text.startswith("\ufeff") and fs_text == note_text[1:])
+                    )
                 ) else "orange"
             else:
                 color = "yellow"
@@ -711,7 +738,14 @@ class CompareGtkMixin:
 
         # FS-only person notes
         for fs_note in fs_notes_remaining:
-            model.add(self._ui_row(["yellow3", _("Person"), _("(missing in Gramps)"), em, fs_note.subject or "", fs_note.text or ""]))
+            model.add(self._ui_row([
+                "yellow3",
+                _("Person"),
+                _("(missing in Gramps)"),
+                em,
+                fs_note.subject or "",
+                fs_note.text or "",
+            ]))
 
         # family (spouse) notes
         fs_couples_remaining = fs_person._spouses.copy()
@@ -755,7 +789,10 @@ class CompareGtkMixin:
                     fs_title = found.subject or ""
                     fs_text = found.text or ""
                     color = "green" if (
-                        fs_title == title and (fs_text == note_text or (note_text.startswith("\ufeff") and fs_text == note_text[1:]))
+                        fs_title == title and (
+                            fs_text == note_text
+                            or (note_text.startswith("\ufeff") and fs_text == note_text[1:])
+                        )
                     ) else "orange"
                 else:
                     color = "yellow"
@@ -763,103 +800,217 @@ class CompareGtkMixin:
                 model.add(self._ui_row([color, _("Family"), title, note_text, fs_title or em, fs_text or em]))
 
             for fs_note in rel_notes:
-                model.add(self._ui_row(["yellow3", _("Family"), _("(missing in Gramps)"), em, fs_note.subject or "", fs_note.text or ""]))
+                model.add(self._ui_row([
+                    "yellow3",
+                    _("Family"),
+                    _("(missing in Gramps)"),
+                    em,
+                    fs_note.subject or "",
+                    fs_note.text or "",
+                ]))
 
         for rel in fs_couples_remaining:
             for fs_note in rel.notes:
-                model.add(self._ui_row(["yellow3", _("Family"), _("(missing in Gramps)"), em, fs_note.subject or "", fs_note.text or ""]))
+                model.add(self._ui_row([
+                    "yellow3",
+                    _("Family"),
+                    _("(missing in Gramps)"),
+                    em,
+                    fs_note.subject or "",
+                    fs_note.text or "",
+                ]))
 
-    def _fill_sources(self, model: Any, gr: Person, fsid: str):
+    def _fill_sources(self, model: Any, gr: Person, fsid: str) -> None:
         self._ensure_sources_cached(fsid)
-
+    
         fs_person = deserialize.Person._index.get(fsid) or deserialize.Person()
         em = "_"
         fs_placeholder = em if self.__class__.fs_Tree else _("Not connected to FamilySearch")
-
+    
         source_meta = self._gather_sr_meta(fsid)
-
+    
+        # Collect FS SourceDescription IDs referenced by person + spouse relationships
         fs_source_ids: dict[str, None] = {}
         for sr in getattr(fs_person, "sources", []) or []:
-            fs_source_ids[getattr(sr, "descriptionId", "")] = None
+            sdid = getattr(sr, "descriptionId", "") or ""
+            if sdid:
+                fs_source_ids[sdid] = None
+    
         for rel in getattr(fs_person, "_spouses", []) or []:
             for sr in getattr(rel, "sources", []) or []:
-                fs_source_ids[getattr(sr, "descriptionId", "")] = None
-
+                sdid = getattr(sr, "descriptionId", "") or ""
+                if sdid:
+                    fs_source_ids[sdid] = None
+    
+        # Ensure SourceDescription objects exist in index and (if connected) add to fs_Tree
         for sdid in list(fs_source_ids.keys()):
             if not sdid:
                 continue
             if sdid not in deserialize.SourceDescription._index:
-                sd = deserialize.SourceDescription()
-                sd.id = sdid
-                deserialize.SourceDescription._index[sdid] = sd
-                self.__class__.fs_Tree.sourceDescriptions.add(sd)
-
-        fs_import.fetch_source_dates(self.__class__.fs_Tree)
-
-        citation_handles: set[str] = set(gr.get_citation_list())
-        for er in gr.get_event_ref_list():
-            ev = self.dbstate.db.get_event_from_handle(er.ref)
-            citation_handles.update(ev.get_citation_list())
-        for fam_h in gr.get_family_handle_list():
-            fam = self.dbstate.db.get_family_from_handle(fam_h)
-            citation_handles.update(fam.get_citation_list())
-            for er in fam.get_event_ref_list():
+                sd_new = deserialize.SourceDescription()
+                sd_new.id = sdid
+                deserialize.SourceDescription._index[sdid] = sd_new
+                try:
+                    if self.__class__.fs_Tree is not None:
+                        self.__class__.fs_Tree.sourceDescriptions.add(sd_new)
+                except Exception:
+                    pass
+    
+        # Populate FS dates if possible
+        try:
+            if self.__class__.fs_Tree is not None:
+                fs_import.fetch_source_dates(self.__class__.fs_Tree)
+        except Exception:
+            pass
+    
+        # Collect Gramps citations across person + events + families
+        citation_handles: set[str] = set(gr.get_citation_list() or [])
+    
+        for er in gr.get_event_ref_list() or []:
+            try:
                 ev = self.dbstate.db.get_event_from_handle(er.ref)
-                citation_handles.update(ev.get_citation_list())
-
+                if ev:
+                    citation_handles.update(ev.get_citation_list() or [])
+            except Exception:
+                pass
+    
+        for fam_h in gr.get_family_handle_list() or []:
+            try:
+                fam = self.dbstate.db.get_family_from_handle(fam_h)
+            except Exception:
+                fam = None
+            if not fam:
+                continue
+    
+            try:
+                citation_handles.update(fam.get_citation_list() or [])
+            except Exception:
+                pass
+    
+            for er in fam.get_event_ref_list() or []:
+                try:
+                    ev = self.dbstate.db.get_event_from_handle(er.ref)
+                    if ev:
+                        citation_handles.update(ev.get_citation_list() or [])
+                except Exception:
+                    pass
+    
+        # Row-per-Gramps-citation
         for ch in citation_handles:
             c = self.dbstate.db.get_citation_from_handle(ch)
+            if not c:
+                continue
+    
             src_gr = fs_import.IntermediateSource()
             src_gr.from_gramps(self.dbstate.db, c)
-            title = src_gr.citation_title
+    
+            title: str = src_gr.citation_title or ""
             note_text = (src_gr.note_text or "").strip()
-            gr_url = self._canon_fs_web(src_gr.url)
-            date = fs_utilities.gramps_date_to_formal(c.date)
-            sd_id = fs_utilities.get_fsftid(c)
-
+            gr_url: str = self._canon_fs_web(getattr(src_gr, "url", None))
+            date: str = fs_utilities.gramps_date_to_formal(c.date)
+    
+            sd_id: str = fs_utilities.get_fsftid(c) or ""
+    
             color = "yellow"
-            fs_title = fs_date = fs_url = ""
-            fs_text = fs_placeholder
-            kind = ""
-            tags_disp = ""
-            contributor = ""
-            modified = ""
-
-            if sd_id and sd_id in deserialize.SourceDescription._index:
-                sd = deserialize.SourceDescription._index[sd_id]
+            fs_title: str = ""
+            fs_date: str = ""
+            fs_url: str = ""
+            fs_text: str = fs_placeholder
+            kind: str = ""
+            tags_disp: str = ""
+            contributor: str = ""
+            modified: str = ""
+    
+            sd_obj: Optional[deserialize.SourceDescription] = (
+                deserialize.SourceDescription._index.get(sd_id) if sd_id else None
+            )
+    
+            if sd_obj is not None:
                 src_fs = fs_import.IntermediateSource()
-                src_fs.from_fs(sd, None)
-                fs_title = src_fs.citation_title
-                fs_text = src_fs.note_text
+                src_fs.from_fs(sd_obj, None)
+    
+                fs_title = src_fs.citation_title or ""
+                fs_text = (src_fs.note_text or "")
                 fs_date = str(src_fs.date)
-                fs_url = self._canon_fs_web(src_fs.url)
-                meta = source_meta.get(sd_id, {})
-                kind = meta.get("kind", "")
+                fs_url = self._canon_fs_web(getattr(src_fs, "url", None))
+    
+                meta = source_meta.get(sd_id, {}) or {}
+                kind = str(meta.get("kind") or "")
                 tags_disp = self._pretty_tags(meta.get("tags", []))
-                contributor = meta.get("contributor", "")
-                modified = meta.get("modified", "")
+                contributor = str(meta.get("contributor") or "")
+                modified = str(meta.get("modified") or "")
+    
                 color = "orange"
-                if (fs_date == date and fs_title == title and fs_url == gr_url and (fs_text or "").strip() == note_text):
+                if (
+                    fs_date == date
+                    and fs_title == title
+                    and fs_url == gr_url
+                    and (fs_text or "").strip() == note_text
+                ):
                     color = "green"
+    
                 fs_source_ids.pop(sd_id, None)
             else:
                 fs_date = fs_title = fs_url = em
-
-            model.add(self._ui_row([color, kind, date, title, gr_url, fs_date, fs_title or em, fs_url or em, tags_disp, contributor, modified, sd_id or ""]))
-
+    
+            model.add(
+                self._ui_row(
+                    [
+                        color,
+                        kind,
+                        date,
+                        title,
+                        gr_url,
+                        fs_date,
+                        fs_title or em,
+                        fs_url or em,
+                        tags_disp,
+                        contributor,
+                        modified,
+                        sd_id,
+                    ]
+                )
+            )
+    
+        # FS-only sources
         for sdid in list(fs_source_ids.keys()):
             if not sdid:
                 continue
-            sd = deserialize.SourceDescription._index.get(sdid)
+    
+            sd_obj2: Optional[deserialize.SourceDescription] = deserialize.SourceDescription._index.get(sdid)
+    
             fs_title = ""
-            if sd and getattr(sd, "titles", None):
-                for t in sd.titles:
-                    fs_title += t.value
-            fs_date = getattr(sd, "_date", "") or ""
-            fs_url = self._canon_fs_web(getattr(sd, "about", "") or "")
-            meta = source_meta.get(sdid, {})
-            kind = meta.get("kind", _("Mention"))
+            if sd_obj2 is not None and getattr(sd_obj2, "titles", None):
+                try:
+                    for t in sd_obj2.titles:
+                        fs_title += (getattr(t, "value", None) or "")
+                except Exception:
+                    pass
+    
+            fs_date_val = getattr(sd_obj2, "_date", "") if sd_obj2 is not None else ""
+            fs_url2 = self._canon_fs_web(getattr(sd_obj2, "about", None) if sd_obj2 is not None else None)
+    
+            meta = source_meta.get(sdid, {}) or {}
+            kind = str(meta.get("kind") or _("Mention"))
             tags_disp = self._pretty_tags(meta.get("tags", []))
-            contributor = meta.get("contributor", "")
-            modified = meta.get("modified", "")
-            model.add(self._ui_row(["yellow3", kind, em, em, em, str(fs_date) or em, fs_title or em, fs_url or em, tags_disp, contributor, modified, sdid]))
+            contributor = str(meta.get("contributor") or "")
+            modified = str(meta.get("modified") or "")
+    
+            model.add(
+                self._ui_row(
+                    [
+                        "yellow3",
+                        kind,
+                        em,
+                        em,
+                        em,
+                        str(fs_date_val) or em,
+                        fs_title or em,
+                        fs_url2 or em,
+                        tags_disp,
+                        contributor,
+                        modified,
+                        sdid,
+                    ]
+                )
+            )

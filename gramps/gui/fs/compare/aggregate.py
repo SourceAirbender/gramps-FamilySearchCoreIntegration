@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
@@ -19,25 +20,26 @@
 
 from __future__ import annotations
 
-import logging
 import email.utils
+import logging
 import time
-
-from gramps.gui.fs import tree
-import gramps.gui.fs.utilities as fs_utilities
-import gramps.gui.fs.person.fsg_sync as FSG_Sync
-from gramps.gui.fs import datab_familysearch
+from typing import Any, Optional, Tuple
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
-from gramps.gen.lib import Person, EventType
+from gramps.gen.lib import EventType, Person
+
+from gramps.gui.fs import datab_familysearch
+from gramps.gui.fs import tree
+import gramps.gui.fs.person.fsg_sync as FSG_Sync
+import gramps.gui.fs.utilities as fs_utilities
 
 from .comparators import (
+    compare_fact,
     compare_gender,
     compare_names,
-    compare_fact,
+    compare_other_facts,
     compare_parents,
     compare_spouses,
-    compare_other_facts,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,7 +66,7 @@ def _ui_color(semantic: str) -> str:
     return _UI.get((semantic or "").strip(), semantic or "")
 
 
-def _ui_row(row):
+def _ui_row(row: Any) -> Any:
     # convert semantic color token in row[0] into a display tint (hex).
     if not row:
         return row
@@ -73,7 +75,7 @@ def _ui_row(row):
     return r
 
 
-def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=False):
+def compare_fs_to_gramps(fs_person: Any, gr_person: Person, db: Any, model: Any = None, dupdoc: bool = False):
     """
     stores comparison timestamps/flags on the Person
     via datab_familysearch.FSStatusDB (JSON attribute blob).
@@ -91,7 +93,7 @@ def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=Fa
     ):
         return
 
-    if fs_person.id:
+    if getattr(fs_person, "id", None):
         db_state.fsid = fs_person.id
 
     FS_Family = FS_Essentials = FS_Facts = FS_Parents = FS_Dup = FS_Dok = False
@@ -104,8 +106,11 @@ def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=Fa
         FS_Dup = True
 
     # core comparisons
-    rows = []
-
+    rows: list[Any] = []
+    
+    Row = Tuple[Any, ...]
+    row: Optional[Row]
+    
     row = compare_gender(gr_person, fs_person)
     if row:
         rows.append(row)
@@ -142,11 +147,14 @@ def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=Fa
         if row[0] != "green":
             FS_Essentials = True
 
-    connected = bool(FSG_Sync.FSG_Sync.fs_Tree)
+    # mypy: session can be None
+    fs_session = getattr(tree, "_fs_session", None)
+
+    connected = bool(getattr(FSG_Sync.FSG_Sync, "fs_Tree", None)) and fs_session is not None
     hdr_gr = _("Gramps")
     hdr_fs = _("FamilySearch") if connected else _("Not connected to FamilySearch")
 
-    def add_section(title: str, semantic_color: str, node_key: str, children):
+    def add_section(title: str, semantic_color: str, node_key: str, children: Any) -> None:
         """
         Adds header row + children rows to the tree model.
         The header row uses the color column as a section badge tint.
@@ -169,7 +177,12 @@ def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=Fa
             None,
             None,
         ]
-        sec_id = model.add(_ui_row(header))
+
+        # mypy: model.add may return Optional[Tuple[...]]
+        sec_id_opt: Optional[Tuple[Any, ...]] = model.add(_ui_row(header))
+        if sec_id_opt is None:
+            return
+        sec_id = sec_id_opt
 
         for line in children:
             model.add(_ui_row(line), node=sec_id)
@@ -204,27 +217,35 @@ def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=Fa
         sec_color = "white" if not connected else ("red" if FS_Facts else "green")
         add_section(_("Facts"), sec_color, "FactsKey", other_rows)
 
-    if not connected:
+    if not connected or fs_session is None:
         return
 
     # ensure we have Last-Modified/Etag for this person, FSID redirect
-    if fs_person.id and (
-        not hasattr(fs_person, "_last_modified") or not fs_person._last_modified
+    if getattr(fs_person, "id", None) and (
+        not hasattr(fs_person, "_last_modified") or not getattr(fs_person, "_last_modified", 0)
     ):
         path = "/platform/tree/persons/" + fs_person.id
-        r = tree._fs_session.head_url(path)
-        while r.status_code == 301 and "X-Entity-Forwarded-Id" in r.headers:
+        r = fs_session.head_url(path)
+
+        while (
+            r is not None
+            and getattr(r, "status_code", 0) == 301
+            and hasattr(r, "headers")
+            and "X-Entity-Forwarded-Id" in r.headers
+        ):
             fsid = r.headers["X-Entity-Forwarded-Id"]
             fs_utilities.link_gramps_fs_id(db, gr_person, fsid)
             fs_person.id = fsid
             path = "/platform/tree/persons/" + fs_person.id
-            r = tree._fs_session.head_url(path)
-        if "Last-Modified" in r.headers:
-            fs_person._last_modified = int(
-                time.mktime(email.utils.parsedate(r.headers["Last-Modified"]))
-            )
-        if "Etag" in r.headers:
-            fs_person._etag = r.headers["Etag"]
+            r = fs_session.head_url(path)
+
+        if r is not None and hasattr(r, "headers"):
+            if "Last-Modified" in r.headers:
+                fs_person._last_modified = int(
+                    time.mktime(email.utils.parsedate(r.headers["Last-Modified"]))
+                )
+            if "Etag" in r.headers:
+                fs_person._etag = r.headers["Etag"]
 
     if not hasattr(fs_person, "_last_modified"):
         fs_person._last_modified = 0
@@ -232,22 +253,20 @@ def compare_fs_to_gramps(fs_person, gr_person: Person, db, model=None, dupdoc=Fa
     FS_Identical = not (FS_Family or FS_Essentials or FS_Facts or FS_Parents)
 
     # optionally query for potential duplicates/documents
-    if fs_person.id and dupdoc:
+    if getattr(fs_person, "id", None) and dupdoc and fs_session is not None:
         path = "/platform/tree/persons/" + fs_person.id + "/matches"
-        r = tree._fs_session.head_url(
-            path, {"Accept": "application/x-gedcomx-atom+json"}
-        )
-        if r and r.status_code == 200:
+        r = fs_session.head_url(path, {"Accept": "application/x-gedcomx-atom+json"})
+        if r and getattr(r, "status_code", 0) == 200:
             FS_Dup = True
-        if r and r.status_code != 200:
+        if r and getattr(r, "status_code", 0) != 200:
             FS_Dup = False
 
         path = (
             "https://www.familysearch.org/service/tree/tree-data/record-matches/"
             + fs_person.id
         )
-        r = tree._fs_session.get_url(path, {"Accept": "application/json"})
-        if r and r.status_code == 200:
+        r = fs_session.get_url(path, {"Accept": "application/json"})
+        if r and getattr(r, "status_code", 0) == 200:
             try:
                 js = r.json()
                 if (

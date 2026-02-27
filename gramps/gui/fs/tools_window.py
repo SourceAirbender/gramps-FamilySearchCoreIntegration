@@ -25,16 +25,16 @@ import os
 import sys
 import weakref
 from dataclasses import dataclass
-from typing import Optional, Any, Tuple
+from typing import Any, Callable, Optional, Tuple, cast
 
 from gi.repository import Gtk, GLib, Gdk, GdkPixbuf
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.display.name import displayer as name_displayer
-
 from gramps.gen.const import IMAGE_DIR as _GRAMPS_IMAGE_DIR
 
 from . import ui as fs_ui
+from .tags import build_tag_color_note_widget
 
 try:
     _trans = glocale.get_addon_translator(__file__)
@@ -43,7 +43,7 @@ except Exception:
 _ = _trans.gettext
 
 from gramps.gui.dialog import ErrorDialog
-from .tags import build_tag_color_note_widget
+
 
 _SINGLETON: Optional["FamilySearchToolsWindow"] = None
 _EDITPERSON_HOOK_INSTALLED = False
@@ -59,12 +59,12 @@ def _dbg(msg: str) -> None:
 
 
 def _try_error(parent: Gtk.Window, title: str, msg: str) -> None:
-    if ErrorDialog:
-        try:
-            ErrorDialog(title, msg, parent=parent)
-            return
-        except Exception:
-            pass
+    # mypy
+    try:
+        ErrorDialog(title, msg, parent=parent)
+        return
+    except Exception:
+        pass
     fs_ui.error_dialog(parent, title, msg)
 
 
@@ -104,13 +104,13 @@ class _EditorCtx:
     person_obj_ref: Optional[weakref.ref] = None
     editor_ref: Optional[weakref.ref] = None
 
-    def person_obj(self):
+    def person_obj(self) -> Any:
         try:
             return self.person_obj_ref() if self.person_obj_ref else None
         except Exception:
             return None
 
-    def editor_obj(self):
+    def editor_obj(self) -> Any:
         try:
             return self.editor_ref() if self.editor_ref else None
         except Exception:
@@ -120,7 +120,7 @@ class _EditorCtx:
 _LAST_EDITOR = _EditorCtx()
 
 
-def notify_from_person_editor(dbstate, uistate, track, person, editor=None) -> None:
+def notify_from_person_editor(dbstate: Any, uistate: Any, track: Any, person: Any, editor: Any = None) -> None:
     global _LAST_EDITOR
 
     ph = _person_handle(person)
@@ -149,6 +149,11 @@ def notify_from_person_editor(dbstate, uistate, track, person, editor=None) -> N
 
 
 def _install_editperson_hook() -> None:
+    """
+    Patch EditPerson._post_init so we can detect which person editor is active.
+
+    - intentionally treat EditPerson as Any because we're patching methods
+    """
     global _EDITPERSON_HOOK_INSTALLED
     if _EDITPERSON_HOOK_INSTALLED:
         return
@@ -159,21 +164,25 @@ def _install_editperson_hook() -> None:
         _dbg(f"EditPerson import failed (hook not installed yet): {e}")
         return
 
-    if getattr(EditPerson, "_fs_tools_hooked", False):
+    EP = cast(Any, EditPerson)
+
+    if getattr(EP, "_fs_tools_hooked", False):
         _EDITPERSON_HOOK_INSTALLED = True
         return
 
-    orig_post_init = getattr(EditPerson, "_post_init", None)
-    if not callable(orig_post_init):
+    orig_post_init_obj = getattr(EP, "_post_init", None)
+    if not callable(orig_post_init_obj):
         _dbg("EditPerson._post_init not callable; cannot hook")
         return
+    
+    orig_post_init: Callable[..., Any] = cast(Callable[..., Any], orig_post_init_obj)
 
-    def _fs_hook_attach(self):
+    def _fs_hook_attach(self: Any) -> None:
         if getattr(self, "_fs_tools_hook_attached", False):
             return
         setattr(self, "_fs_tools_hook_attached", True)
 
-        def _fire():
+        def _fire() -> bool:
             try:
                 notify_from_person_editor(self.dbstate, self.uistate, self.track, self.obj, editor=self)
             except Exception as e:
@@ -197,7 +206,7 @@ def _install_editperson_hook() -> None:
             except Exception:
                 pass
 
-    def wrapped_post_init(self, *args, **kwargs):
+    def wrapped_post_init(self: Any, *args: Any, **kwargs: Any) -> Any:
         rv = orig_post_init(self, *args, **kwargs)
         try:
             _fs_hook_attach(self)
@@ -205,13 +214,14 @@ def _install_editperson_hook() -> None:
             _dbg(f"hook attach failed: {e}")
         return rv
 
-    EditPerson._post_init = wrapped_post_init
-    EditPerson._fs_tools_hooked = True
+    # mypy Cannot assign to a method
+    setattr(EP, "_post_init", wrapped_post_init)
+    setattr(EP, "_fs_tools_hooked", True)
     _EDITPERSON_HOOK_INSTALLED = True
     _dbg("Installed EditPerson hook for FS Tools")
 
 
-def _find_open_editperson_instance():
+def _find_open_editperson_instance() -> Any:
     try:
         from gramps.gui.editors.editperson import EditPerson
     except Exception:
@@ -271,9 +281,8 @@ def close_tools_window() -> None:
     _SINGLETON = None
 
 
-def toggle_tools_window(session, dbstate=None, uistate=None) -> None:
+def toggle_tools_window(session: Any, dbstate: Any = None, uistate: Any = None) -> None:
     global _SINGLETON
-
     _install_editperson_hook()
 
     if _SINGLETON is not None and _SINGLETON.is_alive():
@@ -284,9 +293,8 @@ def toggle_tools_window(session, dbstate=None, uistate=None) -> None:
     _SINGLETON.present()
 
 
-def present_tools_window(session, dbstate=None, uistate=None) -> None:
+def present_tools_window(session: Any, dbstate: Any = None, uistate: Any = None) -> None:
     global _SINGLETON
-
     _install_editperson_hook()
 
     if _SINGLETON is not None and _SINGLETON.is_alive():
@@ -298,16 +306,17 @@ def present_tools_window(session, dbstate=None, uistate=None) -> None:
 
 
 class FamilySearchToolsWindow:
-    _BANNER_MAX_HEIGHT = 120 #px
+    _BANNER_MAX_HEIGHT = 120  # px
     _BANNER_MIN_HEIGHT = 64
     _BANNER_SIDE_PAD = 10
 
-    def __init__(self, session):
+    def __init__(self, session: Any):
         self.session = session
-        self._tick_id = None
+        self._tick_id: Optional[int] = None
 
         self._logo_pixbuf_orig: Optional[GdkPixbuf.Pixbuf] = None
         self._logo_last_width: int = 0
+        self._logo_image: Optional[Gtk.Image] = None
 
         self.window = Gtk.Window(title=_("FamilySearch Tools"))
         self.window.set_default_size(820, 430)
@@ -319,12 +328,10 @@ class FamilySearchToolsWindow:
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.window.add(outer)
 
-        # FS logo emerging solution
         banner = self._build_banner()
         if banner is not None:
             outer.pack_start(banner, False, False, 0)
 
-        # --- Status row ---
         status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         status_row.get_style_context().add_class("fs-status-row")
         outer.pack_start(status_row, False, False, 0)
@@ -335,18 +342,23 @@ class FamilySearchToolsWindow:
             status_widget = None
 
         if status_widget is not None:
-            status_widget.set_halign(Gtk.Align.START)
+            try:
+                status_widget.set_halign(Gtk.Align.START)
+            except Exception:
+                pass
             status_row.pack_start(status_widget, False, False, 0)
 
         self.active_label = Gtk.Label(label=_("Editor person: (none)"))
         self.active_label.set_xalign(0.0)
-        self.active_label.set_ellipsize(3)
+        try:
+            self.active_label.set_ellipsize(3)
+        except Exception:
+            pass
         self.active_label.get_style_context().add_class("fs-active-label")
         status_row.pack_start(self.active_label, True, True, 0)
 
         outer.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
 
-        # --- Sections ---
         self._size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.BOTH)
 
         sec_person, box_person = self._make_section(_("Person actions"), "fs-sec-person")
@@ -358,7 +370,6 @@ class FamilySearchToolsWindow:
         self.btn_sync = Gtk.Button(label=_("Sync from FamilySearch"))
         self.btn_sync.get_style_context().add_class("suggested-action")
 
-        # push sync button:
         self.btn_sync_to = Gtk.Button(label=_("Sync to FamilySearch..."))
         try:
             self.btn_sync_to.set_tooltip_text(
@@ -393,7 +404,6 @@ class FamilySearchToolsWindow:
         self._add_btn(box_util, self.btn_tags)
         self._add_btn(box_util, self.btn_clear_cache)
 
-        # uinote: Tag colors are configurable via Edit -> Tags
         try:
             note = build_tag_color_note_widget()
             try:
@@ -407,11 +417,10 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _dbg(f"Tag color note add failed: {e}")
 
-        # --- signals ---
         self.btn_link.connect("clicked", self._on_link)
         self.btn_cmp.connect("clicked", self._on_compare)
-        self.btn_sync.connect("clicked", self._on_sync)          # pull
-        self.btn_sync_to.connect("clicked", self._on_sync_to)    # push
+        self.btn_sync.connect("clicked", self._on_sync)
+        self.btn_sync_to.connect("clicked", self._on_sync_to)
 
         self.btn_imp_par.connect("clicked", self._on_import_parents)
         self.btn_imp_spo.connect("clicked", self._on_import_spouse)
@@ -423,7 +432,6 @@ class FamilySearchToolsWindow:
         self.window.connect("destroy", self._on_destroy)
         self.window.show_all()
 
-        # adopt any already-open editor
         try:
             ep = _find_open_editperson_instance()
             if ep is not None:
@@ -437,9 +445,6 @@ class FamilySearchToolsWindow:
     # ---- Styling / layout helpers --------
 
     def _install_css(self) -> None:
-        """
-        Keep theme-friendly; local classes only. Uses fs_ui.install_css_once.
-        """
         css = b"""
         .fs-tools-window { }
 
@@ -466,7 +471,6 @@ class FamilySearchToolsWindow:
             letter-spacing: 0.2px;
         }
 
-        /* subtle section tints */
         .fs-sec-person {
             background-color: rgba(0, 120, 170, 0.10);
             border-color: rgba(0, 120, 170, 0.22);
@@ -552,12 +556,17 @@ class FamilySearchToolsWindow:
         self._logo_image.set_valign(Gtk.Align.CENTER)
         box.pack_start(self._logo_image, True, True, 0)
 
-        self._set_logo_width(self.window.get_size()[0] if hasattr(self.window, "get_size") else 820)
+        try:
+            w = self.window.get_size()[0]
+        except Exception:
+            w = 820
+        self._set_logo_width(w)
+
         wrap.connect("size-allocate", self._on_banner_size_allocate)
         return wrap
 
     def _load_logo_pixbuf(self) -> Optional[GdkPixbuf.Pixbuf]:
-        candidates = []
+        candidates: list[str] = []
 
         try:
             if _GRAMPS_IMAGE_DIR:
@@ -566,9 +575,7 @@ class FamilySearchToolsWindow:
             pass
 
         try:
-            repo_root = os.path.abspath(
-                os.path.join(os.path.dirname(__file__), "..", "..", "..")
-            )
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
             candidates.append(os.path.join(repo_root, "images", "fs_logo.png"))
         except Exception:
             pass
@@ -588,7 +595,7 @@ class FamilySearchToolsWindow:
 
         return None
 
-    def _on_banner_size_allocate(self, _widget, allocation) -> None:
+    def _on_banner_size_allocate(self, _widget: Any, allocation: Any) -> None:
         try:
             w = int(getattr(allocation, "width", 0))
         except Exception:
@@ -601,7 +608,7 @@ class FamilySearchToolsWindow:
         self._set_logo_width(w)
 
     def _set_logo_width(self, container_width: int) -> None:
-        if self._logo_pixbuf_orig is None:
+        if self._logo_pixbuf_orig is None or self._logo_image is None:
             return
         try:
             avail_w = max(1, int(container_width) - (self._BANNER_SIDE_PAD * 2) - 24)
@@ -647,7 +654,7 @@ class FamilySearchToolsWindow:
             except Exception:
                 pass
 
-    def _on_destroy(self, *_args) -> None:
+    def _on_destroy(self, *_args: Any) -> None:
         global _SINGLETON
         _SINGLETON = None
         try:
@@ -663,7 +670,7 @@ class FamilySearchToolsWindow:
         except Exception:
             return False
 
-    def _editor_person_obj(self):
+    def _editor_person_obj(self) -> Any:
         p = _LAST_EDITOR.person_obj()
         if p is not None:
             return p
@@ -691,7 +698,6 @@ class FamilySearchToolsWindow:
             nm = name_displayer.display(p)
         except Exception:
             nm = "(person)"
-        gid = ""
         try:
             gid = p.get_gramps_id() or ""
         except Exception:
@@ -702,7 +708,7 @@ class FamilySearchToolsWindow:
         else:
             self.active_label.set_text(_("Editor person: %(name)s") % {"name": nm})
 
-    def _tick(self, *_args) -> bool:
+    def _tick(self, *_args: Any) -> bool:
         _install_editperson_hook()
 
         connected = self._fs_connected()
@@ -745,7 +751,7 @@ class FamilySearchToolsWindow:
         self._tick()
         return False
 
-    def _require_ready(self):
+    def _require_ready(self) -> Any:
         if not self._fs_connected():
             _try_info(self.window, "FamilySearch", "Not connected to FamilySearch.")
             return None
@@ -766,7 +772,7 @@ class FamilySearchToolsWindow:
 
         return p
 
-    def _ctx(self):
+    def _ctx(self) -> Optional[dict[str, Any]]:
         p = self._require_ready()
         if p is None:
             return None
@@ -781,7 +787,7 @@ class FamilySearchToolsWindow:
             "session": self.session,
         }
 
-    def _ctx_db_only(self):
+    def _ctx_db_only(self) -> Optional[dict[str, Any]]:
         if not self._fs_connected():
             _try_info(self.window, "FamilySearch", "Not connected to FamilySearch.")
             return None
@@ -798,7 +804,7 @@ class FamilySearchToolsWindow:
             "session": self.session,
         }
 
-    def _on_link(self, *_args):
+    def _on_link(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
@@ -812,7 +818,7 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Link failed: {e}")
 
-    def _on_compare(self, *_args):
+    def _on_compare(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
@@ -826,7 +832,7 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Compare failed: {e}")
 
-    def _on_sync(self, *_args):
+    def _on_sync(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
@@ -837,7 +843,9 @@ class FamilySearchToolsWindow:
                 fn = getattr(actions, "sync_this_person", None)
 
             if not callable(fn):
-                raise AttributeError("No pull-sync function found in actions.py (expected sync_from_familysearch or sync_this_person)")
+                raise AttributeError(
+                    "No pull-sync function found in actions.py (expected sync_from_familysearch or sync_this_person)"
+                )
 
             fn(
                 ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
@@ -847,7 +855,7 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Sync failed: {e}")
 
-    def _on_sync_to(self, *_args):
+    def _on_sync_to(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
@@ -872,8 +880,7 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Sync to FamilySearch failed: {e}")
 
-
-    def _on_import_parents(self, *_args):
+    def _on_import_parents(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
@@ -887,7 +894,7 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Import parents failed: {e}")
 
-    def _on_import_spouse(self, *_args):
+    def _on_import_spouse(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
@@ -901,7 +908,7 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Import spouse failed: {e}")
 
-    def _on_import_children(self, *_args):
+    def _on_import_children(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
@@ -915,7 +922,7 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Import children failed: {e}")
 
-    def _on_tags(self, *_args):
+    def _on_tags(self, *_args: Any) -> None:
         ctx = self._ctx_db_only()
         if not ctx:
             return
@@ -929,7 +936,7 @@ class FamilySearchToolsWindow:
         except Exception as e:
             _try_error(self.window, "FamilySearch", f"Tags failed: {e}")
 
-    def _on_clear_cache(self, *_args):
+    def _on_clear_cache(self, *_args: Any) -> None:
         ctx = self._ctx_db_only()
         if not ctx:
             return

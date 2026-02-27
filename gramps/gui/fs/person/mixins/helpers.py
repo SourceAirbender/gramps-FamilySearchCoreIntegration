@@ -21,6 +21,7 @@
 from __future__ import annotations
 import time
 from typing import Dict, Optional, List
+from typing import Any, TYPE_CHECKING
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.lib import Person
@@ -28,6 +29,7 @@ from gramps.gui.dialog import OkDialog, WarningDialog, ErrorDialog
 
 import gramps.gui.fs.import_ as fs_import
 import gramps.gui.fs.utilities as fs_utilities
+
 
 from gramps.gui.fs.import_ import deserializer as deserialize
 
@@ -51,6 +53,18 @@ FS_MENTION_ONLY = {"http://gedcomx.org/Name", "http://gedcomx.org/Gender"}
 
 
 class HelpersMixin:
+    """
+    - this mixin is used with CacheMixin (provides _ensure_person_cached/_ensure_sources_cached)
+    - and a host object that provides dbstate (Gramps DBState).
+    """
+
+    # provided by host at runtime
+    dbstate: Any
+
+    if TYPE_CHECKING:
+        # provided by CacheMixin at runtime
+        def _ensure_sources_cached(self, fsid: str) -> None: ...
+        def _ensure_person_cached(self, fsid: str, *, with_relatives: bool, force: bool = False) -> Any: ...
     def _pretty_tags(self, tags: List[str]) -> str:
         labs = []
         for t in tags:

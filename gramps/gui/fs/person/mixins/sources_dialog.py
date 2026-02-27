@@ -2,7 +2,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,12 +22,16 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, cast
+from types import ModuleType
 
 from gi.repository import Gtk, Gdk
 
+# mypy Pango 
+Pango: Any = None
 try:
-    from gi.repository import Pango
+    from gi.repository import Pango as _Pango  # type: ignore
+    Pango = cast(Any, _Pango)
 except Exception:
     Pango = None
 
@@ -40,8 +44,11 @@ from gramps.gui.fs.import_ import deserializer as deserialize
 from gramps.gui.fs import ui as fs_ui
 
 _has_img_picker = False
+fs_source_image: Optional[ModuleType] = None
+
 try:
-    from gramps.gui.fs import fs_source_image
+    from gramps.gui.fs import fs_source_image as _fs_source_image
+    fs_source_image = cast(ModuleType, _fs_source_image)
     _has_img_picker = True
 except Exception:
     fs_source_image = None
@@ -54,8 +61,24 @@ except ValueError:
 _ = _trans.gettext
 
 
+if TYPE_CHECKING:
+    from typing import Protocol
+
+    class _SourcesDialogDeps(Protocol):
+        # provided by host class / other mixins
+        dbstate: Any
+        uistate: Any
+        CONFIG: Any
+        fs_Tree: Any
+
+        def _ensure_sources_cached(self, fsid: str) -> None: ...
+        def _gather_sr_meta(self, fsid: str) -> dict[str, Any]: ...
+        def _import_fs_sources(self, gr: Any, selected_items: Any) -> int: ...
+        def _pretty_tags(self, tags: Any) -> str: ...
+
+
 class SourcesDialogMixin:
-    # Sources import dialog UI 
+    # Sources import dialog UI
 
     _CSS_KEY = "fs.sources_dialog"
 
@@ -84,7 +107,9 @@ class SourcesDialogMixin:
         """
         fs_ui.install_css_once(self._CSS_KEY, css)
 
-    def _import_sources_dialog(self, gr, fsid: str):
+    def _import_sources_dialog(self, gr: Any, fsid: str) -> None:
+        deps = cast("_SourcesDialogDeps", self)
+
         items = self._collect_fs_sources(fsid)
         if not items:
             OkDialog(_("No FamilySearch sources found to import."))
@@ -92,19 +117,22 @@ class SourcesDialogMixin:
 
         self._install_sources_css()
 
-        by_sdid: Dict[str, List] = {}
+        by_sdid: Dict[str, List[Any]] = {}
         citation_handles: set[str] = set(gr.get_citation_list())
+
         for er in gr.get_event_ref_list():
-            ev = self.dbstate.db.get_event_from_handle(er.ref)
+            ev = deps.dbstate.db.get_event_from_handle(er.ref)
             citation_handles.update(ev.get_citation_list())
+
         for fam_h in gr.get_family_handle_list():
-            fam = self.dbstate.db.get_family_from_handle(fam_h)
+            fam = deps.dbstate.db.get_family_from_handle(fam_h)
             citation_handles.update(fam.get_citation_list())
             for er in fam.get_event_ref_list():
-                ev = self.dbstate.db.get_event_from_handle(er.ref)
+                ev = deps.dbstate.db.get_event_from_handle(er.ref)
                 citation_handles.update(ev.get_citation_list())
+
         for ch in citation_handles:
-            c = self.dbstate.db.get_citation_from_handle(ch)
+            c = deps.dbstate.db.get_citation_from_handle(ch)
             sdid = fs_utilities.get_fsftid(c)
             if sdid:
                 by_sdid.setdefault(sdid, []).append(c)
@@ -112,27 +140,38 @@ class SourcesDialogMixin:
         def detect_color_for_sdid(sdid: str) -> str:
             if sdid not in by_sdid:
                 return "yellow3"
+
             sd = deserialize.SourceDescription._index.get(sdid)
             if not sd:
                 return "orange"
+
             src_fs = fs_import.IntermediateSource()
             src_fs.from_fs(sd, None)
+
             fs_title = src_fs.citation_title or ""
             fs_text = (src_fs.note_text or "")
             fs_date = str(src_fs.date) if getattr(src_fs, "date", "") else ""
             fs_url = src_fs.url or ""
+
             for c in by_sdid.get(sdid, []):
                 src_gr = fs_import.IntermediateSource()
-                src_gr.from_gramps(self.dbstate.db, c)
+                src_gr.from_gramps(deps.dbstate.db, c)
+
                 title = src_gr.citation_title or ""
                 note_text = (src_gr.note_text or "").strip()
                 gr_url = src_gr.url or ""
                 date = fs_utilities.gramps_date_to_formal(c.date)
+
                 if (fs_date == date and fs_title == title and fs_url == gr_url and (fs_text or "").strip() == note_text):
                     return "green"
+
             return "orange"
 
-        dlg = Gtk.Dialog(title=_("Import FamilySearch sources"), transient_for=self.uistate.window, flags=0)
+        dlg = Gtk.Dialog(
+            title=_("Import FamilySearch sources"),
+            transient_for=deps.uistate.window,
+            flags=0,
+        )
         dlg.get_style_context().add_class("fs-sources-dialog")
         fs_ui.set_headerbar(dlg, _("Import FamilySearch sources"), subtitle=fsid or "")
 
@@ -147,17 +186,18 @@ class SourcesDialogMixin:
         box.set_margin_end(10)
 
         images_by_sdid: Dict[str, List[str]] = {}
-        last_dir = self.CONFIG.get("preferences.fs_image_download_dir") or ""
+        last_dir = deps.CONFIG.get("preferences.fs_image_download_dir") or ""
 
         # store:
-        # 0 import?, 1 bg_color_hex, 2 action text, 3 auto_kind, 4 chosen kind,
+        # 0 import?, 1 bg_color_token, 2 action text, 3 auto_kind, 4 chosen kind,
         # 5 title, 6 date, 7 url, 8 tags, 9 contributor, 10 sdid, 11 img_count, 12 add_to_person_gallery
         store = Gtk.ListStore(bool, str, str, str, str, str, str, str, str, str, str, int, bool)
+
         for sdid, auto_kind, title, date_s, url, tags, contributor in items:
             color_token = detect_color_for_sdid(sdid)
             store.append([
                 True,
-                color_token,   # <-- store token like "green"/"orange"/"yellow3"
+                color_token,
                 "",
                 auto_kind or "",
                 "Auto",
@@ -170,7 +210,6 @@ class SourcesDialogMixin:
                 0,
                 True,
             ])
-
 
         treeview = Gtk.TreeView(model=store)
         treeview.set_activate_on_single_click(True)
@@ -185,7 +224,7 @@ class SourcesDialogMixin:
         # color indicator column
         color_cell = Gtk.CellRendererText()
         color_col = Gtk.TreeViewColumn(_(""), color_cell)
-        
+
         def _color_cell_data_func(_col, cell, model, itr, _data=None):
             token = model.get_value(itr, 1) or ""
             fs_ui.set_cell_bg(cell, token, widget=treeview)
@@ -193,14 +232,8 @@ class SourcesDialogMixin:
                 cell.set_property("text", "")
             except Exception:
                 pass
-        
+
         color_col.set_cell_data_func(color_cell, _color_cell_data_func)
-        
-        try:
-            color_col.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
-            color_col.set_fixed_width(20)
-        except Exception:
-            pass
 
         try:
             color_col.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
@@ -215,6 +248,7 @@ class SourcesDialogMixin:
         kind_model = Gtk.ListStore(str)
         for v in ("Auto", "Direct", "Mention"):
             kind_model.append([v])
+
         cell_combo = Gtk.CellRendererCombo()
         cell_combo.set_property("editable", True)
         cell_combo.set_property("model", kind_model)
@@ -231,7 +265,7 @@ class SourcesDialogMixin:
         # Text columns
         cr_title = Gtk.CellRendererText()
         try:
-            cr_title.set_property("wrap-mode", 2) 
+            cr_title.set_property("wrap-mode", 2)
             cr_title.set_property("wrap-width", 520)
         except Exception:
             pass
@@ -256,7 +290,6 @@ class SourcesDialogMixin:
         col_tags = Gtk.TreeViewColumn(_("Tags"), cr_tags, text=8)
 
         col_con = Gtk.TreeViewColumn(_("Contributor"), Gtk.CellRendererText(), text=9)
-
         col_img_ct = Gtk.TreeViewColumn(_("Images"), Gtk.CellRendererText(), text=11)
 
         cr_person = Gtk.CellRendererToggle()
@@ -269,7 +302,7 @@ class SourcesDialogMixin:
 
         # Actions
         action_cell = Gtk.CellRendererText()
-        if Pango:
+        if Pango is not None:
             try:
                 action_cell.set_property("underline", Pango.Underline.SINGLE)
                 action_cell.set_property("foreground", "steelblue")
@@ -301,7 +334,7 @@ class SourcesDialogMixin:
         except Exception:
             pass
 
-        # ---------------- Manage images dialog -
+        # ---------------- Manage images dialog ----------------
 
         def manage_images_for_sdid(sdid: str, url_for_picker: str) -> int:
             nonlocal last_dir
@@ -345,16 +378,17 @@ class SourcesDialogMixin:
 
             box2.pack_start(actions, False, False, 0)
 
+            # cols: dir, base, ext, fullpath
             model = Gtk.ListStore(str, str, str, str)
 
-            def _split_path(p: str):
+            def _split_path(p: str) -> Tuple[str, str, str]:
                 d, fname = os.path.split(p)
                 base, ext = os.path.splitext(fname)
                 return d, base, ext or ""
 
             for p in imgs:
-                d, b, e = _split_path(p)
-                model.append([d, b, e, p])
+                d, b, ext = _split_path(p)
+                model.append([d, b, ext, p])
 
             tv = Gtk.TreeView(model=model)
             fs_ui.tune_treeview(tv)
@@ -393,10 +427,10 @@ class SourcesDialogMixin:
             v2.pack_start(sw2, True, True, 0)
             box2.add(v2)
 
-            def _refresh_imgs_from_model():
-                new_list = []
-                for d, b, e, _old in model:
-                    new_list.append(os.path.join(d, b + e))
+            def _refresh_imgs_from_model() -> List[str]:
+                new_list: List[str] = []
+                for d, b, ext, _old in model:
+                    new_list.append(os.path.join(d, b + ext))
                 return new_list
 
             def do_add(_btn):
@@ -411,22 +445,20 @@ class SourcesDialogMixin:
                         start_dir=last_dir,
                         title=_("Add Source Image"),
                     )
-                except Exception as e:
-                    WarningDialog(_("Could not open image picker:\n{e}").format(e=str(e)))
+                except Exception as ex:
+                    WarningDialog(_("Could not open image picker:\n{e}").format(e=str(ex)))
                     return
                 if not saved:
                     return
                 for p in saved:
-                    d, b, e = _split_path(p)
-                    model.append([d, b, e, p])
-                try:
-                    last_dir_local = os.path.dirname(saved[0])
-                except Exception:
-                    last_dir_local = last_dir
+                    d, b, ext = _split_path(p)
+                    model.append([d, b, ext, p])
+
+                last_dir_local = os.path.dirname(saved[0]) if saved else last_dir
                 if last_dir_local:
                     last_dir = last_dir_local
-                    self.CONFIG.set("preferences.fs_image_download_dir", last_dir)
-                    self.CONFIG.save()
+                    deps.CONFIG.set("preferences.fs_image_download_dir", last_dir)
+                    deps.CONFIG.save()
 
             def do_choose(_btn):
                 nonlocal last_dir
@@ -476,44 +508,44 @@ class SourcesDialogMixin:
                     return
 
                 for p in paths:
-                    d, b, e = _split_path(p)
-                    model.append([d, b, e, p])
+                    d, b, ext = _split_path(p)
+                    model.append([d, b, ext, p])
 
-                try:
-                    last_dir_local = os.path.dirname(paths[0])
-                except Exception:
-                    last_dir_local = last_dir
+                last_dir_local = os.path.dirname(paths[0]) if paths else last_dir
                 if last_dir_local:
                     last_dir = last_dir_local
-                    self.CONFIG.set("preferences.fs_image_download_dir", last_dir)
-                    self.CONFIG.save()
+                    deps.CONFIG.set("preferences.fs_image_download_dir", last_dir)
+                    deps.CONFIG.save()
 
             def do_rename(_btn):
                 for row in list(model):
-                    d, b_new, e, full_old = row[:]
+                    d, b_new, ext, full_old = row[:]
                     d = d or ""
                     b_new = (b_new or "").strip()
+
                     d_old, fname_old = os.path.split(full_old)
                     base_old, ext_old = os.path.splitext(fname_old)
+
                     if d_old and not d:
                         d = d_old
-                    if not e:
-                        e = ext_old
-                    if base_old == b_new and d_old == d and ext_old == e:
+                    if not ext:
+                        ext = ext_old
+
+                    if base_old == b_new and d_old == d and ext_old == ext:
                         continue
 
-                    def _unique_path(dirpath: str, base: str, ext: str) -> str:
-                        candidate = os.path.join(dirpath, base + ext)
+                    def _unique_path(dirpath: str, base: str, ext2: str) -> str:
+                        candidate = os.path.join(dirpath, base + ext2)
                         if not os.path.exists(candidate):
                             return candidate
                         i = 1
                         while True:
-                            candidate = os.path.join(dirpath, f"{base} ({i}){ext}")
+                            candidate = os.path.join(dirpath, f"{base} ({i}){ext2}")
                             if not os.path.exists(candidate):
                                 return candidate
                             i += 1
 
-                    target = _unique_path(d or d_old, b_new, e)
+                    target = _unique_path(d or d_old, b_new, ext)
                     try:
                         os.rename(full_old, target)
                         d_new, fname_new = os.path.split(target)
@@ -538,7 +570,7 @@ class SourcesDialogMixin:
             images_by_sdid[sdid] = _refresh_imgs_from_model()
             return len(images_by_sdid[sdid])
 
-        def on_row_activated(tv, path, column):
+        def on_row_activated(_tv, path, column):
             if column is not action_col:
                 return
             row = store[path]
@@ -584,27 +616,30 @@ class SourcesDialogMixin:
             dlg.destroy()
             return
 
-        source_meta = self._gather_sr_meta(fsid)
+        source_meta = deps._gather_sr_meta(fsid)
 
-        selected_items = []
+        selected_items: List[Tuple[str, str, str, str, List[str], bool]] = []
         for row in store:
             if not row[0]:
                 continue
+
             sdid = row[10]
             auto_kind = row[3] or "Mention"
             chosen = row[4] or "Auto"
             final_kind = auto_kind if chosen == "Auto" else chosen
             contributor = row[9] or ""
+
             modified = (source_meta.get(sdid, {}) or {}).get("modified", "")
             img_list = images_by_sdid.get(sdid, [])[:]
             add_to_person = bool(row[12])
+
             selected_items.append((sdid, modified, contributor, final_kind, img_list, add_to_person))
 
         dlg.destroy()
         if not selected_items:
             return
 
-        count = self._import_fs_sources(gr, selected_items)
+        count = deps._import_fs_sources(gr, selected_items)
         OkDialog(_("{n} source(s) imported.").format(n=count))
 
     # ------------------
@@ -612,12 +647,14 @@ class SourcesDialogMixin:
     # ------------------
 
     def _collect_fs_sources(self, fsid: str) -> List[Tuple[str, str, str, str, str, str, str]]:
-        self._ensure_sources_cached(fsid)
+        deps = cast("_SourcesDialogDeps", self)
+
+        deps._ensure_sources_cached(fsid)
         fs_person = deserialize.Person._index.get(fsid)
         if not fs_person:
             return []
 
-        meta = self._gather_sr_meta(fsid)
+        meta = deps._gather_sr_meta(fsid)
 
         sdids: set[str] = set()
         for sr in getattr(fs_person, "sources", []) or []:
@@ -630,27 +667,30 @@ class SourcesDialogMixin:
             if not sdid:
                 continue
             if sdid not in deserialize.SourceDescription._index:
-                sd = deserialize.SourceDescription()
-                sd.id = sdid
-                deserialize.SourceDescription._index[sdid] = sd
-                self.__class__.fs_Tree.sourceDescriptions.add(sd)
-        fs_import.fetch_source_dates(self.__class__.fs_Tree)
+                sd_new = deserialize.SourceDescription()
+                sd_new.id = sdid
+                deserialize.SourceDescription._index[sdid] = sd_new
+                deps.fs_Tree.sourceDescriptions.add(sd_new)
+
+        fs_import.fetch_source_dates(deps.fs_Tree)
 
         out: List[Tuple[str, str, str, str, str, str, str]] = []
         for sdid in sdids:
             if not sdid:
                 continue
-            sd = deserialize.SourceDescription._index.get(sdid)
-            if not sd:
+            sd_obj = deserialize.SourceDescription._index.get(sdid)
+            if sd_obj is None:
                 continue
+            
             isrc = fs_import.IntermediateSource()
-            isrc.from_fs(sd, None)
+            isrc.from_fs(sd_obj, None)
             title = isrc.citation_title or ""
             date_s = str(isrc.date) if getattr(isrc, "date", "") else ""
             url = isrc.url or ""
             m = meta.get(sdid, {})
             auto_kind = m.get("kind", "Mention")
-            tags_disp = self._pretty_tags(m.get("tags", []))
+            tags_disp = deps._pretty_tags(m.get("tags", []))
             contributor = m.get("contributor", "")
             out.append((sdid, auto_kind, title, date_s, url, tags_disp, contributor))
+
         return out

@@ -45,7 +45,7 @@ import threading
 import time
 import webbrowser
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 
 import certifi
@@ -404,6 +404,10 @@ class EnvProfile:
 
 class Session(requests.Session):
     # Requests session with FamilySearch auth helpers.
+
+    # mypy declare dynamically-assigned class attributes
+    _shared: ClassVar["Session | None"] = None
+    _last_instance: ClassVar["Session | None"] = None
 
     def __init__(self, server: int = 0, app_key: str = "", redirect: str = ""):
         super().__init__()

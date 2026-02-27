@@ -22,27 +22,29 @@ import os
 import shutil
 import sys
 import webbrowser
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple
 from urllib.parse import urlparse, urlunparse
 
 import gi
+
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, Gdk, GLib  # noqa: F401  (Gdk might be used by downstream)
 
 from gramps.gui.fs import ui as fs_ui
 
-try:
-    from gramps.gen.constfunc import is_windows as _is_windows
-except Exception:
-    def _is_windows() -> bool:
-        return sys.platform.startswith("win")
+
+def _is_windows() -> bool:
+    # Avoid importing gramps.gen.constfunc.is_windows because mypy/type stubs
+    # may not expose it even if it exists at runtime.
+    return sys.platform.startswith("win") or os.name == "nt"
 
 
-WebKit2 = None
+WebKit2: Optional[Any] = None
 try:
     if not _is_windows():
         gi.require_version("WebKit2", "4.0")
-        from gi.repository import WebKit2 as _WebKit2
+        from gi.repository import WebKit2 as _WebKit2  # type: ignore
+
         WebKit2 = _WebKit2
 except Exception:
     WebKit2 = None
@@ -60,6 +62,7 @@ def _canonicalize_fs_web_url(url: str) -> str:
         return u
     try:
         from gramps.gui.fs import tree
+
         sess = getattr(tree, "_fs_session", None)
         if sess and hasattr(sess, "canonical_web_url"):
             return sess.canonical_web_url(u)
@@ -105,8 +108,11 @@ class SourceImageBrowser:
         self.parent_window = parent_window
         self.download_dir: Optional[str] = start_dir
         self.saved_files: List[str] = []
-        self._handlers: list[tuple[object, int]] = []
-        self._ctx = None
+
+        # Store signal connections as (object_with_disconnect, handler_id)
+        self._handlers: List[Tuple[Any, int]] = []
+
+        self._ctx: Optional[Any] = None
         self._use_webkit = (not _is_windows()) and (WebKit2 is not None)
 
         self.dialog = Gtk.Dialog(
@@ -117,7 +123,7 @@ class SourceImageBrowser:
         self.dialog.add_button("Close", Gtk.ResponseType.CLOSE)
         self.dialog.set_default_size(1040, 820)
 
-        # keep UI CSS centralized 
+        # keep UI CSS centralized
         self._install_css()
 
         try:
@@ -149,17 +155,23 @@ class SourceImageBrowser:
             pass
 
         self.btn_pick_folder = Gtk.Button()
-        fs_ui.set_button_icon_and_label(self.btn_pick_folder, "folder-open-symbolic", "Folder...")
+        fs_ui.set_button_icon_and_label(
+            self.btn_pick_folder, "folder-open-symbolic", "Folder..."
+        )
         self.btn_pick_folder.set_tooltip_text("Choose download folder")
         self.btn_pick_folder.connect("clicked", self._choose_dir)
 
         self.btn_pick_files = Gtk.Button()
-        fs_ui.set_button_icon_and_label(self.btn_pick_files, "document-open-symbolic", "Choose file...")
+        fs_ui.set_button_icon_and_label(
+            self.btn_pick_files, "document-open-symbolic", "Choose file..."
+        )
         self.btn_pick_files.set_tooltip_text("Choose a local file from disk")
         self.btn_pick_files.connect("clicked", self._choose_files)
 
         self.btn_open_browser = Gtk.Button()
-        fs_ui.set_button_icon_and_label(self.btn_open_browser, "web-browser-symbolic", "Browser")
+        fs_ui.set_button_icon_and_label(
+            self.btn_open_browser, "web-browser-symbolic", "Browser"
+        )
         self.btn_open_browser.set_tooltip_text("Open source page in system browser")
         self.btn_open_browser.connect("clicked", self._open_external_browser)
 
@@ -185,18 +197,25 @@ class SourceImageBrowser:
             pass
 
         # embedded browser or empty
-        self.webview = None
-        if self._use_webkit:
-            self.webview = WebKit2.WebView()
-            sc = Gtk.ScrolledWindow()
-            sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-            sc.add(self.webview)
+        self.webview: Optional[Any] = None
+        webkit = WebKit2
+        if self._use_webkit and webkit is not None:
             try:
-                sc.get_style_context().add_class("fs-srcimg-web")
+                self.webview = webkit.WebView()
             except Exception:
-                pass
-            body.pack_start(sc, True, True, 0)
-        else:
+                self.webview = None
+
+            if self.webview is not None:
+                sc = Gtk.ScrolledWindow()
+                sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+                sc.add(self.webview)
+                try:
+                    sc.get_style_context().add_class("fs-srcimg-web")
+                except Exception:
+                    pass
+                body.pack_start(sc, True, True, 0)
+
+        if self.webview is None:
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             box.set_margin_top(18)
             box.set_margin_bottom(18)
@@ -281,18 +300,17 @@ class SourceImageBrowser:
         else:
             self._open_external_browser()
 
-    # public APi
+    # public API
     def run(self) -> List[str]:
         self.dialog.show_all()
         self.dialog.run()
         self._teardown()
         return self.saved_files
 
-    #  old 
+    # old
     def _install_css(self) -> None:
-        # pass
         return
-        
+
     # internals
     def _reload(self, *_a) -> None:
         if self._use_webkit and self.webview is not None:
@@ -316,12 +334,15 @@ class SourceImageBrowser:
             self.info.set_text("Could not open system browser.")
 
     def _wire_downloads(self) -> None:
-        if not self._use_webkit or self.webview is None or WebKit2 is None:
+        if not self._use_webkit or self.webview is None:
             return
+
         try:
-            self._ctx = self.webview.get_context()
-            h = self._ctx.connect("download-started", self._on_download_started)
-            self._handlers.append((self._ctx, h))
+            # Use a local ctx so mypy never sees Optional here
+            ctx = self.webview.get_context()
+            hid = ctx.connect("download-started", self._on_download_started)
+            self._handlers.append((ctx, hid))
+            self._ctx = ctx
         except Exception:
             pass
 
@@ -390,8 +411,10 @@ class SourceImageBrowser:
             parent=self.dialog,
             action=Gtk.FileChooserAction.SELECT_FOLDER,
             buttons=(
-                "Cancel", Gtk.ResponseType.CANCEL,
-                "Select", Gtk.ResponseType.OK,
+                "Cancel",
+                Gtk.ResponseType.CANCEL,
+                "Select",
+                Gtk.ResponseType.OK,
             ),
         )
         if self.download_dir and os.path.isdir(self.download_dir):
@@ -411,8 +434,10 @@ class SourceImageBrowser:
             parent=self.dialog,
             action=Gtk.FileChooserAction.OPEN,
             buttons=(
-                "Cancel", Gtk.ResponseType.CANCEL,
-                "Select", Gtk.ResponseType.OK,
+                "Cancel",
+                Gtk.ResponseType.CANCEL,
+                "Select",
+                Gtk.ResponseType.OK,
             ),
         )
         try:

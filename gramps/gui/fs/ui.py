@@ -19,7 +19,7 @@
 #
 from __future__ import annotations
 
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Protocol, Sequence, Tuple
 
 import gi
 
@@ -28,6 +28,10 @@ from gi.repository import Gtk, Gdk, Pango  # noqa: E402
 
 from gramps.gui.dialog import ErrorDialog, OkDialog, WarningDialog
 
+
+# ----------------------------------------------------------------------
+# CSS install
+# ----------------------------------------------------------------------
 
 _CSS_KEYS: set[str] = set()
 
@@ -50,15 +54,22 @@ def install_css_once(key: str, css: bytes) -> bool:
         return False
 
 
-def set_headerbar(widget: object, title: str, subtitle: str = "") -> None:
+# ----------------------------------------------------------------------
+# Headerbar helpers
+# ----------------------------------------------------------------------
+
+class _HasTitlebar(Protocol):
+    def set_titlebar(self, titlebar: Gtk.Widget) -> None: ...
+
+
+def set_headerbar(widget: _HasTitlebar, title: str, subtitle: str = "") -> None:
     try:
         hb = Gtk.HeaderBar()
         hb.set_show_close_button(True)
         hb.props.title = title or ""
         if subtitle:
             hb.props.subtitle = subtitle
-        if hasattr(widget, "set_titlebar"):
-            widget.set_titlebar(hb)
+        widget.set_titlebar(hb)
     except Exception:
         pass
 
@@ -75,7 +86,6 @@ def wrap_scroller(child: Gtk.Widget, min_h: int = 360) -> Gtk.ScrolledWindow:
 
 
 def tune_treeview(tv: Gtk.TreeView, *, headers: bool = True, grid: bool = True, rules: bool = True) -> None:
-    # General TreeView polish used across multiple dialogs/windows
     try:
         tv.set_headers_visible(bool(headers))
     except Exception:
@@ -117,15 +127,14 @@ def tune_treeview(tv: Gtk.TreeView, *, headers: bool = True, grid: bool = True, 
 # ----------------------------------------------------------------------
 
 _TOKEN_TO_DEFINE_COLOR = {
-    # semantic tokens
     "match": "fs_compare_match_bg",
     "different": "fs_compare_different_bg",
     "only-gramps": "fs_compare_only_gramps_bg",
-    "only_fs": "fs_compare_only_fs_bg",   # FIX: was only_gramps
+    "only_fs": "fs_compare_only_fs_bg",
     "only-fs": "fs_compare_only_fs_bg",
     "critical": "fs_compare_critical_bg",
 
-    # backward-compat mappings (palette names)
+    # legacy palette tokens
     "green": "fs_compare_match_bg",
     "orange": "fs_compare_different_bg",
     "yellow": "fs_compare_only_gramps_bg",
@@ -134,8 +143,6 @@ _TOKEN_TO_DEFINE_COLOR = {
     "red": "fs_compare_critical_bg",
 }
 
-
-# If CSS lookup fails, fall back to the historic pastel colors.
 _DEFINE_COLOR_FALLBACK_HEX = {
     "fs_compare_match_bg": "#D8F3DC",
     "fs_compare_different_bg": "#FFE8CC",
@@ -144,13 +151,22 @@ _DEFINE_COLOR_FALLBACK_HEX = {
     "fs_compare_critical_bg": "#FFE3E3",
 }
 
+# used when caller passes "green"/etc directly and CSS lookup fails
+_LEGACY_TOKEN_FALLBACK_HEX = {
+    "green": "#D8F3DC",
+    "orange": "#FFE8CC",
+    "yellow": "#FFF3BF",
+    "yellow3": "#D0EBFF",
+    "blue": "#D0EBFF",
+    "red": "#FFE3E3",
+}
 
 
 def _lookup_defined_color(name: str, *, widget: Optional[Gtk.Widget] = None) -> Optional[Gdk.RGBA]:
     if not name:
         return None
     try:
-        w = widget or Gtk.Label()  
+        w = widget or Gtk.Label()
         ctx = w.get_style_context()
         ok, rgba = ctx.lookup_color(name)
         if ok and isinstance(rgba, Gdk.RGBA):
@@ -161,7 +177,6 @@ def _lookup_defined_color(name: str, *, widget: Optional[Gtk.Widget] = None) -> 
 
 
 def _parse_color_literal(s: str) -> Optional[Gdk.RGBA]:
-    # Parse a literal color string like '#RRGGBB' into RGBA.
     if not s:
         return None
     try:
@@ -174,8 +189,6 @@ def _parse_color_literal(s: str) -> Optional[Gdk.RGBA]:
 
 
 def resolve_fs_bg_color(token_or_color: str, *, widget: Optional[Gtk.Widget] = None) -> Optional[Gdk.RGBA]:
-    # Resolve a background color for FS UI:
-
     s = (token_or_color or "").strip()
     if not s:
         return None
@@ -196,20 +209,13 @@ def resolve_fs_bg_color(token_or_color: str, *, widget: Optional[Gtk.Widget] = N
             if rgba is not None:
                 return rgba
 
-    # If they passed "green"/etc directly and CSS wasn't found
     if s in _LEGACY_TOKEN_FALLBACK_HEX:
         return _parse_color_literal(_LEGACY_TOKEN_FALLBACK_HEX[s])
 
     return _parse_color_literal(s)
 
 
-
-# ----------------------------------------------------------------------
-# Cell renderer background (TreeView) needs concrete colors
-# ----------------------------------------------------------------------
-
 def set_cell_bg(cell: Gtk.CellRenderer, color_token: str, *, widget: Optional[Gtk.Widget] = None) -> None:
-    # set a TreeView cell renderer background
     rgba = resolve_fs_bg_color(color_token, widget=widget)
     if rgba is None:
         clear_cell_bg(cell)
@@ -243,32 +249,12 @@ def clear_cell_bg(cell: Gtk.CellRenderer) -> None:
         pass
 
 
-# ---------------------------------
-# Legend builder w/ CSS classes 
-# ----------------------------------
-
 def build_legend_row(
     items: Sequence[Tuple[str, str]],
     *,
     hint: str = "",
     wrap_class: str = "",
 ) -> Gtk.Widget:
-    """
-    items: [(kind, label), ...]
-
-    'kind' should usually be one of:
-      - 'fs-match'
-      - 'fs-different'
-      - 'fs-only-gramps'
-      - 'fs-only-fs'
-      - 'fs-critical'
-
-    For convenience, we also accept semantic tokens:
-      - 'match', 'different', 'only-gramps', 'only-fs', 'critical'
-      - and legacy 'green/orange/yellow/blue/red'
-
-    These are mapped to the appropriate CSS class.
-    """
     wrap = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
     if wrap_class:
         try:
@@ -283,7 +269,6 @@ def build_legend_row(
         "only-fs": "fs-only-fs",
         "critical": "fs-critical",
 
-        # legacy tokens
         "green": "fs-match",
         "orange": "fs-different",
         "yellow": "fs-only-gramps",
@@ -330,10 +315,6 @@ def build_legend_row(
     return wrap
 
 
-# ----------------------------------------------------------------------
-# Buttons
-# ----------------------------------------------------------------------
-
 def set_button_icon_and_label(btn: Gtk.Button, icon_name: str, label: str) -> None:
     try:
         img = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.BUTTON)
@@ -354,10 +335,6 @@ def set_button_icon_and_label(btn: Gtk.Button, icon_name: str, label: str) -> No
         pass
 
 
-# ----------------------------------------------------------------------
-# Standard Gramps dialogs
-# ----------------------------------------------------------------------
-
 def info_dialog(parent: Optional[Gtk.Window], title: str, body: str) -> None:
     OkDialog(title or "", body or "", parent=parent)
 
@@ -368,4 +345,3 @@ def error_dialog(parent: Optional[Gtk.Window], title: str, body: str) -> None:
 
 def warn_dialog(parent: Optional[Gtk.Window], title: str, body: str) -> None:
     WarningDialog(title or "", body or "", parent=parent)
-
