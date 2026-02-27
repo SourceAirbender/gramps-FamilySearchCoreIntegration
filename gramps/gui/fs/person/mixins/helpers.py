@@ -63,8 +63,14 @@ class HelpersMixin:
 
     if TYPE_CHECKING:
         # provided by CacheMixin at runtime
-        def _ensure_sources_cached(self, fsid: str) -> None: ...
-        def _ensure_person_cached(self, fsid: str, *, with_relatives: bool, force: bool = False) -> Any: ...
+        def _ensure_sources_cached(self, fsid: str) -> None:
+            ...
+
+        def _ensure_person_cached(
+            self, fsid: str, *, with_relatives: bool, force: bool = False
+        ) -> Any:
+            ...
+
     def _pretty_tags(self, tags: List[str]) -> str:
         labs = []
         for t in tags:
@@ -124,7 +130,11 @@ class HelpersMixin:
                 pass
             try:
                 attr = getattr(sr, "attribution", None)
-                rid = getattr(getattr(attr, "contributor", None), "resourceId", "") if attr else ""
+                rid = (
+                    getattr(getattr(attr, "contributor", None), "resourceId", "")
+                    if attr
+                    else ""
+                )
                 mod_ms = getattr(attr, "modified", None)
                 mod_iso = ""
                 if isinstance(mod_ms, (int, float)):
@@ -175,16 +185,16 @@ class HelpersMixin:
         return None
 
 
-
 class AuthMixin:
     @classmethod
     def ensure_session(cls, caller=None, verbosity=5) -> bool:
         """
-        Ensure a shared session exists. 
+        Ensure a shared session exists.
         Returns True if a session exists (logged-in or not).
         """
         try:
             from gramps.gui.fs.manager import get_session
+
             sess = get_session(
                 getattr(caller, "dbstate", None) if caller else None,
                 getattr(caller, "uistate", None) if caller else None,
@@ -192,6 +202,7 @@ class AuthMixin:
             if sess:
                 try:
                     import gramps.gui.fs.tree as tree
+
                     tree._fs_session = sess
                 except Exception:
                     pass
@@ -206,17 +217,24 @@ class AuthMixin:
         """
         from gramps.gui.fs.manager import get_session
 
-        sess = get_session(getattr(self, "dbstate", None), getattr(self, "uistate", None))
-        parent = getattr(self, "window", None) or getattr(getattr(self, "uistate", None), "window", None)
+        sess = get_session(
+            getattr(self, "dbstate", None), getattr(self, "uistate", None)
+        )
+        parent = getattr(self, "window", None) or getattr(
+            getattr(self, "uistate", None), "window", None
+        )
 
         if not sess:
-            ErrorDialog(_("FamilySearch"),
-                        _("FamilySearch is not configured (missing app key / redirect)."),
-                        parent=parent)
+            ErrorDialog(
+                _("FamilySearch"),
+                _("FamilySearch is not configured (missing app key / redirect)."),
+                parent=parent,
+            )
             return
 
         try:
             import gramps.gui.fs.tree as tree
+
             tree._fs_session = sess
         except Exception:
             pass

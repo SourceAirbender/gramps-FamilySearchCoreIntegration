@@ -58,8 +58,10 @@ def install_css_once(key: str, css: bytes) -> bool:
 # Headerbar helpers
 # ----------------------------------------------------------------------
 
+
 class _HasTitlebar(Protocol):
-    def set_titlebar(self, titlebar: Gtk.Widget) -> None: ...
+    def set_titlebar(self, titlebar: Gtk.Widget) -> None:
+        ...
 
 
 def set_headerbar(widget: _HasTitlebar, title: str, subtitle: str = "") -> None:
@@ -85,7 +87,9 @@ def wrap_scroller(child: Gtk.Widget, min_h: int = 360) -> Gtk.ScrolledWindow:
     return sw
 
 
-def tune_treeview(tv: Gtk.TreeView, *, headers: bool = True, grid: bool = True, rules: bool = True) -> None:
+def tune_treeview(
+    tv: Gtk.TreeView, *, headers: bool = True, grid: bool = True, rules: bool = True
+) -> None:
     try:
         tv.set_headers_visible(bool(headers))
     except Exception:
@@ -133,7 +137,6 @@ _TOKEN_TO_DEFINE_COLOR = {
     "only_fs": "fs_compare_only_fs_bg",
     "only-fs": "fs_compare_only_fs_bg",
     "critical": "fs_compare_critical_bg",
-
     # legacy palette tokens
     "green": "fs_compare_match_bg",
     "orange": "fs_compare_different_bg",
@@ -162,7 +165,9 @@ _LEGACY_TOKEN_FALLBACK_HEX = {
 }
 
 
-def _lookup_defined_color(name: str, *, widget: Optional[Gtk.Widget] = None) -> Optional[Gdk.RGBA]:
+def _lookup_defined_color(
+    name: str, *, widget: Optional[Gtk.Widget] = None
+) -> Optional[Gdk.RGBA]:
     if not name:
         return None
     try:
@@ -188,7 +193,9 @@ def _parse_color_literal(s: str) -> Optional[Gdk.RGBA]:
     return None
 
 
-def resolve_fs_bg_color(token_or_color: str, *, widget: Optional[Gtk.Widget] = None) -> Optional[Gdk.RGBA]:
+def resolve_fs_bg_color(
+    token_or_color: str, *, widget: Optional[Gtk.Widget] = None
+) -> Optional[Gdk.RGBA]:
     s = (token_or_color or "").strip()
     if not s:
         return None
@@ -215,7 +222,9 @@ def resolve_fs_bg_color(token_or_color: str, *, widget: Optional[Gtk.Widget] = N
     return _parse_color_literal(s)
 
 
-def set_cell_bg(cell: Gtk.CellRenderer, color_token: str, *, widget: Optional[Gtk.Widget] = None) -> None:
+def set_cell_bg(
+    cell: Gtk.CellRenderer, color_token: str, *, widget: Optional[Gtk.Widget] = None
+) -> None:
     rgba = resolve_fs_bg_color(color_token, widget=widget)
     if rgba is None:
         clear_cell_bg(cell)
@@ -268,7 +277,6 @@ def build_legend_row(
         "only-gramps": "fs-only-gramps",
         "only-fs": "fs-only-fs",
         "critical": "fs-critical",
-
         "green": "fs-match",
         "orange": "fs-different",
         "yellow": "fs-only-gramps",

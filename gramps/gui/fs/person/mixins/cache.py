@@ -69,7 +69,9 @@ class _FsCache:
         entry.last_modified = last_mod
         self.mem[fsid] = entry
 
-    def mark_loaded(self, fsid: str, *, notes: bool = False, sources: bool = False) -> None:
+    def mark_loaded(
+        self, fsid: str, *, notes: bool = False, sources: bool = False
+    ) -> None:
         e = self.mem.get(fsid)
         if not e:
             e = _FsCacheEntry(None, None)
@@ -116,7 +118,9 @@ class _FsCache:
             except Exception:
                 pass
 
-    def read_json(self, fsid: str) -> Optional[Tuple[dict[str, Any], Optional[str], Optional[int]]]:
+    def read_json(
+        self, fsid: str
+    ) -> Optional[Tuple[dict[str, Any], Optional[str], Optional[int]]]:
         """
         Read cache file for FSID.
         Returns: (person_blob, etag, last_modified) or None on error/missing.
@@ -175,7 +179,9 @@ class CacheMixin:
     def _get_fs_session() -> Any:
         fs_session = getattr(tree, "_fs_session", None)
         if fs_session is None:
-            raise RuntimeError("FamilySearch session (tree._fs_session) is not initialized")
+            raise RuntimeError(
+                "FamilySearch session (tree._fs_session) is not initialized"
+            )
         return fs_session
 
     def _ensure_person_cached(
@@ -188,10 +194,10 @@ class CacheMixin:
         fs_tree = self.__class__._get_fs_tree()
         fs_session = self._get_fs_session()
         cache = self.__class__._cache
-    
+
         etag: Optional[str] = None
         last_mod: Optional[int] = None
-    
+
         # Fetch headers for freshness checks (etag / last-modified)
         if force or (fsid not in fs_tree._persons):
             r = fs_session.head_url(f"/platform/tree/persons/{fsid}")
@@ -201,64 +207,74 @@ class CacheMixin:
                 etag = r.headers.get("Etag")
                 lm = r.headers.get("Last-Modified")
                 last_mod = int(time.mktime(email.utils.parsedate(lm))) if lm else None
-    
+
         ce = cache.get_meta(fsid) if cache else None
-        up_to_date = (not force) and ce and (
-            (ce.etag and etag and ce.etag == etag)
-            or (ce.last_modified and last_mod and ce.last_modified == last_mod)
+        up_to_date = (
+            (not force)
+            and ce
+            and (
+                (ce.etag and etag and ce.etag == etag)
+                or (ce.last_modified and last_mod and ce.last_modified == last_mod)
+            )
         )
-    
+
         if not up_to_date:
             # Disk cache first
             disk = None if (force or not cache) else cache.read_json(fsid)
-            if disk and (etag is None or disk[1] == etag) and (last_mod is None or disk[2] == last_mod):
+            if (
+                disk
+                and (etag is None or disk[1] == etag)
+                and (last_mod is None or disk[2] == last_mod)
+            ):
                 try:
                     # disk[0] := {"persons":[ <person json> ]}
                     deserialize.deserialize_json(fs_tree, disk[0])
                 except Exception as e:
                     print(f"[FS Cache] deserialize (disk) failed for {fsid}: {e}")
-    
+
                 p = deserialize.Person._index.get(fsid)
                 if p:
                     # mypy dynamic attrs
                     setattr(p, "_etag", disk[1])
                     setattr(p, "_last_modified", disk[2])
-    
+
                     fs_tree._persons[fsid] = p
                     if cache:
                         cache.set_meta(fsid, disk[1], disk[2])
-    
+
             # If still not present, download and then write to disk cache
             if fsid not in fs_tree._persons:
                 fs_tree.add_persons([fsid])
                 p = deserialize.Person._index.get(fsid)
                 if p:
                     fs_tree._persons[fsid] = p
-    
+
                     if cache:
                         cache.set_meta(
                             fsid,
                             getattr(p, "_etag", None),
                             getattr(p, "_last_modified", None),
                         )
-    
+
                         try:
-                            full_tree: dict[str, Any] = deserialize.serialize_json(fs_tree)
+                            full_tree: dict[str, Any] = deserialize.serialize_json(
+                                fs_tree
+                            )
                             persons: list[dict[str, Any]] = []
-    
-                            for pj in (full_tree.get("persons") or []):
+
+                            for pj in full_tree.get("persons") or []:
                                 if not isinstance(pj, dict):
                                     continue
                                 pid = pj.get("id") or pj.get("@id")
                                 if pid == fsid:
                                     persons = [pj]
                                     break
-    
+
                             if not persons and full_tree.get("persons"):
                                 first = full_tree["persons"][0]
                                 if isinstance(first, dict):
                                     persons = [first]
-    
+
                             person_only: dict[str, Any] = {"persons": persons}
                             cache.write_json(
                                 fsid,
@@ -268,12 +284,12 @@ class CacheMixin:
                             )
                         except Exception as e:
                             print(f"[FS Cache] serialize/write failed for {fsid}: {e}")
-    
+
         if with_relatives:
             fs_tree.add_spouses({fsid})
             fs_tree.add_children({fsid})
             fs_tree.add_parents({fsid})
-    
+
         return deserialize.Person._index.get(fsid) or deserialize.Person()
 
     def _ensure_notes_cached(self, fsid: str) -> None:
@@ -284,7 +300,9 @@ class CacheMixin:
                 return
 
         fs_session = self._get_fs_session()
-        _get_json = getattr(fs_session, "get_jsonurl", None) or getattr(fs_session, "get_json", None)
+        _get_json = getattr(fs_session, "get_jsonurl", None) or getattr(
+            fs_session, "get_json", None
+        )
         if _get_json:
             _get_json(f"/platform/tree/persons/{fsid}/notes")
 
@@ -295,7 +313,7 @@ class CacheMixin:
 
         p = deserialize.Person._index.get(fsid)
         if p:
-            for rel in (getattr(p, "_spouses", []) or []):
+            for rel in getattr(p, "_spouses", []) or []:
                 if _get_json:
                     _get_json(f"/platform/tree/couple-relationships/{rel.id}/notes")
 
@@ -311,7 +329,9 @@ class CacheMixin:
                 return
 
         fs_session = self._get_fs_session()
-        _get_json = getattr(fs_session, "get_jsonurl", None) or getattr(fs_session, "get_json", None)
+        _get_json = getattr(fs_session, "get_jsonurl", None) or getattr(
+            fs_session, "get_json", None
+        )
         if _get_json:
             _get_json(f"/platform/tree/persons/{fsid}/sources")
 
@@ -322,10 +342,12 @@ class CacheMixin:
 
         p = deserialize.Person._index.get(fsid)
         if p:
-            for rel in (getattr(p, "_spouses", []) or []):
+            for rel in getattr(p, "_spouses", []) or []:
                 try:
                     if _get_json:
-                        _get_json(f"/platform/tree/couple-relationships/{rel.id}/sources")
+                        _get_json(
+                            f"/platform/tree/couple-relationships/{rel.id}/sources"
+                        )
                 except Exception:
                     pass
 

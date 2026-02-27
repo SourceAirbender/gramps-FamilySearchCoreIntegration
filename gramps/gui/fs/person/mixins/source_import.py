@@ -75,7 +75,9 @@ def _get_sd_about_url(sd: Any) -> str:
     return ""
 
 
-def _ensure_citation_has_source_and_link(db: Any, txn: Any, cit: Any, title: str, url: str) -> None:
+def _ensure_citation_has_source_and_link(
+    db: Any, txn: Any, cit: Any, title: str, url: str
+) -> None:
     """
     Ensure citation is not 'empty':
       - it references a Source
@@ -187,7 +189,11 @@ class SourceImportMixin:
                             pass
                     if t is not None:
                         name_forms.append(str(t))
-                    if any(self._normalize_attr_name(n) == key_norm for n in name_forms if n):
+                    if any(
+                        self._normalize_attr_name(n) == key_norm
+                        for n in name_forms
+                        if n
+                    ):
                         a.set_value(val)
                         updated = True
                         break
@@ -237,7 +243,9 @@ class SourceImportMixin:
             except Exception:
                 pass
 
-    def _pin_active_person(self, handle: str, ms: int = 15000, interval_ms: int = 150) -> None:
+    def _pin_active_person(
+        self, handle: str, ms: int = 15000, interval_ms: int = 150
+    ) -> None:
         if not handle:
             return
 
@@ -359,7 +367,14 @@ class SourceImportMixin:
                     sdid, fs_modified, contributor, final_kind, image_paths = tup
                     add_to_person = False
                 else:
-                    sdid, fs_modified, contributor, final_kind, image_paths, add_to_person = tup
+                    (
+                        sdid,
+                        fs_modified,
+                        contributor,
+                        final_kind,
+                        image_paths,
+                        add_to_person,
+                    ) = tup
 
                 sdid = (sdid or "").strip()
                 if not sdid:
@@ -382,7 +397,9 @@ class SourceImportMixin:
                                 except Exception:
                                     pass
                     else:
-                        cit = fs_import.add_source(db, txn, sdid, person, person.get_citation_list())
+                        cit = fs_import.add_source(
+                            db, txn, sdid, person, person.get_citation_list()
+                        )
                         if not cit:
                             errors.append(f"{sdid}: add_source returned None")
                             continue
@@ -408,18 +425,26 @@ class SourceImportMixin:
 
                     all_created_media: List[str] = []
                     for cit2 in target_citations:
-                        self._set_attr_on_citation(cit2, "FS Modified", (fs_modified or ""))
-                        self._set_attr_on_citation(cit2, "FS Contributor", (contributor or ""))
+                        self._set_attr_on_citation(
+                            cit2, "FS Modified", (fs_modified or "")
+                        )
+                        self._set_attr_on_citation(
+                            cit2, "FS Contributor", (contributor or "")
+                        )
                         self._set_attr_on_citation(cit2, "FS Kind", (final_kind or ""))
 
                         if image_paths:
-                            created = self._attach_images_to_citation(cit2, image_paths, txn)
+                            created = self._attach_images_to_citation(
+                                cit2, image_paths, txn
+                            )
                             all_created_media.extend(created)
 
                         db.commit_citation(cit2, txn)
 
                     if add_to_person and all_created_media:
-                        self._attach_media_to_person_by_handles(person, all_created_media, txn)
+                        self._attach_media_to_person_by_handles(
+                            person, all_created_media, txn
+                        )
 
                     imported += 1
 
@@ -435,22 +460,23 @@ class SourceImportMixin:
 
         if target_handle is not None and target_handle != "":
             handle = target_handle  # mypy: narrow Optional[str] -> str
-        
+
             self._pin_active_person(handle, ms=15000, interval_ms=150)
-        
+
             def _late_pin() -> bool:
                 try:
                     self._pin_active_person(handle, ms=15000, interval_ms=150)
                 except Exception:
                     pass
                 return False
-        
+
             GLib.timeout_add(400, _late_pin)
 
         if errors:
             WarningDialog(
                 _("Some sources could not be imported:\n{errs}").format(
-                    errs="\n".join(errors[:10]) + (("\n...") if len(errors) > 10 else "")
+                    errs="\n".join(errors[:10])
+                    + (("\n...") if len(errors) > 10 else "")
                 )
             )
 
@@ -460,7 +486,9 @@ class SourceImportMixin:
     # Media attachment helpers
     # --------------------------
 
-    def _attach_images_to_citation(self, cit: Citation, image_paths: List[str], txn: DbTxn) -> List[str]:
+    def _attach_images_to_citation(
+        self, cit: Citation, image_paths: List[str], txn: DbTxn
+    ) -> List[str]:
         created_handles: List[str] = []
         if not image_paths:
             return created_handles
@@ -487,7 +515,9 @@ class SourceImportMixin:
                 path_use = p
                 if base:
                     try:
-                        if os.path.commonprefix([os.path.abspath(p), os.path.abspath(base)]) == os.path.abspath(base):
+                        if os.path.commonprefix(
+                            [os.path.abspath(p), os.path.abspath(base)]
+                        ) == os.path.abspath(base):
                             try:
                                 path_use = relative_path(p, base)
                             except Exception:
@@ -561,7 +591,9 @@ class SourceImportMixin:
                                 pass
 
                 if not attached:
-                    print("WARN: Could not attach media to citation or source; leaving Media unattached.")
+                    print(
+                        "WARN: Could not attach media to citation or source; leaving Media unattached."
+                    )
 
                 created_handles.append(m.handle)
 
@@ -570,7 +602,9 @@ class SourceImportMixin:
 
         return created_handles
 
-    def _attach_media_to_person_by_handles(self, person: Any, media_handles: List[str], txn: DbTxn) -> None:
+    def _attach_media_to_person_by_handles(
+        self, person: Any, media_handles: List[str], txn: DbTxn
+    ) -> None:
         if not media_handles:
             return
         try:

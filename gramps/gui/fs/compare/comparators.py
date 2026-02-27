@@ -361,21 +361,16 @@ def compare_spouse_notes(db, gr_person: Person, fs_person) -> List[Tuple]:
             fs_pair_id = None
 
             for couple in fs_spouses:
-                if (
-                    (couple.person1 and couple.person1.resourceId == spouse_fsid)
-                    or (
-                        (couple.person1 is None or couple.person1.resourceId == "")
-                        and spouse_fsid == ""
-                    )
+                if (couple.person1 and couple.person1.resourceId == spouse_fsid) or (
+                    (couple.person1 is None or couple.person1.resourceId == "")
+                    and spouse_fsid == ""
                 ):
                     fs_spouse_id = spouse_fsid
                     fs_pair = couple
                     fs_pair_id = couple.id
                     fs_spouses.remove(couple)
                     break
-                elif (
-                    couple.person2 and couple.person2.resourceId == spouse_fsid
-                ) or (
+                elif (couple.person2 and couple.person2.resourceId == spouse_fsid) or (
                     (couple.person2 is None or couple.person2.resourceId == "")
                     and spouse_fsid == ""
                 ):
@@ -498,21 +493,16 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
             fs_pair_id = None
 
             for couple in fs_spouses:
-                if (
-                    (couple.person1 and couple.person1.resourceId == spouse_fsid)
-                    or (
-                        (couple.person1 is None or couple.person1.resourceId == "")
-                        and spouse_fsid == ""
-                    )
+                if (couple.person1 and couple.person1.resourceId == spouse_fsid) or (
+                    (couple.person1 is None or couple.person1.resourceId == "")
+                    and spouse_fsid == ""
                 ):
                     fs_spouse_id = spouse_fsid
                     fs_pair = couple
                     fs_pair_id = couple.id
                     fs_spouses.remove(couple)
                     break
-                elif (
-                    couple.person2 and couple.person2.resourceId == spouse_fsid
-                ) or (
+                elif (couple.person2 and couple.person2.resourceId == spouse_fsid) or (
                     (couple.person2 is None or couple.person2.resourceId == "")
                     and spouse_fsid == ""
                 ):
@@ -584,7 +574,9 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 gr_value = (
                     gr_desc
                     if gr_place == ""
-                    else (gr_desc + " from deserialize.xml import parse_xml " + gr_place)
+                    else (
+                        gr_desc + " from deserialize.xml import parse_xml " + gr_place
+                    )
                 )
 
                 color = "yellow"
@@ -633,7 +625,9 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 fs_value = (
                     fs_desc
                     if fs_place == ""
-                    else (fs_desc + " from deserialize.xml import parse_xml " + fs_place)
+                    else (
+                        fs_desc + " from deserialize.xml import parse_xml " + fs_place
+                    )
                 )
 
                 res.append(
@@ -664,7 +658,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                     title = unquote(fs_fact.type[6:])
                 else:
                     title = fs_fact.type
-                fs_date = (str(fs_fact.date or "") if hasattr(fs_fact, "date") else "")
+                fs_date = str(fs_fact.date or "") if hasattr(fs_fact, "date") else ""
                 fs_place = (
                     fs_fact.place.original or ""
                     if getattr(fs_fact, "place", None)
@@ -674,7 +668,9 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 fs_value = (
                     fs_desc
                     if fs_place == ""
-                    else (fs_desc + " from deserialize.xml import parse_xml " + fs_place)
+                    else (
+                        fs_desc + " from deserialize.xml import parse_xml " + fs_place
+                    )
                 )
 
                 res.append(
@@ -795,7 +791,9 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
 
                     # mypy-proof
                     fs_child_for_name = (
-                        fs_child_opt if fs_child_opt is not None else deserialize.Person()
+                        fs_child_opt
+                        if fs_child_opt is not None
+                        else deserialize.Person()
                     )
                     fs_name = fs_child_for_name.preferred_name()
 
@@ -1087,9 +1085,7 @@ def compare_other_facts(db, person: Person, fs_person) -> List[list]:
 
         fs_date = str(fs_fact.date or "") if hasattr(fs_fact, "date") else ""
         fs_place = (
-            fs_fact.place.original or ""
-            if getattr(fs_fact, "place", None)
-            else ""
+            fs_fact.place.original or "" if getattr(fs_fact, "place", None) else ""
         )
         fs_desc = fs_fact.value or ""
         fs_value = (

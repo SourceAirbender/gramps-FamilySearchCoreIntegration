@@ -81,15 +81,26 @@ def add_event(db, txn, fs_fact, obj):
 
     for er in obj.event_ref_list:
         e = db.get_event_from_handle(er.ref)
-        gr_type = int(e.type) if isinstance(e.type, int) or hasattr(e.type, "__int__") else e.type
+        gr_type = (
+            int(e.type)
+            if isinstance(e.type, int) or hasattr(e.type, "__int__")
+            else e.type
+        )
         if gr_type == evt_type:
             same_place = (e.get_place_handle() == place_handle) or (
                 not e.get_place_handle() and not place_handle
             )
-            same_desc = (e.description == fs_desc) or (not e.description and not fs_desc)
+            same_desc = (e.description == fs_desc) or (
+                not e.description and not fs_desc
+            )
             if e.get_date_object() == gr_date and same_place and same_desc:
                 return e
-            if e.get_date_object().is_empty() and not gr_date and same_place and same_desc:
+            if (
+                e.get_date_object().is_empty()
+                and not gr_date
+                and same_place
+                and same_desc
+            ):
                 return e
 
     event = Event()

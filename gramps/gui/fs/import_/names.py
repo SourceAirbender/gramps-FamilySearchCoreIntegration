@@ -33,7 +33,7 @@ def add_name(db, txn, fs_name, gr_person):
     elif fs_name.type == "http://gedcomx.org/BirthName":
         name.set_type(NameType(NameType.BIRTH))
     else:
-        #nickName, AdoptiveName, FormalName, ReligiousName, #InformalName
+        # nickName, AdoptiveName, FormalName, ReligiousName, #InformalName
         name.set_type(NameType(NameType.CUSTOM))
 
     name.set_first_name(fs_name.akGiven())

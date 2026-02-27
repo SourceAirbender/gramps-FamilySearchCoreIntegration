@@ -91,7 +91,11 @@ class FSToGrampsImporter:
                 if not fh:
                     continue
                 fam = self.dbstate.db.get_family_from_handle(fh)
-                if fam and fam.get_mother_handle() == mother_h and fam.get_father_handle() == father_h:
+                if (
+                    fam
+                    and fam.get_mother_handle() == mother_h
+                    and fam.get_father_handle() == father_h
+                ):
                     return fam
         if mother_h:
             m = self.dbstate.db.get_person_from_handle(mother_h)
@@ -99,7 +103,11 @@ class FSToGrampsImporter:
                 if not fh:
                     continue
                 fam = self.dbstate.db.get_family_from_handle(fh)
-                if fam and fam.get_father_handle() == father_h and fam.get_mother_handle() == mother_h:
+                if (
+                    fam
+                    and fam.get_father_handle() == father_h
+                    and fam.get_mother_handle() == mother_h
+                ):
                     return fam
         return None
 
@@ -128,7 +136,9 @@ class FSToGrampsImporter:
 
         father_h = mother_h = None
         # explicitly references the root child.
-        for cpr in list(getattr(self.fs_TreeImp, "childAndParentsRelationships", []) or []):
+        for cpr in list(
+            getattr(self.fs_TreeImp, "childAndParentsRelationships", []) or []
+        ):
             if cpr.child and cpr.child.resourceId == root_fsid:
                 father_h = (
                     fs_utilities.FS_INDEX_PEOPLE.get(cpr.parent1.resourceId)
@@ -164,7 +174,10 @@ class FSToGrampsImporter:
                 self.dbstate.db.commit_person(m, self.txn)
 
         # attach the child if not already a member of this family.
-        if not any(cr.get_reference_handle() == child_h for cr in list(family.get_child_ref_list() or [])):
+        if not any(
+            cr.get_reference_handle() == child_h
+            for cr in list(family.get_child_ref_list() or [])
+        ):
             cr = ChildRef()
             cr.set_reference_handle(child_h)
             family.add_child_ref(cr)
@@ -226,7 +239,7 @@ class FSToGrampsImporter:
         for fs_fact in list(getattr(fs_person, "facts", []) or []):
             ev = add_event(db, txn, fs_fact, gr_person)
 
-            # find existing link ref (if any) - list() 
+            # find existing link ref (if any) - list()
             link_er = None
             for _er in list(gr_person.get_event_ref_list() or []):
                 if _er.ref == ev.handle:
@@ -257,7 +270,9 @@ class FSToGrampsImporter:
 
         # sources
         for fs_src in list(getattr(fs_person, "sources", []) or []):
-            add_source(db, txn, fs_src.descriptionId, gr_person, gr_person.citation_list)
+            add_source(
+                db, txn, fs_src.descriptionId, gr_person, gr_person.citation_list
+            )
 
         # compare
         fs_compare.compare_fs_to_gramps(fs_person, gr_person, db, None)
@@ -305,7 +320,9 @@ class FSToGrampsImporter:
             FSG_Sync.FSG_Sync.fs_Tree = self.fs_TreeImp
 
         # 3/11 — person
-        progress.set_pass(_("Downloading persons… (3/11)"), mode=ProgressMeter.MODE_ACTIVITY)
+        progress.set_pass(
+            _("Downloading persons… (3/11)"), mode=ProgressMeter.MODE_ACTIVITY
+        )
         print(_("Downloading person…"))
         if self.FS_ID:
             self.fs_TreeImp.add_persons([self.FS_ID])
@@ -342,7 +359,9 @@ class FSToGrampsImporter:
 
         # 6/11 — spouses (only if explicitly requested)
         if self.include_spouses:
-            progress.set_pass(_("Downloading spouses… (6/11)"), mode=ProgressMeter.MODE_ACTIVITY)
+            progress.set_pass(
+                _("Downloading spouses… (6/11)"), mode=ProgressMeter.MODE_ACTIVITY
+            )
             print(_("Downloading spouses…"))
             todo = set(self.fs_TreeImp._persons.keys())
             self.fs_TreeImp.add_spouses(set(todo))
@@ -360,11 +379,13 @@ class FSToGrampsImporter:
                 sess = getattr(tree, "_fs_session", None)
                 if sess is None:
                     return
-            
-                fn = getattr(sess, "get_jsonurl", None) or getattr(sess, "get_json", None)
+
+                fn = getattr(sess, "get_jsonurl", None) or getattr(
+                    sess, "get_json", None
+                )
                 if not callable(fn):
                     return
-            
+
                 payload = fn(url_path)
                 self._strip_unknowns(payload)
                 deserialize.deserialize_json(self.fs_TreeImp, payload)
@@ -376,7 +397,9 @@ class FSToGrampsImporter:
 
             def _load_couple_extras(rel_id: str) -> None:
                 _fetch_into_tree(f"/platform/tree/couple-relationships/{rel_id}/notes")
-                _fetch_into_tree(f"/platform/tree/couple-relationships/{rel_id}/sources")
+                _fetch_into_tree(
+                    f"/platform/tree/couple-relationships/{rel_id}/sources"
+                )
 
             for fs_person in list(self.fs_TreeImp.persons or []):
                 progress.step()
@@ -388,11 +411,11 @@ class FSToGrampsImporter:
 
             fetch_source_dates(self.fs_TreeImp)
 
-
         if self.verbosity >= 3:
             res = deserialize.to_string(self.fs_TreeImp)
             with open("import.out.json", "w") as f:
                 import json
+
                 json.dump(res, f, indent=2)
 
         print(_("Importing…"))
@@ -407,7 +430,6 @@ class FSToGrampsImporter:
             intr = False
             self.txn = DbTxn("FamilySearch import", caller.dbstate.db)
             caller.dbstate.db.transaction_begin(self.txn)
-
 
         # 8/11 — places
         progress.set_pass(_("Importing places… (8/11)"), len(self.fs_TreeImp.places))
@@ -424,7 +446,9 @@ class FSToGrampsImporter:
             self.add_person(caller.dbstate.db, self.txn, fs_person)
 
         # 10/11 — families (couple relationships)
-        progress.set_pass(_("Importing families… (10/11)"), len(self.fs_TreeImp.relationships))
+        progress.set_pass(
+            _("Importing families… (10/11)"), len(self.fs_TreeImp.relationships)
+        )
         print(_("Importing families…"))
         for fs_fam in list(self.fs_TreeImp.relationships or []):
             progress.step()
@@ -438,7 +462,9 @@ class FSToGrampsImporter:
                 len(getattr(self.fs_TreeImp, "childAndParentsRelationships", []) or []),
             )
             print(_("Importing children…"))
-            for fs_cpr in list(getattr(self.fs_TreeImp, "childAndParentsRelationships", []) or []):
+            for fs_cpr in list(
+                getattr(self.fs_TreeImp, "childAndParentsRelationships", []) or []
+            ):
                 progress.step()
                 self.add_child(fs_cpr)
 
@@ -486,7 +512,9 @@ class FSToGrampsImporter:
 
         # at least one known parent locally
         if not (father_h or mother_h):
-            print(_("Possibly parentless family - Need at least one known parent locally"))
+            print(
+                _("Possibly parentless family - Need at least one known parent locally")
+            )
             return
 
         # create the correct family (works with one- or two-parent)
@@ -510,7 +538,10 @@ class FSToGrampsImporter:
             return
 
         # attach child
-        if not any(cr.get_reference_handle() == child_h for cr in list(family.get_child_ref_list() or [])):
+        if not any(
+            cr.get_reference_handle() == child_h
+            for cr in list(family.get_child_ref_list() or [])
+        ):
             cr = ChildRef()
             cr.set_reference_handle(child_h)
             family.add_child_ref(cr)
@@ -603,7 +634,9 @@ class FSToGrampsImporter:
         # Family facts
         for fs_fact in list(getattr(fs_fam, "facts", []) or []):
             ev = add_event(self.dbstate.db, self.txn, fs_fact, family)
-            if not any(er.ref == ev.handle for er in list(family.get_event_ref_list() or [])):
+            if not any(
+                er.ref == ev.handle for er in list(family.get_event_ref_list() or [])
+            ):
                 er = EventRef()
                 er.set_role(EventRoleType.FAMILY)
                 er.set_reference_handle(ev.get_handle())
@@ -617,7 +650,7 @@ class FSToGrampsImporter:
             note = add_note(self.dbstate.db, self.txn, fs_note, family.note_list)
             family.add_note(note.handle)
 
-        # sources 
+        # sources
         for fs_src in list(getattr(fs_fam, "sources", []) or []):
             add_source(
                 self.dbstate.db,

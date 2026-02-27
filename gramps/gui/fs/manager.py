@@ -60,6 +60,7 @@ def _scan_for_session():
 def _discover_from_grampsgui():
     try:
         from gramps.gui import grampsgui
+
         return getattr(grampsgui, "dbstate", None), getattr(grampsgui, "uistate", None)
     except Exception:
         return None, None
@@ -111,6 +112,7 @@ def get_session(dbstate=None, uistate=None):
     config = None
     try:
         from gramps.gen.config import config as _config
+
         config = _config
     except Exception:
         config = None

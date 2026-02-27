@@ -54,6 +54,7 @@ _URL_RE = re.compile(r"https?://[^\s)\]\">]+")
 
 # (no db.dbapi)
 
+
 def _yield_handles(db, kind: str) -> Iterator[str]:
     """
     Yield handles for a primary object type in a backend-portable way.
@@ -153,14 +154,16 @@ def _canon_fs_web(url: str) -> str:
         p = urlparse(u)
         host = (p.netloc or "").lower()
         if host.endswith("familysearch.org"):
-            return urlunparse((
-                p.scheme or "https",
-                "www.familysearch.org",
-                p.path or "",
-                p.params or "",
-                p.query or "",
-                p.fragment or "",
-            ))
+            return urlunparse(
+                (
+                    p.scheme or "https",
+                    "www.familysearch.org",
+                    p.path or "",
+                    p.params or "",
+                    p.query or "",
+                    p.fragment or "",
+                )
+            )
     except Exception:
         # keep behavior: ignore parse errors and return original
         LOG.debug("Failed to canonicalize FamilySearch URL: %s", url, exc_info=True)
@@ -277,7 +280,9 @@ def _hydrate_source_description(fs_tree, sdid: str) -> None:
             {"Accept": "application/x-gedcomx-v1+json"},
         )
     except Exception:
-        LOG.debug("Failed to fetch SourceDescription hydration for %s", sdid, exc_info=True)
+        LOG.debug(
+            "Failed to fetch SourceDescription hydration for %s", sdid, exc_info=True
+        )
         return
 
     if not r or getattr(r, "status_code", None) != 200:
@@ -291,7 +296,9 @@ def _hydrate_source_description(fs_tree, sdid: str) -> None:
         deserialize.deserialize_json(fs_tree, data)
     except Exception:
         # keep behavior: hydration is best-effort
-        LOG.debug("Failed to deserialize hydrated SourceDescription %s", sdid, exc_info=True)
+        LOG.debug(
+            "Failed to deserialize hydrated SourceDescription %s", sdid, exc_info=True
+        )
         return
 
 
@@ -334,7 +341,11 @@ def fetch_source_dates(fs_tree):
                 r = sess.get_url(links_url, {"Accept": "application/json"})
             except Exception:
                 r = None
-                LOG.debug("Failed to fetch /service/tree/links/source/%s", sd.id, exc_info=True)
+                LOG.debug(
+                    "Failed to fetch /service/tree/links/source/%s",
+                    sd.id,
+                    exc_info=True,
+                )
             finally:
                 sd._fs_links_fetched = True
 
@@ -351,17 +362,21 @@ def fetch_source_dates(fs_tree):
                             d.formal = deserialize.DateFormal(str_formal)
                             sd._date = d
                         except Exception:
-                            LOG.debug("Failed to parse eventDate for %s", sd.id, exc_info=True)
+                            LOG.debug(
+                                "Failed to parse eventDate for %s", sd.id, exc_info=True
+                            )
 
                 sd._collectionUri = data.get("fsCollectionUri")
                 if sd._collectionUri and isinstance(sd._collectionUri, str):
-                    prefix = "https://www.familysearch.org/platform/records/collections/"
+                    prefix = (
+                        "https://www.familysearch.org/platform/records/collections/"
+                    )
                     try:
                         # Py3.9+ has removeprefix
                         sd._collection = sd._collectionUri.removeprefix(prefix)
                     except AttributeError:
                         sd._collection = (
-                            sd._collectionUri[len(prefix):]
+                            sd._collectionUri[len(prefix) :]
                             if sd._collectionUri.startswith(prefix)
                             else None
                         )
@@ -388,7 +403,12 @@ def fetch_source_dates(fs_tree):
                 )
                 cand = ""
                 if isinstance(uri_val, dict):
-                    cand = uri_val.get("uri") or uri_val.get("url") or uri_val.get("href") or ""
+                    cand = (
+                        uri_val.get("uri")
+                        or uri_val.get("url")
+                        or uri_val.get("href")
+                        or ""
+                    )
                 elif isinstance(uri_val, str):
                     cand = uri_val
 
@@ -477,7 +497,9 @@ class IntermediateSource:
             fs_citation_value = next(iter(fs_sd.citations)).value
 
         if fs_sd.resourceType not in ("FSREADONLY", "LEGACY", "DEFAULT", "IGI"):
-            LOG.warning("Unknown FS SourceDescription resourceType: %s", str(fs_sd.resourceType))
+            LOG.warning(
+                "Unknown FS SourceDescription resourceType: %s", str(fs_sd.resourceType)
+            )
         if fs_sd.resourceType == "LEGACY":
             self.source_title = "Legacy NFS Sources"
 
@@ -498,28 +520,50 @@ class IntermediateSource:
                 if line.startswith(_("Repository")):
                     # removeprefix exists in newer python; keep compatibility
                     try:
-                        self.repository_name = line.removeprefix(_("Repository") + " :").strip()
+                        self.repository_name = line.removeprefix(
+                            _("Repository") + " :"
+                        ).strip()
                     except AttributeError:
                         prefix = _("Repository") + " :"
-                        self.repository_name = line[len(prefix):].strip() if line.startswith(prefix) else line.strip()
+                        self.repository_name = (
+                            line[len(prefix) :].strip()
+                            if line.startswith(prefix)
+                            else line.strip()
+                        )
                 elif line.startswith(_("Source:")):
                     try:
                         self.source_title = line.removeprefix(_("Source:")).strip()
                     except AttributeError:
                         prefix = _("Source:")
-                        self.source_title = line[len(prefix):].strip() if line.startswith(prefix) else line.strip()
+                        self.source_title = (
+                            line[len(prefix) :].strip()
+                            if line.startswith(prefix)
+                            else line.strip()
+                        )
                 elif line.startswith(_("Volume/Page:")):
                     try:
-                        self.page_or_position = line.removeprefix(_("Volume/Page:")).strip()
+                        self.page_or_position = line.removeprefix(
+                            _("Volume/Page:")
+                        ).strip()
                     except AttributeError:
                         prefix = _("Volume/Page:")
-                        self.page_or_position = line[len(prefix):].strip() if line.startswith(prefix) else line.strip()
+                        self.page_or_position = (
+                            line[len(prefix) :].strip()
+                            if line.startswith(prefix)
+                            else line.strip()
+                        )
                 elif line.startswith(_("Confidence:")):
                     try:
-                        self.confidence_label = line.removeprefix(_("Confidence:")).strip()
+                        self.confidence_label = line.removeprefix(
+                            _("Confidence:")
+                        ).strip()
                     except AttributeError:
                         prefix = _("Confidence:")
-                        self.confidence_label = line[len(prefix):].strip() if line.startswith(prefix) else line.strip()
+                        self.confidence_label = (
+                            line[len(prefix) :].strip()
+                            if line.startswith(prefix)
+                            else line.strip()
+                        )
             if not self.source_title and len(lines) >= 1:
                 self.source_title = lines[0]
 
@@ -604,7 +648,9 @@ class IntermediateSource:
 
                 # update cache
                 try:
-                    _db_cache_get(db, "_grampsfs_repo_by_name_cache")[self.repository_name] = repo_handle
+                    _db_cache_get(db, "_grampsfs_repo_by_name_cache")[
+                        self.repository_name
+                    ] = repo_handle
                 except Exception:
                     pass
 
@@ -641,7 +687,9 @@ class IntermediateSource:
 
             # update cache
             try:
-                _db_cache_get(db, "_grampsfs_source_by_title_cache")[self.source_title] = src.handle
+                _db_cache_get(db, "_grampsfs_source_by_title_cache")[
+                    self.source_title
+                ] = src.handle
             except Exception:
                 pass
 
@@ -684,6 +732,7 @@ class IntermediateSource:
 
         if self.date:
             from gramps.gui.fs.utilities import fs_date_to_gramps_date
+
             citation.date = fs_date_to_gramps_date(self.date)
 
         if src:

@@ -93,6 +93,7 @@ def _txn(db, title: str) -> Iterator[DbTxn]:
 # Tag ensure
 # -------------
 
+
 def _ensure_tag(db, name: str, *, txn: DbTxn) -> Tag:
     tag = db.get_tag_from_name(name)
     if tag:
@@ -225,7 +226,9 @@ def retag_all_link_status(db) -> Tuple[int, int, int, int]:
     return total, linked, not_linked, changed
 
 
-def set_sync_status_for_person(db, person: Person, *, is_synced: bool) -> None: #not working
+def set_sync_status_for_person(
+    db, person: Person, *, is_synced: bool
+) -> None:  # not working
     """
     Apply FS_Synced (default green) or FS_OutOfSync (default yellow) exclusively.
 
@@ -239,7 +242,6 @@ def set_sync_status_for_person(db, person: Person, *, is_synced: bool) -> None: 
         changed = _set_exclusive_tag(db, person, target, txn=txn)
         if changed:
             db.commit_person(person, txn)
-
 
 
 def _norm_color(value: Any) -> str:
@@ -309,10 +311,14 @@ def compute_sync_from_payload(data: dict) -> bool:
     - data["notes"] = [row, ...] with first cell status
     - data["sources"] = [row, ...] with first cell status
     """
-    for group in (data.get("overview") or []):
-        for row in (group.get("rows") or []):
+    for group in data.get("overview") or []:
+        for row in group.get("rows") or []:
             cols = row.get("columns") if isinstance(row, dict) else None
-            v = cols[0] if cols else (row[0] if isinstance(row, (list, tuple)) and row else row)
+            v = (
+                cols[0]
+                if cols
+                else (row[0] if isinstance(row, (list, tuple)) and row else row)
+            )
             if _norm_color(v) != "green":
                 return False
 
@@ -331,7 +337,11 @@ def explain_out_of_sync(data: dict) -> List[str]:
         title = group.get("title", _("Group %(num)d") % {"num": gi + 1})
         for ri, row in enumerate(group.get("rows") or []):
             cols = row.get("columns") if isinstance(row, dict) else None
-            v = cols[0] if cols else (row[0] if isinstance(row, (list, tuple)) and row else row)
+            v = (
+                cols[0]
+                if cols
+                else (row[0] if isinstance(row, (list, tuple)) and row else row)
+            )
             c = _norm_color(v)
             if c != "green":
                 reasons.append(
@@ -344,18 +354,23 @@ def explain_out_of_sync(data: dict) -> List[str]:
         v = row[0] if isinstance(row, (list, tuple)) and row else row
         c = _norm_color(v)
         if c != "green":
-            reasons.append(_("Notes → row %(row)d not green (%(color)s)") % {"row": ri + 1, "color": c})
+            reasons.append(
+                _("Notes → row %(row)d not green (%(color)s)")
+                % {"row": ri + 1, "color": c}
+            )
             break
 
     for ri, row in enumerate(data.get("sources") or []):
         v = row[0] if isinstance(row, (list, tuple)) and row else row
         c = _norm_color(v)
         if c != "green":
-            reasons.append(_("Sources → row %(row)d not green (%(color)s)") % {"row": ri + 1, "color": c})
+            reasons.append(
+                _("Sources → row %(row)d not green (%(color)s)")
+                % {"row": ri + 1, "color": c}
+            )
             break
 
     return reasons
-
 
 
 def get_tag_color_ui_note() -> str:

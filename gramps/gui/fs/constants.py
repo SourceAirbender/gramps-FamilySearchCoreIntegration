@@ -22,6 +22,7 @@ from __future__ import annotations
 MAX_PERSONS = 200
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
+
 try:
     _trans = glocale.get_addon_translator(__file__)
 except ValueError:
@@ -81,15 +82,14 @@ GEDCOMX_TO_GRAMPS_FACTS = {
     "http://gedcomx.org/Stillbirth": EventType.STILLBIRTH,
     "data:,http://gedcomx.org/Will": EventType.WILL,
     "http://familysearch.org/v1/TitleOfNobility": EventType.NOB_TITLE,
-
     # common pseudo/extra labels
-    "http://familysearch.org/v1/LifeSketch": _('LifeSketch'),
-    "data:,Birth Registration": _('Birth Registration'),
-    "data:,Birth+Registration": _('Birth Registration'),
-    "data:,Death Registration": _('Death Registration'),
-    "data:,Death+Registration": _('Death Registration'),
-    "data:,Obituary": _('Obituary'),
-    "data:,Citizenship": _('Citizenship'),
+    "http://familysearch.org/v1/LifeSketch": _("LifeSketch"),
+    "data:,Birth Registration": _("Birth Registration"),
+    "data:,Birth+Registration": _("Birth Registration"),
+    "data:,Death Registration": _("Death Registration"),
+    "data:,Death+Registration": _("Death Registration"),
+    "data:,Obituary": _("Obituary"),
+    "data:,Citizenship": _("Citizenship"),
 }
 
 EXTRA_FACTS = {
@@ -99,8 +99,10 @@ EXTRA_FACTS = {
     "data:,Testament": EventType.WILL,
 }
 
+
 def _reversed_dict(d):
     return {val: key for key, val in d.items()}
+
 
 GRAMPS_TO_GEDCOMX_FACTS = _reversed_dict(GEDCOMX_TO_GRAMPS_FACTS)
 
@@ -135,6 +137,7 @@ GEDCOMX_TO_GRAMPS_PLACES = {
 
 __all__ = [
     "MAX_PERSONS",
-    "GEDCOMX_TO_GRAMPS_FACTS", "GRAMPS_TO_GEDCOMX_FACTS",
+    "GEDCOMX_TO_GRAMPS_FACTS",
+    "GRAMPS_TO_GEDCOMX_FACTS",
     "GEDCOMX_TO_GRAMPS_PLACES",
 ]

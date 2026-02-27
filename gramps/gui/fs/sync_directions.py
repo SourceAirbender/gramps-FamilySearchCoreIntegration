@@ -60,7 +60,11 @@ def _as_tree_model(maybe_model):
 
     for attr in ("model", "_model", "store", "_store", "treemodel"):
         inner = getattr(maybe_model, attr, None)
-        if inner is not None and hasattr(inner, "get_iter_first") and hasattr(inner, "get_value"):
+        if (
+            inner is not None
+            and hasattr(inner, "get_iter_first")
+            and hasattr(inner, "get_value")
+        ):
             return inner
 
     return None
@@ -192,6 +196,7 @@ def _make_overview_model() -> ListModel:
 def _bind_global_session(session) -> None:
     try:
         from . import tree as fs_tree_mod
+
         setattr(fs_tree_mod, "_fs_session", session)
     except Exception:
         pass
@@ -201,7 +206,11 @@ def _find_fs_tree(session) -> Optional[Any]:
     # session.fs_Tree
     try:
         t = getattr(session, "fs_Tree", None)
-        if t is not None and not isinstance(t, type) and (hasattr(t, "add_persons") or hasattr(t, "add_person")):
+        if (
+            t is not None
+            and not isinstance(t, type)
+            and (hasattr(t, "add_persons") or hasattr(t, "add_person"))
+        ):
             return t
     except Exception:
         pass
@@ -213,7 +222,11 @@ def _find_fs_tree(session) -> Optional[Any]:
         for name in ("fs_Tree", "_fs_tree", "tree", "_tree"):
             try:
                 t = getattr(fs_tree_mod, name, None)
-                if t is not None and not isinstance(t, type) and (hasattr(t, "add_persons") or hasattr(t, "add_person")):
+                if (
+                    t is not None
+                    and not isinstance(t, type)
+                    and (hasattr(t, "add_persons") or hasattr(t, "add_person"))
+                ):
                     return t
             except Exception:
                 pass
@@ -276,7 +289,9 @@ def _fmt(date_s: str, val_s: str) -> str:
     return date_s or val_s or _("(empty)")
 
 
-def _prompt(parent: Gtk.Window, items: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
+def _prompt(
+    parent: Gtk.Window, items: List[Dict[str, Any]]
+) -> Tuple[str, List[Dict[str, Any]]]:
     dlg = Gtk.Dialog(title=_("Sync to FamilySearch"), transient_for=parent, flags=0)
     dlg.set_modal(True)
     dlg.set_default_size(780, 560)
@@ -390,7 +405,11 @@ def _prompt(parent: Gtk.Window, items: List[Dict[str, Any]]) -> Tuple[str, List[
 def _err_text(resp) -> str:
     try:
         data = resp.json()
-        if isinstance(data, dict) and isinstance(data.get("errors"), list) and data["errors"]:
+        if (
+            isinstance(data, dict)
+            and isinstance(data.get("errors"), list)
+            and data["errors"]
+        ):
             e0 = data["errors"][0]
             msg = e0.get("message") or ""
             code = e0.get("code") or ""
@@ -404,7 +423,9 @@ def _err_text(resp) -> str:
         return ""
 
 
-def _build_payload(fsid: str, chosen: List[Dict[str, Any]], change_message: str) -> Dict[str, Any]:
+def _build_payload(
+    fsid: str, chosen: List[Dict[str, Any]], change_message: str
+) -> Dict[str, Any]:
     msg = (change_message or "").strip() or _("Updated from Gramps")
     person: Dict[str, Any] = {"id": fsid}
     names = []
@@ -420,7 +441,9 @@ def _build_payload(fsid: str, chosen: List[Dict[str, Any]], change_message: str)
             given = str(it.get("gr_given") or "").strip()
             sur = str(it.get("gr_surname") or "").strip()
 
-            name_form: Dict[str, Any] = {"fullText": full or (given + " " + sur).strip()}
+            name_form: Dict[str, Any] = {
+                "fullText": full or (given + " " + sur).strip()
+            }
             parts = []
             if given:
                 parts.append({"type": "http://gedcomx.org/Given", "value": given})
@@ -444,13 +467,18 @@ def _build_payload(fsid: str, chosen: List[Dict[str, Any]], change_message: str)
             if not fact_id:
                 continue
 
-            fact: Dict[str, Any] = {"id": fact_id, "attribution": {"changeMessage": msg}}
+            fact: Dict[str, Any] = {
+                "id": fact_id,
+                "attribution": {"changeMessage": msg},
+            }
 
             try:
                 fs_person = deserialize.Person._index.get(fsid)
                 if fs_person and getattr(fs_person, "facts", None):
                     for f in fs_person.facts:
-                        if getattr(f, "id", None) == fact_id and getattr(f, "type", None):
+                        if getattr(f, "id", None) == fact_id and getattr(
+                            f, "type", None
+                        ):
                             fact["type"] = str(f.type)
                             break
             except Exception:
@@ -477,14 +505,22 @@ def _build_payload(fsid: str, chosen: List[Dict[str, Any]], change_message: str)
     return {"persons": [person]}
 
 
-def sync_to_familysearch(dbstate, uistate, track, person, session, parent, editor=None) -> None:
-    if not (getattr(session, "logged", False) or getattr(session, "access_token", None) or getattr(session, "connected", False)):
+def sync_to_familysearch(
+    dbstate, uistate, track, person, session, parent, editor=None
+) -> None:
+    if not (
+        getattr(session, "logged", False)
+        or getattr(session, "access_token", None)
+        or getattr(session, "connected", False)
+    ):
         WarningDialog(_("Not connected to FamilySearch."), parent=parent)
         return
 
     fsid = fs_utilities.get_fsftid(person)
     if not fsid:
-        WarningDialog(_("No FamilySearch Person ID is set for this person."), parent=parent)
+        WarningDialog(
+            _("No FamilySearch Person ID is set for this person."), parent=parent
+        )
         return
 
     _prime_cache(session, fsid)
@@ -492,16 +528,22 @@ def sync_to_familysearch(dbstate, uistate, track, person, session, parent, edito
     fs_person = deserialize.Person._index.get(fsid)
     if fs_person is None:
         WarningDialog(
-            _("FamilySearch person is not cached yet.\nTry 'Sync from FamilySearch' once or re-login, then try again."),
+            _(
+                "FamilySearch person is not cached yet.\nTry 'Sync from FamilySearch' once or re-login, then try again."
+            ),
             parent=parent,
         )
         return
 
     try:
         model = _make_overview_model()
-        fs_compare.compare_fs_to_gramps(fs_person, person, dbstate.db, model=model, dupdoc=True)
+        fs_compare.compare_fs_to_gramps(
+            fs_person, person, dbstate.db, model=model, dupdoc=True
+        )
     except Exception as e:
-        WarningDialog(_("Could not prepare compare data: {e}").format(e=str(e)), parent=parent)
+        WarningDialog(
+            _("Could not prepare compare data: {e}").format(e=str(e)), parent=parent
+        )
         return
 
     items = _collect_push_items(model)
@@ -520,7 +562,9 @@ def sync_to_familysearch(dbstate, uistate, track, person, session, parent, edito
     try:
         r_head = session.head_url(path)
     except Exception as e:
-        WarningDialog(_("FamilySearch request failed: {e}").format(e=str(e)), parent=parent)
+        WarningDialog(
+            _("FamilySearch request failed: {e}").format(e=str(e)), parent=parent
+        )
         return
 
     # follow forwarded IDs (301)
@@ -560,7 +604,9 @@ def sync_to_familysearch(dbstate, uistate, track, person, session, parent, edito
     try:
         resp = session.post(path, json=payload, headers=headers)
     except Exception as e:
-        WarningDialog(_("FamilySearch update failed: {e}").format(e=str(e)), parent=parent)
+        WarningDialog(
+            _("FamilySearch update failed: {e}").format(e=str(e)), parent=parent
+        )
         return
 
     if resp is None:
@@ -573,12 +619,17 @@ def sync_to_familysearch(dbstate, uistate, track, person, session, parent, edito
         return
 
     if resp.status_code in (409, 412):
-        WarningDialog(_("FamilySearch rejected the update (person changed on server)."), parent=parent)
+        WarningDialog(
+            _("FamilySearch rejected the update (person changed on server)."),
+            parent=parent,
+        )
         return
 
     msg = _err_text(resp)
     WarningDialog(
-        _("FamilySearch update failed (HTTP {code}).").format(code=getattr(resp, "status_code", "?"))
+        _("FamilySearch update failed (HTTP {code}).").format(
+            code=getattr(resp, "status_code", "?")
+        )
         + (("\n" + msg) if msg else ""),
         parent=parent,
     )

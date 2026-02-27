@@ -33,6 +33,7 @@ _LAZY_ATTRS = {
     "get_active_session": (".session", "get_active_session"),
 }
 
+
 def __getattr__(name: str) -> Any:
     if name in _LAZY_MODULES:
         mod = importlib.import_module(_LAZY_MODULES[name], package=__name__)
@@ -48,7 +49,15 @@ def __getattr__(name: str) -> Any:
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
+
 def __dir__():
-    return sorted(set(list(globals().keys()) + list(_LAZY_MODULES.keys()) + list(_LAZY_ATTRS.keys())))
+    return sorted(
+        set(
+            list(globals().keys())
+            + list(_LAZY_MODULES.keys())
+            + list(_LAZY_ATTRS.keys())
+        )
+    )
+
 
 __all__ = ["tree", "session", "Session", "get_active_session"]

@@ -85,7 +85,11 @@ def fs_person_dates_str(db, fs_person) -> str:
         return ""
 
     fs_fact = fs_utilities.get_fs_fact(fs_person, "http://gedcomx.org/Birth")
-    if fs_fact and getattr(fs_fact, "date", None) and getattr(fs_fact.date, "formal", None):
+    if (
+        fs_fact
+        and getattr(fs_fact, "date", None)
+        and getattr(fs_fact.date, "formal", None)
+    ):
         if fs_fact.date.formal.approximate:
             res = "~"
         else:
@@ -99,7 +103,11 @@ def fs_person_dates_str(db, fs_person) -> str:
         res = " ....-"
 
     fs_fact = fs_utilities.get_fs_fact(fs_person, "http://gedcomx.org/Death")
-    if fs_fact and getattr(fs_fact, "date", None) and getattr(fs_fact.date, "formal", None):
+    if (
+        fs_fact
+        and getattr(fs_fact, "date", None)
+        and getattr(fs_fact.date, "formal", None)
+    ):
         if fs_fact.date.formal.approximate:
             res = res + "~"
         else:

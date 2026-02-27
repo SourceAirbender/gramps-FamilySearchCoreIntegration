@@ -86,5 +86,5 @@ def build_fs_index(caller, progress, total_steps: int) -> None:
                 FS_INDEX_PLACES[getattr(url, "path", "")] = place_handle
 
 
-# local import to avoid circular import 
+# local import to avoid circular import
 from .attributes import get_fsftid

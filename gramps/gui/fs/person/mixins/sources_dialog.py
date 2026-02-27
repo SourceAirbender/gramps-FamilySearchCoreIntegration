@@ -27,10 +27,11 @@ from types import ModuleType
 
 from gi.repository import Gtk, Gdk
 
-# mypy Pango 
+# mypy Pango
 Pango: Any = None
 try:
     from gi.repository import Pango as _Pango  # type: ignore
+
     Pango = cast(Any, _Pango)
 except Exception:
     Pango = None
@@ -48,6 +49,7 @@ fs_source_image: Optional[ModuleType] = None
 
 try:
     from gramps.gui.fs import fs_source_image as _fs_source_image
+
     fs_source_image = cast(ModuleType, _fs_source_image)
     _has_img_picker = True
 except Exception:
@@ -71,10 +73,17 @@ if TYPE_CHECKING:
         CONFIG: Any
         fs_Tree: Any
 
-        def _ensure_sources_cached(self, fsid: str) -> None: ...
-        def _gather_sr_meta(self, fsid: str) -> dict[str, Any]: ...
-        def _import_fs_sources(self, gr: Any, selected_items: Any) -> int: ...
-        def _pretty_tags(self, tags: Any) -> str: ...
+        def _ensure_sources_cached(self, fsid: str) -> None:
+            ...
+
+        def _gather_sr_meta(self, fsid: str) -> dict[str, Any]:
+            ...
+
+        def _import_fs_sources(self, gr: Any, selected_items: Any) -> int:
+            ...
+
+        def _pretty_tags(self, tags: Any) -> str:
+            ...
 
 
 class SourcesDialogMixin:
@@ -149,7 +158,7 @@ class SourcesDialogMixin:
             src_fs.from_fs(sd, None)
 
             fs_title = src_fs.citation_title or ""
-            fs_text = (src_fs.note_text or "")
+            fs_text = src_fs.note_text or ""
             fs_date = str(src_fs.date) if getattr(src_fs, "date", "") else ""
             fs_url = src_fs.url or ""
 
@@ -162,7 +171,12 @@ class SourcesDialogMixin:
                 gr_url = src_gr.url or ""
                 date = fs_utilities.gramps_date_to_formal(c.date)
 
-                if (fs_date == date and fs_title == title and fs_url == gr_url and (fs_text or "").strip() == note_text):
+                if (
+                    fs_date == date
+                    and fs_title == title
+                    and fs_url == gr_url
+                    and (fs_text or "").strip() == note_text
+                ):
                     return "green"
 
             return "orange"
@@ -191,25 +205,29 @@ class SourcesDialogMixin:
         # store:
         # 0 import?, 1 bg_color_token, 2 action text, 3 auto_kind, 4 chosen kind,
         # 5 title, 6 date, 7 url, 8 tags, 9 contributor, 10 sdid, 11 img_count, 12 add_to_person_gallery
-        store = Gtk.ListStore(bool, str, str, str, str, str, str, str, str, str, str, int, bool)
+        store = Gtk.ListStore(
+            bool, str, str, str, str, str, str, str, str, str, str, int, bool
+        )
 
         for sdid, auto_kind, title, date_s, url, tags, contributor in items:
             color_token = detect_color_for_sdid(sdid)
-            store.append([
-                True,
-                color_token,
-                "",
-                auto_kind or "",
-                "Auto",
-                title or "",
-                date_s or "",
-                url or "",
-                tags or "",
-                contributor or "",
-                sdid,
-                0,
-                True,
-            ])
+            store.append(
+                [
+                    True,
+                    color_token,
+                    "",
+                    auto_kind or "",
+                    "Auto",
+                    title or "",
+                    date_s or "",
+                    url or "",
+                    tags or "",
+                    contributor or "",
+                    sdid,
+                    0,
+                    True,
+                ]
+            )
 
         treeview = Gtk.TreeView(model=store)
         treeview.set_activate_on_single_click(True)
@@ -218,7 +236,9 @@ class SourcesDialogMixin:
 
         # import toggle
         toggle = Gtk.CellRendererToggle()
-        toggle.connect("toggled", lambda _w, path: store[path].__setitem__(0, not store[path][0]))
+        toggle.connect(
+            "toggled", lambda _w, path: store[path].__setitem__(0, not store[path][0])
+        )
         col0 = Gtk.TreeViewColumn(_("Import"), toggle, active=0)
 
         # color indicator column
@@ -323,8 +343,18 @@ class SourcesDialogMixin:
         action_col.set_cell_data_func(action_cell, _action_cell_data_func)
 
         for col in (
-            col0, color_col, col_auto, col_kind, col_title, col_date, col_url, col_tags,
-            col_con, col_img_ct, col_person, action_col
+            col0,
+            color_col,
+            col_auto,
+            col_kind,
+            col_title,
+            col_date,
+            col_url,
+            col_tags,
+            col_con,
+            col_img_ct,
+            col_person,
+            action_col,
         ):
             treeview.append_column(col)
 
@@ -401,7 +431,9 @@ class SourcesDialogMixin:
                 row[1] = _sanitize_base(new_text)
 
             cr_base.connect("edited", on_base_edited)
-            col_base = Gtk.TreeViewColumn(_("Filename (without extension)"), cr_base, text=1)
+            col_base = Gtk.TreeViewColumn(
+                _("Filename (without extension)"), cr_base, text=1
+            )
 
             cr_ext = Gtk.CellRendererText()
             col_ext = Gtk.TreeViewColumn(_("Extension"), cr_ext, text=2)
@@ -416,10 +448,12 @@ class SourcesDialogMixin:
             help_lbl.set_line_wrap(True)
             help_lbl.get_style_context().add_class("fs-muted")
             help_lbl.set_text(
-                _("Tips:\n"
-                  "• Double-click the name to edit.\n"
-                  "• Extensions are preserved.\n"
-                  "• If a file with the new name exists, a numeric suffix will be added.")
+                _(
+                    "Tips:\n"
+                    "• Double-click the name to edit.\n"
+                    "• Extensions are preserved.\n"
+                    "• If a file with the new name exists, a numeric suffix will be added."
+                )
             )
 
             v2 = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -446,7 +480,9 @@ class SourcesDialogMixin:
                         title=_("Add Source Image"),
                     )
                 except Exception as ex:
-                    WarningDialog(_("Could not open image picker:\n{e}").format(e=str(ex)))
+                    WarningDialog(
+                        _("Could not open image picker:\n{e}").format(e=str(ex))
+                    )
                     return
                 if not saved:
                     return
@@ -467,8 +503,10 @@ class SourcesDialogMixin:
                     parent=dlg2,
                     action=Gtk.FileChooserAction.OPEN,
                     buttons=(
-                        _("Cancel"), Gtk.ResponseType.CANCEL,
-                        _("Select"), Gtk.ResponseType.OK,
+                        _("Cancel"),
+                        Gtk.ResponseType.CANCEL,
+                        _("Select"),
+                        Gtk.ResponseType.OK,
                     ),
                 )
                 try:
@@ -555,7 +593,11 @@ class SourcesDialogMixin:
                         row[2] = ext_new
                         row[3] = target
                     except Exception as ex:
-                        WarningDialog(_("Rename failed for:\n{p}\n\n{err}").format(p=full_old, err=str(ex)))
+                        WarningDialog(
+                            _("Rename failed for:\n{p}\n\n{err}").format(
+                                p=full_old, err=str(ex)
+                            )
+                        )
 
                 images_by_sdid[sdid] = _refresh_imgs_from_model()
 
@@ -600,8 +642,14 @@ class SourcesDialogMixin:
         box.pack_start(top, False, False, 0)
         box.pack_start(
             fs_ui.build_legend_row(
-                [("green", _("Match")), ("orange", _("Different")), ("yellow3", _("Only in FamilySearch"))],
-                hint=_("Tip: click “Manage Images…” to add/choose/rename files before importing."),
+                [
+                    ("green", _("Match")),
+                    ("orange", _("Different")),
+                    ("yellow3", _("Only in FamilySearch")),
+                ],
+                hint=_(
+                    "Tip: click “Manage Images…” to add/choose/rename files before importing."
+                ),
                 wrap_class="fs-sources-legend",
             ),
             False,
@@ -633,7 +681,9 @@ class SourcesDialogMixin:
             img_list = images_by_sdid.get(sdid, [])[:]
             add_to_person = bool(row[12])
 
-            selected_items.append((sdid, modified, contributor, final_kind, img_list, add_to_person))
+            selected_items.append(
+                (sdid, modified, contributor, final_kind, img_list, add_to_person)
+            )
 
         dlg.destroy()
         if not selected_items:
@@ -646,7 +696,9 @@ class SourcesDialogMixin:
     # Data collection
     # ------------------
 
-    def _collect_fs_sources(self, fsid: str) -> List[Tuple[str, str, str, str, str, str, str]]:
+    def _collect_fs_sources(
+        self, fsid: str
+    ) -> List[Tuple[str, str, str, str, str, str, str]]:
         deps = cast("_SourcesDialogDeps", self)
 
         deps._ensure_sources_cached(fsid)
@@ -681,7 +733,7 @@ class SourcesDialogMixin:
             sd_obj = deserialize.SourceDescription._index.get(sdid)
             if sd_obj is None:
                 continue
-            
+
             isrc = fs_import.IntermediateSource()
             isrc.from_fs(sd_obj, None)
             title = isrc.citation_title or ""

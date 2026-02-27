@@ -54,8 +54,10 @@ import requests
 from gramps.gen.config import config
 from gramps.gen.constfunc import lin, win
 import gi
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib  # noqa: E402
+
 sys.modules.setdefault("gramps.gui.fs.session", sys.modules[__name__])
 LOG = logging.getLogger(__name__)
 
@@ -75,7 +77,9 @@ if _debug_enabled():
     if not LOG.handlers and not logging.getLogger().handlers:
         _h = logging.StreamHandler(stream=sys.stderr)
         _h.setLevel(logging.DEBUG)
-        _h.setFormatter(logging.Formatter("[FS DEBUG %(asctime)s] %(message)s", "%Y-%m-%d %H:%M:%S"))
+        _h.setFormatter(
+            logging.Formatter("[FS DEBUG %(asctime)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+        )
         LOG.addHandler(_h)
         LOG.propagate = False
 
@@ -184,7 +188,7 @@ class FamilySearchSession:
         self._dbstate = None
         self._uistate = None
         self._track = None
-        self._last_person_handle = None 
+        self._last_person_handle = None
 
     def bind_context(self, dbstate=None, uistate=None, track=None, person_handle=None):
         if dbstate is not None:
@@ -194,7 +198,9 @@ class FamilySearchSession:
         if track is not None:
             self._track = track
         elif uistate is not None:
-            self._track = getattr(uistate, "track", None) or getattr(uistate, "_track", None)
+            self._track = getattr(uistate, "track", None) or getattr(
+                uistate, "_track", None
+            )
         if person_handle:
             self._last_person_handle = person_handle
 
@@ -292,7 +298,13 @@ class FSStatusIndicator:
         s = (self._state or "").upper()
         if s in ("CONNECTED", "API_OK"):
             return (0.20, 0.70, 0.25)  # green
-        if s in ("PROBING", "LOGGING_IN", "AUTHORIZING", "EXCHANGING_TOKEN", "AWAITING_BROWSER"):
+        if s in (
+            "PROBING",
+            "LOGGING_IN",
+            "AUTHORIZING",
+            "EXCHANGING_TOKEN",
+            "AWAITING_BROWSER",
+        ):
             return (0.95, 0.70, 0.15)  # amber
         if s in ("TOKEN_ACQUIRED", "AUTH_CODE_RECEIVED"):
             return (0.20, 0.55, 0.90)  # blue
@@ -344,7 +356,9 @@ class Listener(threading.Thread):
                 try:
                     conn, addr = s.accept()
                 except socket.timeout:
-                    raise TimeoutError(f"Callback not received within {self.timeout_s}s")
+                    raise TimeoutError(
+                        f"Callback not received within {self.timeout_s}s"
+                    )
 
                 _dbg(f"Listener accepted connection from {addr}")
                 with conn:
@@ -358,7 +372,11 @@ class Listener(threading.Thread):
                     path_only = req_path.split("?", 1)[0] if req_path else ""
                     query = req_path.split("?", 1)[1] if "?" in req_path else ""
 
-                    if self.expected_path and path_only and path_only != self.expected_path:
+                    if (
+                        self.expected_path
+                        and path_only
+                        and path_only != self.expected_path
+                    ):
                         _dbg(
                             f"Listener WARNING: unexpected path {path_only!r} "
                             f"expected {self.expected_path!r}"
@@ -369,7 +387,9 @@ class Listener(threading.Thread):
                     _dbg(f"Listener parsed params: {self.result}")
 
                     if "error" in self.result or "error_description" in self.result:
-                        msg = "Access denied or error returned. You can close this tab.\n"
+                        msg = (
+                            "Access denied or error returned. You can close this tab.\n"
+                        )
                     else:
                         msg = "Success! You can now return to Gramps.\n"
 
@@ -436,7 +456,9 @@ class Session(requests.Session):
             or str(_cfg_get("familysearch.scope", "") or "").strip()
             or "profile email qualifies_for_affiliate_account country"
         )
-        self.listen_timeout: int = int(os.environ.get("GRAMPS_FS_LISTENER_TIMEOUT", "300") or "300")
+        self.listen_timeout: int = int(
+            os.environ.get("GRAMPS_FS_LISTENER_TIMEOUT", "300") or "300"
+        )
 
         self.status_indicator = FSStatusIndicator()
         self._set_status("DISCONNECTED", "No token yet")
@@ -454,14 +476,23 @@ class Session(requests.Session):
 
         self._auth_method_chosen: str = (
             os.environ.get("GRAMPS_FS_AUTH_METHOD", "").strip().lower()
-            or str(_cfg_get("familysearch.auth_method", AUTH_AUTO) or AUTH_AUTO).strip().lower()
+            or str(_cfg_get("familysearch.auth_method", AUTH_AUTO) or AUTH_AUTO)
+            .strip()
+            .lower()
         )
-        if self._auth_method_chosen not in (AUTH_AUTO, AUTH_WEBKIT, AUTH_LOOPBACK, AUTH_MANUAL):
+        if self._auth_method_chosen not in (
+            AUTH_AUTO,
+            AUTH_WEBKIT,
+            AUTH_LOOPBACK,
+            AUTH_MANUAL,
+        ):
             self._auth_method_chosen = AUTH_AUTO
 
         self._beta_profile = self._build_profile(ENV_BETA)
         self._prod_profile = self._build_profile(ENV_PROD)
-        self._profile: EnvProfile = self._beta_profile if env == ENV_BETA else self._prod_profile
+        self._profile: EnvProfile = (
+            self._beta_profile if env == ENV_BETA else self._prod_profile
+        )
         self._apply_profile(self._profile, clear_state=False)
 
         # Listener plumbing
@@ -486,7 +517,12 @@ class Session(requests.Session):
             f"app_key={_mask(self.app_key)} redirect={self.redirect} scope={self.oauth_scope!r}"
         )
 
-        if os.environ.get("GRAMPS_FS_SHOW_STATUS", "").strip().lower() in ("1", "true", "yes", "on"):
+        if os.environ.get("GRAMPS_FS_SHOW_STATUS", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
             try:
                 self.status_indicator.show_window(parent=self._get_parent_window())
             except Exception as e:
@@ -496,7 +532,9 @@ class Session(requests.Session):
     def from_config(cls) -> "Session":
         legacy_server = _cfg_get("familysearch.server", 0)
         legacy_app = _cfg_get("familysearch.app-key", "") or ""
-        legacy_redirect = _cfg_get("familysearch.redirect", "") or DEFAULT_LOOPBACK_REDIRECT
+        legacy_redirect = (
+            _cfg_get("familysearch.redirect", "") or DEFAULT_LOOPBACK_REDIRECT
+        )
         return cls(int(legacy_server or 0), str(legacy_app), str(legacy_redirect))
 
     def _build_profile(self, env: str) -> EnvProfile:
@@ -639,7 +677,9 @@ class Session(requests.Session):
         headers = kwargs.setdefault("headers", {})
         if not any(k.lower() == "accept" for k in headers.keys()):
             headers["accept"] = "application/x-fs-v1+json"
-        if self.access_token and not any(k.lower() == "authorization" for k in headers.keys()):
+        if self.access_token and not any(
+            k.lower() == "authorization" for k in headers.keys()
+        ):
             headers["authorization"] = "Bearer " + self.access_token
 
     def get(self, url, **kwargs):
@@ -704,7 +744,9 @@ class Session(requests.Session):
         try:
             r = self.get_url(url, headers=headers)
         except requests.exceptions.RequestException as e:
-            self.write_log(f"WARNING: request failed for {url}: {type(e).__name__}: {e}")
+            self.write_log(
+                f"WARNING: request failed for {url}: {type(e).__name__}: {e}"
+            )
             return None
 
         if r is None or r == "error":
@@ -729,7 +771,9 @@ class Session(requests.Session):
                 return "error"
 
         if r.status_code >= 400:
-            self.write_log(f"WARNING: HTTP {r.status_code} from {url}: {_safe(getattr(r, 'text', ''), 200)}")
+            self.write_log(
+                f"WARNING: HTTP {r.status_code} from {url}: {_safe(getattr(r, 'text', ''), 200)}"
+            )
             return None
 
         try:
@@ -750,7 +794,8 @@ class Session(requests.Session):
     def _recompute_listener(self) -> None:
         r = urlparse(self.redirect or DEFAULT_LOOPBACK_REDIRECT)
         self.listen_timeout = int(
-            os.environ.get("GRAMPS_FS_LISTENER_TIMEOUT", str(self.listen_timeout)) or str(self.listen_timeout)
+            os.environ.get("GRAMPS_FS_LISTENER_TIMEOUT", str(self.listen_timeout))
+            or str(self.listen_timeout)
         )
         if r.hostname in ("127.0.0.1", "localhost"):
             self.listen_host = r.hostname or "127.0.0.1"
@@ -777,13 +822,16 @@ class Session(requests.Session):
             self._set_status("ERROR", self.listener.error)
             return ""
 
-        if self.listener and ("error_description" in self.listener.result or "error" in self.listener.result):
+        if self.listener and (
+            "error_description" in self.listener.result
+            or "error" in self.listener.result
+        ):
             err = self.listener.result.get("error", "")
             desc = self.listener.result.get("error_description", "")
             self._set_status("ERROR", f"{err} {desc}".strip())
             return ""
 
-        return (self.listener.result.get("code", "") if self.listener else "")
+        return self.listener.result.get("code", "") if self.listener else ""
 
     def canonical_web_url(self, url: str) -> str:
         """
@@ -800,7 +848,11 @@ class Session(requests.Session):
         try:
             p = urlparse(url)
             host = (p.netloc or "").lower()
-            if host in ("beta.familysearch.org", "familysearch.org", "www.familysearch.org"):
+            if host in (
+                "beta.familysearch.org",
+                "familysearch.org",
+                "www.familysearch.org",
+            ):
                 return urlunparse(
                     (
                         p.scheme or "https",
@@ -847,10 +899,17 @@ class Session(requests.Session):
             self.connected = False
             self.last_probe_http = None
             self.last_probe_detail = "No access token"
-            self._set_status("DISCONNECTED", f"{reason}: no token" if reason else "No token")
+            self._set_status(
+                "DISCONNECTED", f"{reason}: no token" if reason else "No token"
+            )
             return False
 
-        self._set_status("PROBING", f"{reason}: GET platform/users/current" if reason else "GET platform/users/current")
+        self._set_status(
+            "PROBING",
+            f"{reason}: GET platform/users/current"
+            if reason
+            else "GET platform/users/current",
+        )
         try:
             r = self.get("platform/users/current")
             http = r.status_code
@@ -862,7 +921,11 @@ class Session(requests.Session):
                 self._maybe_show_tools_window()
                 return True
             self.connected = False
-            self._set_status("API_FAIL", _safe(r.text, 200) or (r.reason or "API probe failed"), http=http)
+            self._set_status(
+                "API_FAIL",
+                _safe(r.text, 200) or (r.reason or "API probe failed"),
+                http=http,
+            )
             return False
         except Exception as e:
             self.connected = False
@@ -937,10 +1000,16 @@ class Session(requests.Session):
         self._apply_profile(prof, clear_state=True)
 
         if not (self.app_key or "").strip():
-            self._set_status("ERROR", "No app key (client_id) configured (Integrations ? FamilySearch ? App key)")
+            self._set_status(
+                "ERROR",
+                "No app key (client_id) configured (Integrations ? FamilySearch ? App key)",
+            )
             return ""
         if not (self.redirect or "").strip():
-            self._set_status("ERROR", "No redirect configured (Integrations ? FamilySearch ? Redirect URL)")
+            self._set_status(
+                "ERROR",
+                "No redirect configured (Integrations ? FamilySearch ? Redirect URL)",
+            )
             return ""
 
         forced_method = os.environ.get("GRAMPS_FS_AUTH_METHOD", "").strip().lower()
@@ -971,8 +1040,12 @@ class Session(requests.Session):
             try:
                 data = r.json()
             except Exception as e:
-                self._set_status("ERROR", "Token endpoint returned non-JSON", http=r.status_code)
-                _dbg(f"get_token(): non-JSON: {type(e).__name__}: {e} body={_safe(getattr(r, 'text', ''), 900)}")
+                self._set_status(
+                    "ERROR", "Token endpoint returned non-JSON", http=r.status_code
+                )
+                _dbg(
+                    f"get_token(): non-JSON: {type(e).__name__}: {e} body={_safe(getattr(r, 'text', ''), 900)}"
+                )
                 return False
 
             if isinstance(data, dict) and data.get("access_token"):
@@ -985,9 +1058,15 @@ class Session(requests.Session):
                 return True
 
             err = data.get("error") if isinstance(data, dict) else "token_error"
-            desc = (data.get("error_description") or data.get("message")) if isinstance(data, dict) else ""
+            desc = (
+                (data.get("error_description") or data.get("message"))
+                if isinstance(data, dict)
+                else ""
+            )
             self._set_status("ERROR", f"{err} {desc}".strip(), http=r.status_code)
-            _dbg(f"get_token(): failed HTTP {r.status_code}: error={err!r} desc={desc!r}")
+            _dbg(
+                f"get_token(): failed HTTP {r.status_code}: error={err!r} desc={desc!r}"
+            )
             return False
         except Exception as e:
             _dbg(f"get_token(): exception: {type(e).__name__}: {e}")
@@ -1017,7 +1096,9 @@ class Session(requests.Session):
         # - Windows: loopback uses system browser
         # - Linux: loopback requires WebKit
         if method == AUTH_LOOPBACK and not _is_loopback_redirect(self.redirect):
-            self._set_status("ERROR", "Loopback method requires a localhost redirect URL")
+            self._set_status(
+                "ERROR", "Loopback method requires a localhost redirect URL"
+            )
             return ""
 
         state = secrets.token_urlsafe(18)
@@ -1034,11 +1115,15 @@ class Session(requests.Session):
     def _authorize_via_loopback(self, auth_url: str) -> str:
         self._set_status("AUTHORIZING", "Preparing loopback listener")
         self._recompute_listener()
-        self.listener = Listener(self.listen_host, self.listen_port, self.listen_path, self.listen_timeout)
+        self.listener = Listener(
+            self.listen_host, self.listen_port, self.listen_path, self.listen_timeout
+        )
         self.listener.start()
 
         if win():
-            self._set_status("AUTHORIZING", "Opening system browser (loopback callback)")
+            self._set_status(
+                "AUTHORIZING", "Opening system browser (loopback callback)"
+            )
             webbrowser.open(auth_url, new=1, autoraise=True)
             code = self.listen().strip()
             if code:
@@ -1048,12 +1133,18 @@ class Session(requests.Session):
         # Linux: require WebKit so loopback does not force system browser
         has_webkit, _ = _try_import_webkit()
         if not has_webkit:
-            self._set_status("ERROR", "Loopback on Linux requires WebKit2GTK. Use manual method or install WebKit2GTK.")
+            self._set_status(
+                "ERROR",
+                "Loopback on Linux requires WebKit2GTK. Use manual method or install WebKit2GTK.",
+            )
             return ""
 
         ok = self._open_auth_ui(auth_url, capture_code=False, expected_state="")
         if not ok:
-            self._set_status("ERROR", "Loopback on Linux requires WebKit2GTK. Use manual method or install WebKit2GTK.")
+            self._set_status(
+                "ERROR",
+                "Loopback on Linux requires WebKit2GTK. Use manual method or install WebKit2GTK.",
+            )
             return ""
 
         code = self.listen().strip()
@@ -1066,9 +1157,13 @@ class Session(requests.Session):
         if win():
             self._set_status("ERROR", "WebKit method is not available on Windows")
             return ""
-        ok = self._open_auth_ui(auth_url, capture_code=True, expected_state=expected_state)
+        ok = self._open_auth_ui(
+            auth_url, capture_code=True, expected_state=expected_state
+        )
         if not ok:
-            self._set_status("ERROR", "Embedded WebKit not available; use manual method")
+            self._set_status(
+                "ERROR", "Embedded WebKit not available; use manual method"
+            )
             return ""
 
         self._set_status("AUTHORIZING", "Waiting for redirect (capturing code)")
@@ -1154,7 +1249,9 @@ class Session(requests.Session):
                 pass
         setattr(self, "_auth_win", None)
 
-    def _open_auth_ui(self, auth_url: str, capture_code: bool = False, expected_state: str = "") -> bool:
+    def _open_auth_ui(
+        self, auth_url: str, capture_code: bool = False, expected_state: str = ""
+    ) -> bool:
         has_webkit, WebKit2 = _try_import_webkit()
         if not has_webkit or WebKit2 is None:
             return False
@@ -1202,17 +1299,23 @@ class Session(requests.Session):
             try:
                 q = urlparse(uri).query
                 qs = parse_qs(q, keep_blank_values=True)
-                got_state = (qs.get("state", [""])[0] or "")
+                got_state = qs.get("state", [""])[0] or ""
                 if expected_state and got_state and got_state != expected_state:
-                    self._oauth_error = "State mismatch (possible stale/duplicate redirect)"
+                    self._oauth_error = (
+                        "State mismatch (possible stale/duplicate redirect)"
+                    )
                     self._oauth_code = ""
-                    _dbg(f"auth ui: state mismatch expected={expected_state!r} got={got_state!r}")
+                    _dbg(
+                        f"auth ui: state mismatch expected={expected_state!r} got={got_state!r}"
+                    )
                     return
                 if "error" in qs or "error_description" in qs:
-                    self._oauth_error = qs.get("error_description", [""])[0] or qs.get("error", [""])[0]
+                    self._oauth_error = (
+                        qs.get("error_description", [""])[0] or qs.get("error", [""])[0]
+                    )
                     self._oauth_code = ""
                 else:
-                    self._oauth_code = (qs.get("code", [""])[0] or "")
+                    self._oauth_code = qs.get("code", [""])[0] or ""
                     self._oauth_error = ""
                 _dbg(
                     f"auth ui: captured code_present={bool(self._oauth_code)} "
@@ -1231,10 +1334,12 @@ class Session(requests.Session):
                     return False
                 nav = decision.get_navigation_action()
                 req = nav.get_request()
-                uri = (req.get_uri() or "")
+                uri = req.get_uri() or ""
                 _dbg(f"auth ui: policy uri={_safe(uri, 500)}")
                 if capture_code and self.redirect and uri.startswith(self.redirect):
-                    _dbg("auth ui: policy hit redirect uri (capturing code; ignoring navigation)")
+                    _dbg(
+                        "auth ui: policy hit redirect uri (capturing code; ignoring navigation)"
+                    )
                     _capture_from_uri(uri)
                     try:
                         decision.ignore()
@@ -1276,4 +1381,9 @@ class Session(requests.Session):
 
 
 def get_active_session():
-    return GLOBAL_SESSION or SESSION or getattr(Session, "_shared", None) or getattr(Session, "_last_instance", None)
+    return (
+        GLOBAL_SESSION
+        or SESSION
+        or getattr(Session, "_shared", None)
+        or getattr(Session, "_last_instance", None)
+    )

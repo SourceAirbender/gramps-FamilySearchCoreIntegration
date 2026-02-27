@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # Annotation utilities
 # ====================================
 
+
 @lru_cache(maxsize=None)
 def _merged_annotations(type_obj: type) -> dict[str, Any]:
     merged: dict[str, Any] = {}
@@ -66,6 +67,7 @@ def init_class(obj: Any) -> None:
 # Type resolution helpers (forward refs like "Link" inside dict[str, "Link"])
 # =============================================================================
 
+
 def _resolve_type_ref(type_ref: Any) -> Any:
     if isinstance(type_ref, str):
         return globals().get(type_ref, type_ref)
@@ -93,6 +95,7 @@ def _unwrap_optional(type_ref: Any) -> Any:
 # ======================
 # Formal date parsing
 # ======================
+
 
 def _tz_from_suffix(suffix: str):
     """
@@ -312,6 +315,7 @@ class DateFormal:
 # JSON serializer/deserializer
 # =================================
 
+
 def serialize_json(obj: Any):
     """
     convert an object graph to JSON-serializable Python types
@@ -365,7 +369,7 @@ def _json_key_to_attr(key: str) -> str:
     """
     ns = "{http://www.w3.org/XML/1998/namespace}"
     if key.startswith(ns):
-        key = key[len(ns):]
+        key = key[len(ns) :]
     return key.replace("-", "_")
 
 
@@ -444,7 +448,12 @@ def _construct_object(target_type_obj: Any, data: Any, parent: Any):
 
     obj = target_type_obj()
     deserialize_json(obj, data)
-    if has_id and has_index and obj_id and isinstance(getattr(target_type_obj, "_index", None), dict):
+    if (
+        has_id
+        and has_index
+        and obj_id
+        and isinstance(getattr(target_type_obj, "_index", None), dict)
+    ):
         target_type_obj._index[obj_id] = obj
     return obj
 
@@ -481,7 +490,9 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
         declared = ann.get(attr_name)
 
         if declared is None:
-            print("Unknown JSON Value: Error: " + obj.__class__.__name__ + ":" + raw_key)
+            print(
+                "Unknown JSON Value: Error: " + obj.__class__.__name__ + ":" + raw_key
+            )
             continue
 
         declared = _unwrap_optional(declared)
@@ -510,7 +521,9 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
             value_origin = get_origin(value_type_obj)
 
             current_any = getattr(obj, attr_name, None)
-            current_dict: dict[str, Any] = dict(current_any) if isinstance(current_any, dict) else {}
+            current_dict: dict[str, Any] = (
+                dict(current_any) if isinstance(current_any, dict) else {}
+            )
 
             if isinstance(raw_value, dict):
                 for k2, v2 in raw_value.items():
@@ -528,12 +541,17 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
         # containers: set
         if declared is set or origin is set:
             current_any_set = getattr(obj, attr_name, None)
-            current_set: set[Any] = set(current_any_set) if isinstance(current_any_set, set) else set()
+            current_set: set[Any] = (
+                set(current_any_set) if isinstance(current_any_set, set) else set()
+            )
 
             elem_type_obj = _unwrap_optional(args[0]) if args else None
             elem_type_obj = _resolve_type_ref(elem_type_obj)
 
-            if elem_type_obj in (bool, str, int, float, type(None)) or elem_type_obj is None:
+            if (
+                elem_type_obj in (bool, str, int, float, type(None))
+                or elem_type_obj is None
+            ):
                 try:
                     current_set.update(raw_value)
                 except TypeError:
@@ -541,10 +559,14 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
                 setattr(obj, attr_name, current_set)
                 continue
 
-            for item in (raw_value or []):
+            for item in raw_value or []:
                 child = _construct_object(elem_type_obj, item, obj)
                 if child is None:
-                    logger.debug("deserialize_json: child construction failed k=%s; x=%r", raw_key, item)
+                    logger.debug(
+                        "deserialize_json: child construction failed k=%s; x=%r",
+                        raw_key,
+                        item,
+                    )
                     continue
 
                 if hasattr(elem_type_obj, "iseq"):
@@ -567,7 +589,9 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
         # containers: list
         if declared is list or origin is list:
             current_any_list = getattr(obj, attr_name, None)
-            current_list: list[Any] = list(current_any_list) if isinstance(current_any_list, list) else []
+            current_list: list[Any] = (
+                list(current_any_list) if isinstance(current_any_list, list) else []
+            )
 
             if isinstance(raw_value, list):
                 current_list.extend(raw_value)
@@ -580,7 +604,9 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
         # containers: dict (untyped)
         if declared is dict or origin is dict:
             current_any_map = getattr(obj, attr_name, None)
-            current_map: dict[Any, Any] = dict(current_any_map) if isinstance(current_any_map, dict) else {}
+            current_map: dict[Any, Any] = (
+                dict(current_any_map) if isinstance(current_any_map, dict) else {}
+            )
 
             if isinstance(raw_value, dict):
                 current_map.update(raw_value)
@@ -589,12 +615,16 @@ def deserialize_json(obj: Any, data: Any, required: bool = False):
             continue
 
         # nested object
-        if isinstance(declared, type) or (declared is not None and not isinstance(declared, str)):
+        if isinstance(declared, type) or (
+            declared is not None and not isinstance(declared, str)
+        ):
             try:
                 child = _construct_object(declared, raw_value, obj)
                 setattr(obj, attr_name, child)
             except Exception:
-                print("deserialize_json:error : k=" + raw_key + "; d[k]=" + str(raw_value))
+                print(
+                    "deserialize_json:error : k=" + raw_key + "; d[k]=" + str(raw_value)
+                )
             continue
 
         setattr(obj, attr_name, raw_value)
@@ -618,11 +648,13 @@ def parse(obj: Any, d: Any, nepre: bool = False):
 # Gedcom
 # =========
 
+
 class ExtensibleData:
     """
     Base for Gedcom objects. Some classes index instances by id (global cache),
     others do not because their ids are only unique within a parent.
     """
+
     _index: ClassVar[Optional[dict[str, Any]]] = None
     id: str
 
@@ -650,6 +682,7 @@ class HypermediaEnabledData(ExtensibleData):
 
 class HasText:
     text: str
+
     def __init__(self):
         init_class(self)
 
@@ -665,6 +698,7 @@ class Link:
     count: int
     offset: int
     results: int
+
     def __init__(self):
         init_class(self)
 
@@ -672,6 +706,7 @@ class Link:
 class Qualifier:
     name: str
     value: str
+
     def __init__(self):
         init_class(self)
 
@@ -679,6 +714,7 @@ class Qualifier:
 class ResourceReference:
     resourceId: str
     resource: str
+
     def __init__(self):
         init_class(self)
 
@@ -695,6 +731,7 @@ class Attribution(ExtensibleData):
 class Tag:
     resource: str
     conclusionId: str
+
     def __init__(self):
         init_class(self)
 
@@ -707,11 +744,16 @@ class OnlineAccount(ExtensibleData):
 class TextValue:
     lang: str
     value: str
+
     def __init__(self):
         init_class(self)
 
     def iseq(self, other: Any) -> bool:
-        return isinstance(other, TextValue) and self.lang == other.lang and self.value == other.value
+        return (
+            isinstance(other, TextValue)
+            and self.lang == other.lang
+            and self.value == other.value
+        )
 
 
 class Agent(HypermediaEnabledData):
@@ -742,6 +784,7 @@ class SourceReference(HypermediaEnabledData):
 
 class ReferencesSources:
     sources: set[SourceReference]
+
     def __init__(self):
         init_class(self)
 
@@ -756,6 +799,7 @@ class VocabElement:
     descriptions: set[TextValue]
     sublist: str
     position: int
+
     def __init__(self):
         init_class(self)
 
@@ -766,6 +810,7 @@ class VocabElementList:
     description: str
     uri: str
     elements: set[VocabElement]
+
     def __init__(self):
         init_class(self)
 
@@ -817,6 +862,7 @@ class Note(HypermediaEnabledData):
 
 class HasNotes:
     notes: set[Note]
+
     def __init__(self):
         init_class(self)
 
@@ -854,6 +900,7 @@ class PlaceReference(ExtensibleData):
 class HasDateAndPlace:
     date: Date
     place: PlaceReference
+
     def __init__(self):
         init_class(self)
 
@@ -869,6 +916,7 @@ class Fact(Conclusion):
 
 class HasFacts:
     facts: set[Fact]
+
     def __init__(self):
         init_class(self)
 
@@ -881,6 +929,7 @@ class NamePart(ExtensibleData):
 
 class NameFormInfo:
     order: str
+
     def __init__(self):
         init_class(self)
 
@@ -892,7 +941,11 @@ class NameForm(ExtensibleData):
     nameFormInfo: set[NameFormInfo]
 
     def iseq(self, other: Any) -> bool:
-        return isinstance(other, NameForm) and self.lang == other.lang and self.fullText == other.fullText
+        return (
+            isinstance(other, NameForm)
+            and self.lang == other.lang
+            and self.fullText == other.fullText
+        )
 
 
 class Name(Conclusion):
@@ -939,6 +992,7 @@ class PersonInfo:
     readOnly: bool
     visibleToAll: bool
     visibleToAllWhenUsingFamilySearchApps: bool
+
     def __init__(self):
         init_class(self)
 
@@ -993,6 +1047,7 @@ class Value:
     lang: str
     type: str
     text: str
+
     def __init__(self):
         init_class(self)
 
@@ -1000,6 +1055,7 @@ class Value:
 class Field:
     type: str
     values: set[Value]
+
     def __init__(self):
         init_class(self)
 
@@ -1046,6 +1102,7 @@ class artifactMetadata:
     screeningState: str
     displayState: str
     editable: bool
+
     def __init__(self):
         init_class(self)
 
@@ -1134,6 +1191,7 @@ class PlaceDescriptionInfo:
     zoomLevel: int
     relatedType: str
     relatedSubType: str
+
     def __init__(self):
         init_class(self)
 

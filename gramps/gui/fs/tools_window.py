@@ -50,7 +50,12 @@ _EDITPERSON_HOOK_INSTALLED = False
 
 
 def _dbg(msg: str) -> None:
-    if os.environ.get("GRAMPS_FS_DEBUG", "").strip().lower() in ("1", "true", "yes", "on"):
+    if os.environ.get("GRAMPS_FS_DEBUG", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
         try:
             sys.stderr.write(f"[FS TOOLS] {msg}\n")
             sys.stderr.flush()
@@ -120,7 +125,9 @@ class _EditorCtx:
 _LAST_EDITOR = _EditorCtx()
 
 
-def notify_from_person_editor(dbstate: Any, uistate: Any, track: Any, person: Any, editor: Any = None) -> None:
+def notify_from_person_editor(
+    dbstate: Any, uistate: Any, track: Any, person: Any, editor: Any = None
+) -> None:
     global _LAST_EDITOR
 
     ph = _person_handle(person)
@@ -174,7 +181,7 @@ def _install_editperson_hook() -> None:
     if not callable(orig_post_init_obj):
         _dbg("EditPerson._post_init not callable; cannot hook")
         return
-    
+
     orig_post_init: Callable[..., Any] = cast(Callable[..., Any], orig_post_init_obj)
 
     def _fs_hook_attach(self: Any) -> None:
@@ -184,7 +191,9 @@ def _install_editperson_hook() -> None:
 
         def _fire() -> bool:
             try:
-                notify_from_person_editor(self.dbstate, self.uistate, self.track, self.obj, editor=self)
+                notify_from_person_editor(
+                    self.dbstate, self.uistate, self.track, self.obj, editor=self
+                )
             except Exception as e:
                 _dbg(f"notify failed: {e}")
             return False
@@ -293,7 +302,9 @@ def toggle_tools_window(session: Any, dbstate: Any = None, uistate: Any = None) 
     _SINGLETON.present()
 
 
-def present_tools_window(session: Any, dbstate: Any = None, uistate: Any = None) -> None:
+def present_tools_window(
+    session: Any, dbstate: Any = None, uistate: Any = None
+) -> None:
     global _SINGLETON
     _install_editperson_hook()
 
@@ -357,11 +368,15 @@ class FamilySearchToolsWindow:
         self.active_label.get_style_context().add_class("fs-active-label")
         status_row.pack_start(self.active_label, True, True, 0)
 
-        outer.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
+        outer.pack_start(
+            Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0
+        )
 
         self._size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.BOTH)
 
-        sec_person, box_person = self._make_section(_("Person actions"), "fs-sec-person")
+        sec_person, box_person = self._make_section(
+            _("Person actions"), "fs-sec-person"
+        )
         outer.pack_start(sec_person, False, False, 0)
 
         self.btn_link = Gtk.Button(label=_("Link FamilySearch ID"))
@@ -373,7 +388,9 @@ class FamilySearchToolsWindow:
         self.btn_sync_to = Gtk.Button(label=_("Sync to FamilySearch..."))
         try:
             self.btn_sync_to.set_tooltip_text(
-                _("Overwrite selected FamilySearch fields with Gramps values (no deletes).")
+                _(
+                    "Overwrite selected FamilySearch fields with Gramps values (no deletes)."
+                )
             )
         except Exception:
             pass
@@ -383,7 +400,9 @@ class FamilySearchToolsWindow:
         self._add_btn(box_person, self.btn_sync)
         self._add_btn(box_person, self.btn_sync_to)
 
-        sec_import, box_import = self._make_section(_("Import relatives"), "fs-sec-import")
+        sec_import, box_import = self._make_section(
+            _("Import relatives"), "fs-sec-import"
+        )
         outer.pack_start(sec_import, False, False, 0)
 
         self.btn_imp_par = Gtk.Button(label=_("Import Parents"))
@@ -435,7 +454,9 @@ class FamilySearchToolsWindow:
         try:
             ep = _find_open_editperson_instance()
             if ep is not None:
-                notify_from_person_editor(ep.dbstate, ep.uistate, ep.track, ep.obj, editor=ep)
+                notify_from_person_editor(
+                    ep.dbstate, ep.uistate, ep.track, ep.obj, editor=ep
+                )
         except Exception:
             pass
 
@@ -488,7 +509,9 @@ class FamilySearchToolsWindow:
         """
         fs_ui.install_css_once("fs.tools_window", css)
 
-    def _make_section(self, title: str, css_class: str) -> Tuple[Gtk.Widget, Gtk.FlowBox]:
+    def _make_section(
+        self, title: str, css_class: str
+    ) -> Tuple[Gtk.Widget, Gtk.FlowBox]:
         wrapper = Gtk.EventBox()
         wrapper.set_visible_window(True)
         sc = wrapper.get_style_context()
@@ -509,7 +532,9 @@ class FamilySearchToolsWindow:
         lbl.get_style_context().add_class("fs-section-title")
         inner.pack_start(lbl, False, False, 0)
 
-        inner.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
+        inner.pack_start(
+            Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0
+        )
 
         flow = Gtk.FlowBox()
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -575,7 +600,9 @@ class FamilySearchToolsWindow:
             pass
 
         try:
-            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+            repo_root = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..", "..")
+            )
             candidates.append(os.path.join(repo_root, "images", "fs_logo.png"))
         except Exception:
             pass
@@ -631,7 +658,9 @@ class FamilySearchToolsWindow:
                 scale = nh / float(oh)
                 nw = max(1, int(ow * scale))
 
-            scaled = self._logo_pixbuf_orig.scale_simple(nw, nh, GdkPixbuf.InterpType.BILINEAR)
+            scaled = self._logo_pixbuf_orig.scale_simple(
+                nw, nh, GdkPixbuf.InterpType.BILINEAR
+            )
             self._logo_image.set_from_pixbuf(scaled)
         except Exception as e:
             _dbg(f"Logo scale failed: {e}")
@@ -666,7 +695,9 @@ class FamilySearchToolsWindow:
 
     def _fs_connected(self) -> bool:
         try:
-            return bool(getattr(self.session, "connected", False)) or bool(getattr(self.session, "access_token", None))
+            return bool(getattr(self.session, "connected", False)) or bool(
+                getattr(self.session, "access_token", None)
+            )
         except Exception:
             return False
 
@@ -704,7 +735,9 @@ class FamilySearchToolsWindow:
             gid = ""
 
         if gid:
-            self.active_label.set_text(_("Editor person: %(name)s  [%(gid)s]") % {"name": nm, "gid": gid})
+            self.active_label.set_text(
+                _("Editor person: %(name)s  [%(gid)s]") % {"name": nm, "gid": gid}
+            )
         else:
             self.active_label.set_text(_("Editor person: %(name)s") % {"name": nm})
 
@@ -737,7 +770,9 @@ class FamilySearchToolsWindow:
                 pass
 
         try:
-            self.btn_tags.set_sensitive(bool(connected and _LAST_EDITOR.dbstate is not None))
+            self.btn_tags.set_sensitive(
+                bool(connected and _LAST_EDITOR.dbstate is not None)
+            )
         except Exception:
             pass
         try:
@@ -758,16 +793,28 @@ class FamilySearchToolsWindow:
 
         ph = _LAST_EDITOR.person_handle
         if not ph or _LAST_EDITOR.dbstate is None:
-            _try_info(self.window, "FamilySearch", "No Edit Person window context yet.\nOpen an Edit Person window first.")
+            _try_info(
+                self.window,
+                "FamilySearch",
+                "No Edit Person window context yet.\nOpen an Edit Person window first.",
+            )
             return None
 
         if not _person_exists_in_db(_LAST_EDITOR.dbstate, ph):
-            _try_info(self.window, "FamilySearch", "This person is not saved in the database yet.\nSave/OK the person first.")
+            _try_info(
+                self.window,
+                "FamilySearch",
+                "This person is not saved in the database yet.\nSave/OK the person first.",
+            )
             return None
 
         p = self._editor_person_obj()
         if p is None:
-            _try_info(self.window, "FamilySearch", "Could not resolve the editor person from the database.")
+            _try_info(
+                self.window,
+                "FamilySearch",
+                "Could not resolve the editor person from the database.",
+            )
             return None
 
         return p
@@ -792,7 +839,11 @@ class FamilySearchToolsWindow:
             _try_info(self.window, "FamilySearch", "Not connected to FamilySearch.")
             return None
         if _LAST_EDITOR.dbstate is None or _LAST_EDITOR.uistate is None:
-            _try_info(self.window, "FamilySearch", "No UI context yet.\nOpen an Edit Person window first.")
+            _try_info(
+                self.window,
+                "FamilySearch",
+                "No UI context yet.\nOpen an Edit Person window first.",
+            )
             return None
         return {
             "dbstate": _LAST_EDITOR.dbstate,
@@ -810,9 +861,14 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             actions.link_familysearch_id(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
@@ -824,9 +880,14 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             actions.compare_person(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
@@ -838,6 +899,7 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             fn = getattr(actions, "sync_from_familysearch", None)
             if not callable(fn):
                 fn = getattr(actions, "sync_this_person", None)
@@ -848,8 +910,12 @@ class FamilySearchToolsWindow:
                 )
 
             fn(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
@@ -861,20 +927,30 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             fn = getattr(actions, "sync_to_familysearch", None)
 
             if callable(fn):
                 fn(
-                    ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                    ctx["session"], ctx["parent"],
+                    ctx["dbstate"],
+                    ctx["uistate"],
+                    ctx["track"],
+                    ctx["person"],
+                    ctx["session"],
+                    ctx["parent"],
                     editor=ctx["editor"],
                 )
                 return
 
             from . import sync_directions as fs_syncdir
+
             fs_syncdir.sync_to_familysearch(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
@@ -886,9 +962,14 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             actions.import_parents(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
@@ -900,9 +981,14 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             actions.import_spouse(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
@@ -914,9 +1000,14 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             actions.import_children(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
@@ -928,9 +1019,14 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             actions.tags_dialog(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:
@@ -942,9 +1038,14 @@ class FamilySearchToolsWindow:
             return
         try:
             from . import actions
+
             actions.clear_cache(
-                ctx["dbstate"], ctx["uistate"], ctx["track"], ctx["person"],
-                ctx["session"], ctx["parent"],
+                ctx["dbstate"],
+                ctx["uistate"],
+                ctx["track"],
+                ctx["person"],
+                ctx["session"],
+                ctx["parent"],
                 editor=ctx["editor"],
             )
         except Exception as e:

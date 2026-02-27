@@ -44,8 +44,8 @@ except ValueError:
 _ = _trans.gettext
 
 
-
 # Person compare window used by actions.py
+
 
 class CompareWindow:
     def __init__(
@@ -306,7 +306,9 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
             ):
                 path = "/platform/tree/persons/" + fsid_local
                 r = tree._fs_session.head_url(path)
-                while r and r.status_code == 301 and "X-Entity-Forwarded-Id" in r.headers:
+                while (
+                    r and r.status_code == 301 and "X-Entity-Forwarded-Id" in r.headers
+                ):
                     fsid_local = r.headers["X-Entity-Forwarded-Id"]
                     logger.info("Redirected FS ID %s -> %s", pair[2], fsid_local)
                     pair[2] = fsid_local

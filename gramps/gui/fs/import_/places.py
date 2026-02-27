@@ -211,7 +211,9 @@ def add_place(db, txn, fs_place):
             existing = add_place(db, txn, fs_desc)
 
         u1 = Url()
-        u1.path = f"https://api.familysearch.org/platform/places/description/{fs_place.id}"
+        u1.path = (
+            f"https://api.familysearch.org/platform/places/description/{fs_place.id}"
+        )
         u1.type = UrlType("FamilySearch")
 
         u2 = Url()

@@ -52,13 +52,13 @@ _ = _trans.gettext
 
 
 _UI = {
-    "green":  "#D8F3DC",  # match
-    "red":    "#FFE3E3",  # critical mismatch
+    "green": "#D8F3DC",  # match
+    "red": "#FFE3E3",  # critical mismatch
     "orange": "#FFE8CC",  # warning mismatch
     "yellow": "#FFF3BF",  # only in Gramps
-    "yellow3":"#D0EBFF",  # only in FS
-    "white":  "#F8F9FA",  # neutral header
-    "gray":   "#E9ECEF",
+    "yellow3": "#D0EBFF",  # only in FS
+    "white": "#F8F9FA",  # neutral header
+    "gray": "#E9ECEF",
 }
 
 
@@ -75,7 +75,9 @@ def _ui_row(row: Any) -> Any:
     return r
 
 
-def compare_fs_to_gramps(fs_person: Any, gr_person: Person, db: Any, model: Any = None, dupdoc: bool = False):
+def compare_fs_to_gramps(
+    fs_person: Any, gr_person: Person, db: Any, model: Any = None, dupdoc: bool = False
+):
     """
     stores comparison timestamps/flags on the Person
     via datab_familysearch.FSStatusDB (JSON attribute blob).
@@ -107,10 +109,10 @@ def compare_fs_to_gramps(fs_person: Any, gr_person: Person, db: Any, model: Any 
 
     # core comparisons
     rows: list[Any] = []
-    
+
     Row = Tuple[Any, ...]
     row: Optional[Row]
-    
+
     row = compare_gender(gr_person, fs_person)
     if row:
         rows.append(row)
@@ -123,25 +125,33 @@ def compare_fs_to_gramps(fs_person: Any, gr_person: Person, db: Any, model: Any 
             FS_Essentials = True
         rows.append(name_rows.pop(0))
 
-    row = compare_fact(db, gr_person, fs_person, EventType.BIRTH, "http://gedcomx.org/Birth")
+    row = compare_fact(
+        db, gr_person, fs_person, EventType.BIRTH, "http://gedcomx.org/Birth"
+    )
     if row:
         rows.append(row)
         if row[0] != "green":
             FS_Essentials = True
 
-    row = compare_fact(db, gr_person, fs_person, EventType.BAPTISM, "http://gedcomx.org/Baptism")
+    row = compare_fact(
+        db, gr_person, fs_person, EventType.BAPTISM, "http://gedcomx.org/Baptism"
+    )
     if row:
         rows.append(row)
         if row[0] != "green":
             FS_Essentials = True
 
-    row = compare_fact(db, gr_person, fs_person, EventType.DEATH, "http://gedcomx.org/Death")
+    row = compare_fact(
+        db, gr_person, fs_person, EventType.DEATH, "http://gedcomx.org/Death"
+    )
     if row:
         rows.append(row)
         if row[0] != "green":
             FS_Essentials = True
 
-    row = compare_fact(db, gr_person, fs_person, EventType.BURIAL, "http://gedcomx.org/Burial")
+    row = compare_fact(
+        db, gr_person, fs_person, EventType.BURIAL, "http://gedcomx.org/Burial"
+    )
     if row:
         rows.append(row)
         if row[0] != "green":
@@ -150,11 +160,15 @@ def compare_fs_to_gramps(fs_person: Any, gr_person: Person, db: Any, model: Any 
     # mypy: session can be None
     fs_session = getattr(tree, "_fs_session", None)
 
-    connected = bool(getattr(FSG_Sync.FSG_Sync, "fs_Tree", None)) and fs_session is not None
+    connected = (
+        bool(getattr(FSG_Sync.FSG_Sync, "fs_Tree", None)) and fs_session is not None
+    )
     hdr_gr = _("Gramps")
     hdr_fs = _("FamilySearch") if connected else _("Not connected to FamilySearch")
 
-    def add_section(title: str, semantic_color: str, node_key: str, children: Any) -> None:
+    def add_section(
+        title: str, semantic_color: str, node_key: str, children: Any
+    ) -> None:
         """
         Adds header row + children rows to the tree model.
         The header row uses the color column as a section badge tint.
@@ -165,11 +179,11 @@ def compare_fs_to_gramps(fs_person: Any, gr_person: Person, db: Any, model: Any 
         header = [
             semantic_color,
             title,
-            "",          # Gramps date
-            hdr_gr,      # Gramps value column carries label
-            "",          # FS date
-            hdr_fs,      # FS value column carries label/status
-            "",          # spacer
+            "",  # Gramps date
+            hdr_gr,  # Gramps value column carries label
+            "",  # FS date
+            hdr_fs,  # FS value column carries label/status
+            "",  # spacer
             False,
             node_key,
             None,
@@ -222,7 +236,8 @@ def compare_fs_to_gramps(fs_person: Any, gr_person: Person, db: Any, model: Any 
 
     # ensure we have Last-Modified/Etag for this person, FSID redirect
     if getattr(fs_person, "id", None) and (
-        not hasattr(fs_person, "_last_modified") or not getattr(fs_person, "_last_modified", 0)
+        not hasattr(fs_person, "_last_modified")
+        or not getattr(fs_person, "_last_modified", 0)
     ):
         path = "/platform/tree/persons/" + fs_person.id
         r = fs_session.head_url(path)

@@ -50,20 +50,14 @@ class CompareOptions(MenuToolOptions):
         category_name = _("FamilySearch Compare Options")
 
         # days between runs
-        self._opt_days_between = NumberOption(
-            _("Days between comparisons"), 0, 0, 99
-        )
-        self._opt_days_between.set_help(
-            _("Number of days between two comparisons.")
-        )
+        self._opt_days_between = NumberOption(_("Days between comparisons"), 0, 0, 99)
+        self._opt_days_between.set_help(_("Number of days between two comparisons."))
         menu.add_option(category_name, "gui_days", self._opt_days_between)
 
         # force compare
         self._opt_force = BooleanOption(_("Force comparison"), True)
         self._opt_force.set_help(
-            _(
-                "Compare regardless of the number of days since the last run."
-            )
+            _("Compare regardless of the number of days since the last run.")
         )
         menu.add_option(category_name, "gui_needed", self._opt_force)
 
@@ -75,9 +69,7 @@ class CompareOptions(MenuToolOptions):
         filter_list = CustomFilters.get_filters("Person")
         GenericFilter = GenericFilterFactory("Person")
         all_filter = GenericFilter()
-        all_filter.set_name(
-            _trans.gettext("All %s") % (_trans.gettext("Persons"))
-        )
+        all_filter.set_name(_trans.gettext("All %s") % (_trans.gettext("Persons")))
         all_filter.add_rule(all_persons_rule)
 
         # only add the generic filter if it isn't already in the menu

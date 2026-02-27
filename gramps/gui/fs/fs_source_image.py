@@ -28,7 +28,11 @@ from urllib.parse import urlparse, urlunparse
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GLib  # noqa: F401  (Gdk might be used by downstream)
+from gi.repository import (
+    Gtk,
+    Gdk,
+    GLib,
+)  # noqa: F401  (Gdk might be used by downstream)
 
 from gramps.gui.fs import ui as fs_ui
 
@@ -71,7 +75,11 @@ def _canonicalize_fs_web_url(url: str) -> str:
     try:
         p = urlparse(u)
         host = (p.netloc or "").lower()
-        if host in ("beta.familysearch.org", "familysearch.org", "www.familysearch.org"):
+        if host in (
+            "beta.familysearch.org",
+            "familysearch.org",
+            "www.familysearch.org",
+        ):
             return urlunparse(
                 (
                     p.scheme or "https",
@@ -176,7 +184,9 @@ class SourceImageBrowser:
         self.btn_open_browser.connect("clicked", self._open_external_browser)
 
         self.btn_reload = Gtk.Button()
-        fs_ui.set_button_icon_and_label(self.btn_reload, "view-refresh-symbolic", "Reload")
+        fs_ui.set_button_icon_and_label(
+            self.btn_reload, "view-refresh-symbolic", "Reload"
+        )
         self.btn_reload.set_tooltip_text("Reload page")
         self.btn_reload.connect("clicked", self._reload)
 
@@ -399,7 +409,8 @@ class SourceImageBrowser:
         if path and os.path.exists(path):
             self._add_saved_file(path)
             self.info.set_text(
-                "Saved: %s (total: %d)" % (os.path.basename(path), len(self.saved_files))
+                "Saved: %s (total: %d)"
+                % (os.path.basename(path), len(self.saved_files))
             )
 
     def _on_failed(self, _download, _error) -> None:
@@ -540,5 +551,7 @@ def pick_images(
     - Opens the system browser w/o WebKit
     - User downloads images and then Choose file to select them
     """
-    b = SourceImageBrowser(url, parent_window=parent_window, start_dir=start_dir, title=title)
+    b = SourceImageBrowser(
+        url, parent_window=parent_window, start_dir=start_dir, title=title
+    )
     return b.run()

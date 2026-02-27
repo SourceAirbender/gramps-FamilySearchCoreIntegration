@@ -106,7 +106,7 @@ class Tree(deserialize.Gedcomx):
 
     def add_parents(self, fids: Set[str]) -> Set[str]:
         rels: Set[str] = set()
-        for fid in (fids & set(self._persons.keys())):
+        for fid in fids & set(self._persons.keys()):
             p = self._persons[fid]
             for rel in getattr(p, "_parents", []) or []:
                 if rel.person1:
@@ -125,7 +125,7 @@ class Tree(deserialize.Gedcomx):
 
     def add_spouses(self, fids: Set[str]) -> Set[str]:
         rels: Set[str] = set()
-        for fid in (fids & set(self._persons.keys())):
+        for fid in fids & set(self._persons.keys()):
             p = self._persons[fid]
             if getattr(p, "_spouses", None):
                 for rel in p._spouses:
@@ -140,7 +140,7 @@ class Tree(deserialize.Gedcomx):
 
     def add_children(self, fids: Set[str]) -> Set[str]:
         rels: Set[str] = set()
-        for fid in (fids & set(self._persons.keys())):
+        for fid in fids & set(self._persons.keys()):
             p = self._persons[fid]
             if getattr(p, "_children", None):
                 for rel in p._children:

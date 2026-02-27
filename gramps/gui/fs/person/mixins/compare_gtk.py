@@ -55,21 +55,34 @@ class CompareGtkMixin:
     if TYPE_CHECKING:
         from gramps.gen.lib import Person as _GrPerson
 
-        def get_active(self, category: str) -> Any: ...
-        def _toggle_noop(self, *args: Any, **kwargs: Any) -> None: ...
+        def get_active(self, category: str) -> Any:
+            ...
+
+        def _toggle_noop(self, *args: Any, **kwargs: Any) -> None:
+            ...
 
         def _ensure_person_cached(
             self, fsid: str, *, with_relatives: bool, force: bool = False
-        ) -> Any: ...
+        ) -> Any:
+            ...
 
-        def _ensure_notes_cached(self, fsid: str) -> None: ...
-        def _ensure_sources_cached(self, fsid: str) -> None: ...
+        def _ensure_notes_cached(self, fsid: str) -> None:
+            ...
 
-        def _gather_sr_meta(self, fsid: str) -> dict[str, Any]: ...
-        def _pretty_tags(self, tags: Any) -> str: ...
+        def _ensure_sources_cached(self, fsid: str) -> None:
+            ...
 
-        def _import_sources_dialog(self, gr: Optional[_GrPerson], fsid: str) -> None: ...
-        def _build_compare_json(self, gr: _GrPerson, fsid: str) -> dict[str, Any]: ...
+        def _gather_sr_meta(self, fsid: str) -> dict[str, Any]:
+            ...
+
+        def _pretty_tags(self, tags: Any) -> str:
+            ...
+
+        def _import_sources_dialog(self, gr: Optional[_GrPerson], fsid: str) -> None:
+            ...
+
+        def _build_compare_json(self, gr: _GrPerson, fsid: str) -> dict[str, Any]:
+            ...
 
     # Color tokens produced by compare code:
     #   green   -> match
@@ -358,7 +371,9 @@ class CompareGtkMixin:
 
                 if not painted:
                     try:
-                        cell.set_property("cell-background", self._TINT_FALLBACK_HEX.get(s, s))
+                        cell.set_property(
+                            "cell-background", self._TINT_FALLBACK_HEX.get(s, s)
+                        )
                         cell.set_property("cell-background-set", True)
                     except Exception:
                         pass
@@ -373,7 +388,7 @@ class CompareGtkMixin:
 
         cols = tv.get_columns() or []
         for idx, col in enumerate(cols):
-            is_indicator = (idx == 0)
+            is_indicator = idx == 0
             try:
                 cells = col.get_cells() or []
             except Exception:
@@ -416,7 +431,9 @@ class CompareGtkMixin:
         wrap.pack_start(pill("fs-critical", _("Critical mismatch")), False, False, 0)
 
         hint = Gtk.Label(
-            label=_("Tip: resize columns by dragging headers | scroll inside tabs | refresh to re-check FamilySearch")
+            label=_(
+                "Tip: resize columns by dragging headers | scroll inside tabs | refresh to re-check FamilySearch"
+            )
         )
         hint.set_xalign(1.0)
         try:
@@ -456,7 +473,11 @@ class CompareGtkMixin:
 
         fsid = fs_utilities.get_fsftid(gr)
         if not fsid:
-            WarningDialog(_("This Gramps person is not linked to FamilySearch yet. Use 'Link person'."))
+            WarningDialog(
+                _(
+                    "This Gramps person is not linked to FamilySearch yet. Use 'Link person'."
+                )
+            )
             return
 
         self._ensure_person_cached(fsid, with_relatives=True)
@@ -483,17 +504,25 @@ class CompareGtkMixin:
         # Action buttons
         btn_refresh = Gtk.Button()
         btn_refresh.set_tooltip_text(_("Refresh from FamilySearch"))
-        btn_refresh.add(Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON))
+        btn_refresh.add(
+            Gtk.Image.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
+        )
         hb.pack_end(btn_refresh)
 
         btn_import_sources = Gtk.Button()
         btn_import_sources.set_tooltip_text(_("Import sources..."))
-        btn_import_sources.add(Gtk.Image.new_from_icon_name("document-import-symbolic", Gtk.IconSize.BUTTON))
+        btn_import_sources.add(
+            Gtk.Image.new_from_icon_name(
+                "document-import-symbolic", Gtk.IconSize.BUTTON
+            )
+        )
         hb.pack_end(btn_import_sources)
 
         btn_close = Gtk.Button()
         btn_close.set_tooltip_text(_("Close"))
-        btn_close.add(Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON))
+        btn_close.add(
+            Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
+        )
         hb.pack_end(btn_close)
 
         # ---- Main layout ---
@@ -510,7 +539,9 @@ class CompareGtkMixin:
         tv_overview.get_style_context().add_class("fs-compare-treeview")
         self._tune_treeview(tv_overview, "overview")
         self._install_treeview_row_tints(tv_overview)
-        notebook.append_page(self._wrap_scroller(tv_overview), Gtk.Label(label=_("Overview")))
+        notebook.append_page(
+            self._wrap_scroller(tv_overview), Gtk.Label(label=_("Overview"))
+        )
 
         # notes tab
         tv_notes, model_notes = self._make_notes_tree()
@@ -528,7 +559,9 @@ class CompareGtkMixin:
             pass
         self._tune_treeview(tv_sources, "sources")
         self._install_treeview_row_tints(tv_sources)
-        notebook.append_page(self._wrap_scroller(tv_sources), Gtk.Label(label=_("Sources")))
+        notebook.append_page(
+            self._wrap_scroller(tv_sources), Gtk.Label(label=_("Sources"))
+        )
 
         # key/legend row
         outer.pack_end(self._build_legend(), False, False, 0)
@@ -567,7 +600,9 @@ class CompareGtkMixin:
             try:
                 payload = self._build_compare_json(gr_local, fsid)
                 is_synced = fs_tags.compute_sync_from_payload(payload)
-                fs_tags.set_sync_status_for_person(self.dbstate.db, gr_local, is_synced=is_synced)
+                fs_tags.set_sync_status_for_person(
+                    self.dbstate.db, gr_local, is_synced=is_synced
+                )
             except Exception:
                 pass
 
@@ -593,7 +628,9 @@ class CompareGtkMixin:
             if gr_local:
                 payload = self._build_compare_json(gr_local, fsid)
                 is_synced = fs_tags.compute_sync_from_payload(payload)
-                fs_tags.set_sync_status_for_person(self.dbstate.db, gr_local, is_synced=is_synced)
+                fs_tags.set_sync_status_for_person(
+                    self.dbstate.db, gr_local, is_synced=is_synced
+                )
         except Exception:
             pass
 
@@ -604,6 +641,7 @@ class CompareGtkMixin:
             return ""
         try:
             from gramps.gui.fs import tree
+
             sess = getattr(tree, "_fs_session", None)
             if sess and hasattr(sess, "canonical_web_url"):
                 return sess.canonical_web_url(url)
@@ -670,7 +708,9 @@ class CompareGtkMixin:
     def _fill_overview(self, model: ListModel, gr: Person, fsid: str):
         fs_person = deserialize.Person._index.get(fsid) or deserialize.Person()
         try:
-            fs_compare.compare_fs_to_gramps(fs_person, gr, self.dbstate.db, model=model, dupdoc=True)
+            fs_compare.compare_fs_to_gramps(
+                fs_person, gr, self.dbstate.db, model=model, dupdoc=True
+            )
         except Exception as e:
             WarningDialog(_("Compare failed: {e}").format(e=str(e)))
 
@@ -681,7 +721,9 @@ class CompareGtkMixin:
             return
 
         em = "_"
-        fs_placeholder = em if self.__class__.fs_Tree else _("Not connected to FamilySearch")
+        fs_placeholder = (
+            em if self.__class__.fs_Tree else _("Not connected to FamilySearch")
+        )
 
         note_handles = gr.get_note_list()
         fs_notes_remaining = fs_person.notes.copy()
@@ -725,27 +767,50 @@ class CompareGtkMixin:
             if found:
                 fs_title = found.subject or ""
                 fs_text = found.text or ""
-                color = "green" if (
-                    fs_title == title and (
-                        fs_text == note_text
-                        or (note_text.startswith("\ufeff") and fs_text == note_text[1:])
+                color = (
+                    "green"
+                    if (
+                        fs_title == title
+                        and (
+                            fs_text == note_text
+                            or (
+                                note_text.startswith("\ufeff")
+                                and fs_text == note_text[1:]
+                            )
+                        )
                     )
-                ) else "orange"
+                    else "orange"
+                )
             else:
                 color = "yellow"
 
-            model.add(self._ui_row([color, _("Person"), title, note_text, fs_title or em, fs_text or em]))
+            model.add(
+                self._ui_row(
+                    [
+                        color,
+                        _("Person"),
+                        title,
+                        note_text,
+                        fs_title or em,
+                        fs_text or em,
+                    ]
+                )
+            )
 
         # FS-only person notes
         for fs_note in fs_notes_remaining:
-            model.add(self._ui_row([
-                "yellow3",
-                _("Person"),
-                _("(missing in Gramps)"),
-                em,
-                fs_note.subject or "",
-                fs_note.text or "",
-            ]))
+            model.add(
+                self._ui_row(
+                    [
+                        "yellow3",
+                        _("Person"),
+                        _("(missing in Gramps)"),
+                        em,
+                        fs_note.subject or "",
+                        fs_note.text or "",
+                    ]
+                )
+            )
 
         # family (spouse) notes
         fs_couples_remaining = fs_person._spouses.copy()
@@ -753,8 +818,14 @@ class CompareGtkMixin:
             fam = self.dbstate.db.get_family_from_handle(fam_h)
             if not fam:
                 continue
-            spouse_h = fam.mother_handle if fam.mother_handle != gr.handle else fam.father_handle
-            spouse = self.dbstate.db.get_person_from_handle(spouse_h) if spouse_h else None
+            spouse_h = (
+                fam.mother_handle
+                if fam.mother_handle != gr.handle
+                else fam.father_handle
+            )
+            spouse = (
+                self.dbstate.db.get_person_from_handle(spouse_h) if spouse_h else None
+            )
             spouse_fsid = fs_utilities.get_fsftid(spouse) if spouse else ""
             fs_rel = None
             for rel in list(fs_couples_remaining):
@@ -788,60 +859,89 @@ class CompareGtkMixin:
                 if found:
                     fs_title = found.subject or ""
                     fs_text = found.text or ""
-                    color = "green" if (
-                        fs_title == title and (
-                            fs_text == note_text
-                            or (note_text.startswith("\ufeff") and fs_text == note_text[1:])
+                    color = (
+                        "green"
+                        if (
+                            fs_title == title
+                            and (
+                                fs_text == note_text
+                                or (
+                                    note_text.startswith("\ufeff")
+                                    and fs_text == note_text[1:]
+                                )
+                            )
                         )
-                    ) else "orange"
+                        else "orange"
+                    )
                 else:
                     color = "yellow"
 
-                model.add(self._ui_row([color, _("Family"), title, note_text, fs_title or em, fs_text or em]))
+                model.add(
+                    self._ui_row(
+                        [
+                            color,
+                            _("Family"),
+                            title,
+                            note_text,
+                            fs_title or em,
+                            fs_text or em,
+                        ]
+                    )
+                )
 
             for fs_note in rel_notes:
-                model.add(self._ui_row([
-                    "yellow3",
-                    _("Family"),
-                    _("(missing in Gramps)"),
-                    em,
-                    fs_note.subject or "",
-                    fs_note.text or "",
-                ]))
+                model.add(
+                    self._ui_row(
+                        [
+                            "yellow3",
+                            _("Family"),
+                            _("(missing in Gramps)"),
+                            em,
+                            fs_note.subject or "",
+                            fs_note.text or "",
+                        ]
+                    )
+                )
 
         for rel in fs_couples_remaining:
             for fs_note in rel.notes:
-                model.add(self._ui_row([
-                    "yellow3",
-                    _("Family"),
-                    _("(missing in Gramps)"),
-                    em,
-                    fs_note.subject or "",
-                    fs_note.text or "",
-                ]))
+                model.add(
+                    self._ui_row(
+                        [
+                            "yellow3",
+                            _("Family"),
+                            _("(missing in Gramps)"),
+                            em,
+                            fs_note.subject or "",
+                            fs_note.text or "",
+                        ]
+                    )
+                )
 
     def _fill_sources(self, model: Any, gr: Person, fsid: str) -> None:
         self._ensure_sources_cached(fsid)
-    
+
         fs_person = deserialize.Person._index.get(fsid) or deserialize.Person()
         em = "_"
-        fs_placeholder = em if self.__class__.fs_Tree else _("Not connected to FamilySearch")
-    
+        fs_placeholder = (
+            em if self.__class__.fs_Tree else _("Not connected to FamilySearch")
+        )
+
         source_meta = self._gather_sr_meta(fsid)
-    
+
         # Collect FS SourceDescription IDs referenced by person + spouse relationships
         fs_source_ids: dict[str, None] = {}
         for sr in getattr(fs_person, "sources", []) or []:
             sdid = getattr(sr, "descriptionId", "") or ""
             if sdid:
                 fs_source_ids[sdid] = None
-    
+
         for rel in getattr(fs_person, "_spouses", []) or []:
             for sr in getattr(rel, "sources", []) or []:
                 sdid = getattr(sr, "descriptionId", "") or ""
                 if sdid:
                     fs_source_ids[sdid] = None
-    
+
         # Ensure SourceDescription objects exist in index and (if connected) add to fs_Tree
         for sdid in list(fs_source_ids.keys()):
             if not sdid:
@@ -855,17 +955,17 @@ class CompareGtkMixin:
                         self.__class__.fs_Tree.sourceDescriptions.add(sd_new)
                 except Exception:
                     pass
-    
+
         # Populate FS dates if possible
         try:
             if self.__class__.fs_Tree is not None:
                 fs_import.fetch_source_dates(self.__class__.fs_Tree)
         except Exception:
             pass
-    
+
         # Collect Gramps citations across person + events + families
         citation_handles: set[str] = set(gr.get_citation_list() or [])
-    
+
         for er in gr.get_event_ref_list() or []:
             try:
                 ev = self.dbstate.db.get_event_from_handle(er.ref)
@@ -873,7 +973,7 @@ class CompareGtkMixin:
                     citation_handles.update(ev.get_citation_list() or [])
             except Exception:
                 pass
-    
+
         for fam_h in gr.get_family_handle_list() or []:
             try:
                 fam = self.dbstate.db.get_family_from_handle(fam_h)
@@ -881,12 +981,12 @@ class CompareGtkMixin:
                 fam = None
             if not fam:
                 continue
-    
+
             try:
                 citation_handles.update(fam.get_citation_list() or [])
             except Exception:
                 pass
-    
+
             for er in fam.get_event_ref_list() or []:
                 try:
                     ev = self.dbstate.db.get_event_from_handle(er.ref)
@@ -894,23 +994,23 @@ class CompareGtkMixin:
                         citation_handles.update(ev.get_citation_list() or [])
                 except Exception:
                     pass
-    
+
         # Row-per-Gramps-citation
         for ch in citation_handles:
             c = self.dbstate.db.get_citation_from_handle(ch)
             if not c:
                 continue
-    
+
             src_gr = fs_import.IntermediateSource()
             src_gr.from_gramps(self.dbstate.db, c)
-    
+
             title: str = src_gr.citation_title or ""
             note_text = (src_gr.note_text or "").strip()
             gr_url: str = self._canon_fs_web(getattr(src_gr, "url", None))
             date: str = fs_utilities.gramps_date_to_formal(c.date)
-    
+
             sd_id: str = fs_utilities.get_fsftid(c) or ""
-    
+
             color = "yellow"
             fs_title: str = ""
             fs_date: str = ""
@@ -920,26 +1020,26 @@ class CompareGtkMixin:
             tags_disp: str = ""
             contributor: str = ""
             modified: str = ""
-    
+
             sd_obj: Optional[deserialize.SourceDescription] = (
                 deserialize.SourceDescription._index.get(sd_id) if sd_id else None
             )
-    
+
             if sd_obj is not None:
                 src_fs = fs_import.IntermediateSource()
                 src_fs.from_fs(sd_obj, None)
-    
+
                 fs_title = src_fs.citation_title or ""
-                fs_text = (src_fs.note_text or "")
+                fs_text = src_fs.note_text or ""
                 fs_date = str(src_fs.date)
                 fs_url = self._canon_fs_web(getattr(src_fs, "url", None))
-    
+
                 meta = source_meta.get(sd_id, {}) or {}
                 kind = str(meta.get("kind") or "")
                 tags_disp = self._pretty_tags(meta.get("tags", []))
                 contributor = str(meta.get("contributor") or "")
                 modified = str(meta.get("modified") or "")
-    
+
                 color = "orange"
                 if (
                     fs_date == date
@@ -948,11 +1048,11 @@ class CompareGtkMixin:
                     and (fs_text or "").strip() == note_text
                 ):
                     color = "green"
-    
+
                 fs_source_ids.pop(sd_id, None)
             else:
                 fs_date = fs_title = fs_url = em
-    
+
             model.add(
                 self._ui_row(
                     [
@@ -971,31 +1071,35 @@ class CompareGtkMixin:
                     ]
                 )
             )
-    
+
         # FS-only sources
         for sdid in list(fs_source_ids.keys()):
             if not sdid:
                 continue
-    
-            sd_obj2: Optional[deserialize.SourceDescription] = deserialize.SourceDescription._index.get(sdid)
-    
+
+            sd_obj2: Optional[
+                deserialize.SourceDescription
+            ] = deserialize.SourceDescription._index.get(sdid)
+
             fs_title = ""
             if sd_obj2 is not None and getattr(sd_obj2, "titles", None):
                 try:
                     for t in sd_obj2.titles:
-                        fs_title += (getattr(t, "value", None) or "")
+                        fs_title += getattr(t, "value", None) or ""
                 except Exception:
                     pass
-    
+
             fs_date_val = getattr(sd_obj2, "_date", "") if sd_obj2 is not None else ""
-            fs_url2 = self._canon_fs_web(getattr(sd_obj2, "about", None) if sd_obj2 is not None else None)
-    
+            fs_url2 = self._canon_fs_web(
+                getattr(sd_obj2, "about", None) if sd_obj2 is not None else None
+            )
+
             meta = source_meta.get(sdid, {}) or {}
             kind = str(meta.get("kind") or _("Mention"))
             tags_disp = self._pretty_tags(meta.get("tags", []))
             contributor = str(meta.get("contributor") or "")
             modified = str(meta.get("modified") or "")
-    
+
             model.add(
                 self._ui_row(
                     [

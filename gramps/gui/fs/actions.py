@@ -56,7 +56,12 @@ FS_ATTR_HUMAN = "FamilySearch ID"
 
 
 def _dbg(msg: str) -> None:
-    if os.environ.get("GRAMPS_FS_DEBUG", "").strip().lower() in ("1", "true", "yes", "on"):
+    if os.environ.get("GRAMPS_FS_DEBUG", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
         logger.debug("%s", msg)
 
 
@@ -65,6 +70,7 @@ def _bind_global_session(session) -> None:
     # kept for windows compat
     try:
         from gramps.gui.fs import tree as fs_tree
+
         fs_tree._fs_session = session
     except Exception:
         pass
@@ -187,6 +193,7 @@ def _require_ready_person(dbstate, parent, person):
 # Link/Compare
 # ---------------
 
+
 def link_familysearch_id(dbstate, uistate, track, person, session, parent, editor=None):
     _bind_global_session(session)
 
@@ -226,7 +233,11 @@ def compare_person(dbstate, uistate, track, person, session, parent, editor=None
 
     fsid = _get_fs_id(person)
     if not fsid:
-        _info(parent, _("FamilySearch"), _("No FamilySearch ID linked.\nClick 'Link FamilySearch ID' first."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No FamilySearch ID linked.\nClick 'Link FamilySearch ID' first."),
+        )
         return
 
     _ensure_status_schema(dbstate.db)
@@ -252,6 +263,7 @@ def compare_person(dbstate, uistate, track, person, session, parent, editor=None
 # FamilySearch API fetch helper
 # -------------------------------
 
+
 def _platform_json(session, endpoint: str) -> dict:
     """
     Fetch GEDCOM JSON from a /platform/... endpoint using the Session object.
@@ -261,7 +273,11 @@ def _platform_json(session, endpoint: str) -> dict:
         if callable(fn):
             try:
                 data = fn(endpoint)
-                return data if isinstance(data, dict) else (data.json() if hasattr(data, "json") else {})
+                return (
+                    data
+                    if isinstance(data, dict)
+                    else (data.json() if hasattr(data, "json") else {})
+                )
             except Exception:
                 pass
 
@@ -283,7 +299,11 @@ def _platform_json(session, endpoint: str) -> dict:
 
     import requests
 
-    base = getattr(session, "api_url", "") or getattr(session, "API_URL", "") or "https://apibeta.familysearch.org"
+    base = (
+        getattr(session, "api_url", "")
+        or getattr(session, "API_URL", "")
+        or "https://apibeta.familysearch.org"
+    )
     base = str(base).rstrip("/")
     token = getattr(session, "access_token", "") or ""
     url = base + (endpoint if endpoint.startswith("/") else ("/" + endpoint))
@@ -303,6 +323,7 @@ def _fs_display_name(p: dict) -> str:
 # --------------------------
 # Relatives chooser dialog
 # --------------------------
+
 
 def _pick_fsid_list(parent, title: str, rows: list[tuple[str, str, bool]]) -> list[str]:
     """
@@ -337,9 +358,11 @@ def _pick_fsid_list(parent, title: str, rows: list[tuple[str, str, bool]]) -> li
     top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
     top.get_style_context().add_class("fs-rel-import-panel")
 
-    lbl_counts = Gtk.Label(label=_("{total} found - {new} new - {existing} already in tree").format(
-        total=total, new=new_ct, existing=existing_ct
-    ))
+    lbl_counts = Gtk.Label(
+        label=_("{total} found - {new} new - {existing} already in tree").format(
+            total=total, new=new_ct, existing=existing_ct
+        )
+    )
     lbl_counts.set_xalign(0.0)
     top.pack_start(lbl_counts, True, True, 0)
 
@@ -352,7 +375,7 @@ def _pick_fsid_list(parent, title: str, rows: list[tuple[str, str, bool]]) -> li
 
     def do_new(_btn):
         for row in store:
-            row[0] = (not row[3])
+            row[0] = not row[3]
 
     btn_none.connect("clicked", do_none)
     btn_new.connect("clicked", do_new)
@@ -365,7 +388,9 @@ def _pick_fsid_list(parent, title: str, rows: list[tuple[str, str, bool]]) -> li
     fs_ui.tune_treeview(tv)
 
     cr_toggle = Gtk.CellRendererToggle()
-    cr_toggle.connect("toggled", lambda _w, path: store[path].__setitem__(0, not store[path][0]))
+    cr_toggle.connect(
+        "toggled", lambda _w, path: store[path].__setitem__(0, not store[path][0])
+    )
     col_toggle = Gtk.TreeViewColumn(_("Import"), cr_toggle, active=0)
     tv.append_column(col_toggle)
 
@@ -409,6 +434,7 @@ def _pick_fsid_list(parent, title: str, rows: list[tuple[str, str, bool]]) -> li
 # Import pipeline wrapper
 # ------------------------
 
+
 def _import_full_person(dbstate, uistate, fsid: str, verbosity: int = 0) -> None:
     import gramps.gui.fs.import_ as fs_import
 
@@ -439,6 +465,7 @@ def _import_full_person(dbstate, uistate, fsid: str, verbosity: int = 0) -> None
 # Family linking helpers
 # --------------------------
 
+
 def _ensure_child_ref(child_handle: str) -> ChildRef:
     cr = ChildRef()
     if hasattr(cr, "set_reference_handle"):
@@ -466,7 +493,9 @@ def _ensure_person_has_family_handle(db, txn, person: Person, fam_handle: str) -
         db.commit_person(person, txn)
 
 
-def _ensure_person_has_parent_family_handle(db, txn, person: Person, fam_handle: str) -> None:
+def _ensure_person_has_parent_family_handle(
+    db, txn, person: Person, fam_handle: str
+) -> None:
     fams = list(person.get_parent_family_handle_list() or [])
     if fam_handle not in fams:
         fams.append(fam_handle)
@@ -479,7 +508,10 @@ def _ensure_child_in_family(db, fam: Family, child_handle: str) -> bool:
         try:
             if getattr(cr, "ref", None) == child_handle:
                 return False
-            if hasattr(cr, "get_reference_handle") and cr.get_reference_handle() == child_handle:
+            if (
+                hasattr(cr, "get_reference_handle")
+                and cr.get_reference_handle() == child_handle
+            ):
                 return False
         except Exception:
             pass
@@ -557,6 +589,7 @@ def _find_person_by_fsid(db, fsid: str):
 
     try:
         import gramps.gui.fs.utilities as fs_utilities
+
         idx = getattr(fs_utilities, "FS_INDEX_PEOPLE", {})
         h = idx.get(fsid)
         if h:
@@ -569,6 +602,7 @@ def _find_person_by_fsid(db, fsid: str):
 
     try:
         import gramps.gui.fs.utilities as fs_utilities
+
         get_fsftid = getattr(fs_utilities, "get_fsftid", None)
     except Exception:
         get_fsftid = None
@@ -590,12 +624,17 @@ def _find_person_by_fsid(db, fsid: str):
 # Import: Parents / Children / Spouses
 # ---------------------------------------
 
+
 def import_parents(dbstate, uistate, track, person, session, parent, editor=None):
     _bind_global_session(session)
 
     fsid = _get_fs_id(person)
     if not fsid:
-        _info(parent, _("FamilySearch"), _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."),
+        )
         return
     me_handle = _require_ready_person(dbstate, parent, person)
     if not me_handle:
@@ -624,7 +663,11 @@ def import_parents(dbstate, uistate, track, person, session, parent, editor=None
                 parent_ids.append(pid)
 
     if not parent_ids:
-        _info(parent, _("FamilySearch"), _("No parents found on FamilySearch for this person."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No parents found on FamilySearch for this person."),
+        )
         return
 
     db = dbstate.db
@@ -647,7 +690,11 @@ def import_parents(dbstate, uistate, track, person, session, parent, editor=None
             imported_parents.append(pr)
 
     if not imported_parents:
-        _error(parent, _("FamilySearch"), _("Parents imported but could not be located in the local database."))
+        _error(
+            parent,
+            _("FamilySearch"),
+            _("Parents imported but could not be located in the local database."),
+        )
         return
 
     with DbTxn(_("FamilySearch: Link parents"), db) as txn:
@@ -658,7 +705,8 @@ def import_parents(dbstate, uistate, track, person, session, parent, editor=None
 
         if not (child.get_parent_family_handle_list() or []):
             parent_handles = set(
-                p.handle for p in imported_parents
+                p.handle
+                for p in imported_parents
                 if p is not None and getattr(p, "handle", None)
             )
             if len(parent_handles) >= 2:
@@ -706,7 +754,11 @@ def import_children(dbstate, uistate, track, person, session, parent, editor=Non
 
     fsid = _get_fs_id(person)
     if not fsid:
-        _info(parent, _("FamilySearch"), _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."),
+        )
         return
     me_handle = _require_ready_person(dbstate, parent, person)
     if not me_handle:
@@ -717,7 +769,9 @@ def import_children(dbstate, uistate, track, person, session, parent, editor=Non
     try:
         data = _platform_json(session, f"/platform/tree/persons/{fsid}/children")
     except Exception as e:
-        _error(parent, _("FamilySearch"), _("Failed to fetch children: {e}").format(e=e))
+        _error(
+            parent, _("FamilySearch"), _("Failed to fetch children: {e}").format(e=e)
+        )
         return
 
     persons = {p.get("id"): p for p in (data.get("persons") or []) if p.get("id")}
@@ -737,7 +791,11 @@ def import_children(dbstate, uistate, track, person, session, parent, editor=Non
 
     child_ids = [cid for cid in child_map.keys() if cid and cid != fsid]
     if not child_ids:
-        _info(parent, _("FamilySearch"), _("No children found on FamilySearch for this person."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No children found on FamilySearch for this person."),
+        )
         return
 
     db = dbstate.db
@@ -750,7 +808,9 @@ def import_children(dbstate, uistate, track, person, session, parent, editor=Non
             other_name = _fs_display_name(persons.get(other, {}) or {}) or other
             other_label = _(" (other parent: {name})").format(name=other_name)
         exists = _find_person_by_fsid(db, cid) is not None
-        label = f"{cn}{other_label} [{cid}]" + (_("  - already in tree") if exists else "")
+        label = f"{cn}{other_label} [{cid}]" + (
+            _("  - already in tree") if exists else ""
+        )
         rows.append((cid, label, exists))
 
     chosen = _pick_fsid_list(parent, _("Import children"), rows)
@@ -765,7 +825,11 @@ def import_children(dbstate, uistate, track, person, session, parent, editor=Non
             imported_children.append(ch)
 
     if not imported_children:
-        _error(parent, _("FamilySearch"), _("Children imported but could not be located in the local database."))
+        _error(
+            parent,
+            _("FamilySearch"),
+            _("Children imported but could not be located in the local database."),
+        )
         return
 
     with DbTxn(_("FamilySearch: Link children"), db) as txn:
@@ -785,7 +849,11 @@ def import_children(dbstate, uistate, track, person, session, parent, editor=Non
                     other_parent_fsid = child_map.get(cid)
                     break
 
-            other_parent = _find_person_by_fsid(db, other_parent_fsid) if other_parent_fsid else None
+            other_parent = (
+                _find_person_by_fsid(db, other_parent_fsid)
+                if other_parent_fsid
+                else None
+            )
 
             fam = None
             if other_parent:
@@ -831,7 +899,9 @@ def import_children(dbstate, uistate, track, person, session, parent, editor=Non
 
 
 def import_spouse(dbstate, uistate, track, person, session, parent, editor=None):
-    return import_spouses(dbstate, uistate, track, person, session, parent, editor=editor)
+    return import_spouses(
+        dbstate, uistate, track, person, session, parent, editor=editor
+    )
 
 
 def import_spouses(dbstate, uistate, track, person, session, parent, editor=None):
@@ -839,7 +909,11 @@ def import_spouses(dbstate, uistate, track, person, session, parent, editor=None
 
     fsid = _get_fs_id(person)
     if not fsid:
-        _info(parent, _("FamilySearch"), _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."),
+        )
         return
     me_handle = _require_ready_person(dbstate, parent, person)
     if not me_handle:
@@ -877,7 +951,11 @@ def import_spouses(dbstate, uistate, track, person, session, parent, editor=None
 
     spouse_ids.discard(fsid)
     if not spouse_ids:
-        _info(parent, _("FamilySearch"), _("No spouses found on FamilySearch for this person."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No spouses found on FamilySearch for this person."),
+        )
         return
 
     db = dbstate.db
@@ -900,7 +978,11 @@ def import_spouses(dbstate, uistate, track, person, session, parent, editor=None
             imported_spouses.append(sp)
 
     if not imported_spouses:
-        _error(parent, _("FamilySearch"), _("Spouses imported but could not be located in the local database."))
+        _error(
+            parent,
+            _("FamilySearch"),
+            _("Spouses imported but could not be located in the local database."),
+        )
         return
 
     with DbTxn(_("FamilySearch: Link spouses"), db) as txn:
@@ -954,28 +1036,43 @@ def import_spouses(dbstate, uistate, track, person, session, parent, editor=None
 
 
 def import_parent_family(dbstate, uistate, track, person, session, parent, editor=None):
-    return import_parents(dbstate, uistate, track, person, session, parent, editor=editor)
+    return import_parents(
+        dbstate, uistate, track, person, session, parent, editor=editor
+    )
 
 
-def import_family_parents(dbstate, uistate, track, person, session, parent, editor=None):
-    return import_parents(dbstate, uistate, track, person, session, parent, editor=editor)
+def import_family_parents(
+    dbstate, uistate, track, person, session, parent, editor=None
+):
+    return import_parents(
+        dbstate, uistate, track, person, session, parent, editor=editor
+    )
 
 
 def import_child(dbstate, uistate, track, person, session, parent, editor=None):
-    return import_children(dbstate, uistate, track, person, session, parent, editor=editor)
+    return import_children(
+        dbstate, uistate, track, person, session, parent, editor=editor
+    )
 
 
-def import_family_children(dbstate, uistate, track, person, session, parent, editor=None):
-    return import_children(dbstate, uistate, track, person, session, parent, editor=editor)
+def import_family_children(
+    dbstate, uistate, track, person, session, parent, editor=None
+):
+    return import_children(
+        dbstate, uistate, track, person, session, parent, editor=editor
+    )
 
 
 def import_partner(dbstate, uistate, track, person, session, parent, editor=None):
-    return import_spouses(dbstate, uistate, track, person, session, parent, editor=editor)
+    return import_spouses(
+        dbstate, uistate, track, person, session, parent, editor=editor
+    )
 
 
 # -------------------------------------
 # clear json cache, tags, sync Person
 # -------------------------------------
+
 
 def _strip_unknowns_inplace(data: Any) -> None:
     KEY = "PersonInfo:visibleToAllWhenUsingFamilySearchApps"
@@ -1007,6 +1104,7 @@ def clear_cache(dbstate, uistate, track, person, session, parent, editor=None) -
     try:
         import gramps.gui.fs.person.fsg_sync as FSG_Sync
         from gramps.gui.fs import tree as fs_tree
+
         try:
             fs_tree._fs_session = session
         except Exception:
@@ -1025,6 +1123,7 @@ def clear_cache(dbstate, uistate, track, person, session, parent, editor=None) -
 
     try:
         import gramps.gui.fs.person.mixins.cache as cache_mod
+
         cache_dir = os.path.dirname(cache_mod.__file__)
         disk_path = cache_dir
         FsCache = getattr(cache_mod, "_FsCache", None)
@@ -1045,7 +1144,9 @@ def clear_cache(dbstate, uistate, track, person, session, parent, editor=None) -
     if cleared_disk:
         msg.append(_("Cleared on-disk cache: yes ({path})").format(path=disk_path))
     else:
-        msg.append(_("Cleared on-disk cache: (not available / not supported by cache helper)"))
+        msg.append(
+            _("Cleared on-disk cache: (not available / not supported by cache helper)")
+        )
 
     _info(parent, _("FamilySearch"), "\n".join(msg))
 
@@ -1065,10 +1166,14 @@ def tags_dialog(dbstate, uistate, track, person, session, parent, editor=None) -
     box.set_margin_end(10)
     box.set_spacing(8)
 
-    box.add(Gtk.Label(label=_(
-        "This will scan your whole tree and apply FS_Linked / FS_NotLinked tags.\n"
-        "It does NOT change any person data."
-    )))
+    box.add(
+        Gtk.Label(
+            label=_(
+                "This will scan your whole tree and apply FS_Linked / FS_NotLinked tags.\n"
+                "It does NOT change any person data."
+            )
+        )
+    )
 
     dlg.show_all()
     resp = dlg.run()
@@ -1079,6 +1184,7 @@ def tags_dialog(dbstate, uistate, track, person, session, parent, editor=None) -
 
     try:
         from gramps.gui.fs import tags as fs_tags
+
         db = dbstate.db
         total, linked, not_linked, changed = fs_tags.retag_all_link_status(db)
         _info(
@@ -1090,7 +1196,9 @@ def tags_dialog(dbstate, uistate, track, person, session, parent, editor=None) -
                 "Linked: {linked}\n"
                 "Not linked: {not_linked}\n"
                 "Changed: {changed}"
-            ).format(total=total, linked=linked, not_linked=not_linked, changed=changed),
+            ).format(
+                total=total, linked=linked, not_linked=not_linked, changed=changed
+            ),
         )
     except Exception as e:
         _error(parent, _("FamilySearch"), _("Retag failed: {e}").format(e=e))
@@ -1145,13 +1253,19 @@ def _refresh_editor_person_views(editor) -> None:
                 pass
 
 
-def sync_this_person(dbstate, uistate, track, person, session, parent, editor=None) -> None:
+def sync_this_person(
+    dbstate, uistate, track, person, session, parent, editor=None
+) -> None:
     # Sync the *selected existing Gramps person* from FamilySearch - facts/events (dates + place) + notes
     _bind_global_session(session)
 
     fsid = _get_fs_id(person)
     if not fsid:
-        _info(parent, _("FamilySearch"), _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."),
+        )
         return
 
     me_handle = _require_ready_person(dbstate, parent, person)
@@ -1206,11 +1320,21 @@ def sync_this_person(dbstate, uistate, track, person, session, parent, editor=No
                 pass
 
         if fs_person is None:
-            _error(parent, _("FamilySearch"), _("Could not load this person from FamilySearch (no GEDCOMX person object)."))
+            _error(
+                parent,
+                _("FamilySearch"),
+                _(
+                    "Could not load this person from FamilySearch (no GEDCOMX person object)."
+                ),
+            )
             return
 
     except Exception as e:
-        _error(parent, _("FamilySearch"), _("Failed to download from FamilySearch: {e}").format(e=e))
+        _error(
+            parent,
+            _("FamilySearch"),
+            _("Failed to download from FamilySearch: {e}").format(e=e),
+        )
         return
 
     try:
@@ -1218,7 +1342,11 @@ def sync_this_person(dbstate, uistate, track, person, session, parent, editor=No
         from gramps.gui.fs.import_.notes import add_note
         import gramps.gui.fs.compare as fs_compare
     except Exception as e:
-        _error(parent, _("FamilySearch"), _("Sync pipeline import helpers missing: {e}").format(e=e))
+        _error(
+            parent,
+            _("FamilySearch"),
+            _("Sync pipeline import helpers missing: {e}").format(e=e),
+        )
         return
 
     try:
@@ -1266,7 +1394,11 @@ def sync_this_person(dbstate, uistate, track, person, session, parent, editor=No
             existing_notes = set(gr_person.get_note_list() or [])
             for fs_note in list(getattr(fs_person, "notes", []) or []):
                 note = add_note(db, txn, fs_note, gr_person.note_list)
-                if note and getattr(note, "handle", None) and note.handle not in existing_notes:
+                if (
+                    note
+                    and getattr(note, "handle", None)
+                    and note.handle not in existing_notes
+                ):
                     gr_person.add_note(note.handle)
                     existing_notes.add(note.handle)
 
@@ -1282,31 +1414,51 @@ def sync_this_person(dbstate, uistate, track, person, session, parent, editor=No
         return
 
     _refresh_editor_person_views(editor)
-    _info(parent, _("FamilySearch"), _("Sync complete: facts/events, dates/places, and notes updated for this person."))
+    _info(
+        parent,
+        _("FamilySearch"),
+        _(
+            "Sync complete: facts/events, dates/places, and notes updated for this person."
+        ),
+    )
 
 
 def sync_person(dbstate, uistate, track, person, session, parent, editor=None):
-    return sync_this_person(dbstate, uistate, track, person, session, parent, editor=editor)
+    return sync_this_person(
+        dbstate, uistate, track, person, session, parent, editor=editor
+    )
 
 
 def _ensure_status_schema(db) -> None:
     # status is stored on Person now, not in a DB table. kept for compat.
     return
 
+
 # --------------------------
-# sync to FS 
+# sync to FS
 # --------------------------
 
-def sync_from_familysearch(dbstate, uistate, track, person, session, parent, editor=None) -> None:
-    return sync_this_person(dbstate, uistate, track, person, session, parent, editor=editor)
+
+def sync_from_familysearch(
+    dbstate, uistate, track, person, session, parent, editor=None
+) -> None:
+    return sync_this_person(
+        dbstate, uistate, track, person, session, parent, editor=editor
+    )
 
 
-def sync_to_familysearch(dbstate, uistate, track, person, session, parent, editor=None) -> None:
+def sync_to_familysearch(
+    dbstate, uistate, track, person, session, parent, editor=None
+) -> None:
     _bind_global_session(session)
 
     fsid = _get_fs_id(person)
     if not fsid:
-        _info(parent, _("FamilySearch"), _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."))
+        _info(
+            parent,
+            _("FamilySearch"),
+            _("No FamilySearch ID linked. Click 'Link FamilySearch ID' first."),
+        )
         return
 
     # ensure person is saved/committed before we read from DB-backed state
@@ -1321,6 +1473,10 @@ def sync_to_familysearch(dbstate, uistate, track, person, session, parent, edito
         return
 
     try:
-        sync_directions.sync_to_familysearch(dbstate, uistate, track, person, session, parent, editor=editor)
+        sync_directions.sync_to_familysearch(
+            dbstate, uistate, track, person, session, parent, editor=editor
+        )
     except Exception as e:
-        _error(parent, _("FamilySearch"), _("Sync to FamilySearch failed: {e}").format(e=e))
+        _error(
+            parent, _("FamilySearch"), _("Sync to FamilySearch failed: {e}").format(e=e)
+        )

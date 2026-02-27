@@ -30,9 +30,10 @@ LOG = logging.getLogger(__name__)
 # instead of creating schema/accessing dbapi directly, store status on Person via a single attribute containing a json, until extention of db is possible
 _STATUS_ATTR = "_GRAMPSFS_SYNC_STATUS"
 
-from gramps.gen.db import DbTxn  
-from gramps.gen.lib import Attribute, AttributeType 
-from gramps.gen.errors import HandleError  
+from gramps.gen.db import DbTxn
+from gramps.gen.lib import Attribute, AttributeType
+from gramps.gen.errors import HandleError
+
 
 def _as_int(v: Any) -> int | None:
     if v is None:
@@ -190,7 +191,9 @@ class FSStatusDB:
         except Exception as err:
             if HandleError is not None and isinstance(err, HandleError):
                 return None
-            LOG.debug("Failed to get person from handle=%s", self.p_handle, exc_info=True)
+            LOG.debug(
+                "Failed to get person from handle=%s", self.p_handle, exc_info=True
+            )
             return None
 
     def commit(self, txn=None) -> None:
@@ -203,7 +206,9 @@ class FSStatusDB:
 
         person = self._get_person()
         if not person:
-            LOG.debug("FSStatusDB.commit: person not found for handle=%s", self.p_handle)
+            LOG.debug(
+                "FSStatusDB.commit: person not found for handle=%s", self.p_handle
+            )
             return
 
         blob = _read_status_blob(person)
@@ -275,7 +280,10 @@ class FSStatusDB:
                     else:
                         self.db.commit_person(person, None)
                 except Exception:
-                    LOG.debug("FSStatusDB.commit: commit_person signature fallback failed", exc_info=True)
+                    LOG.debug(
+                        "FSStatusDB.commit: commit_person signature fallback failed",
+                        exc_info=True,
+                    )
             except Exception:
                 LOG.debug("FSStatusDB.commit: commit_person failed", exc_info=True)
 
@@ -294,7 +302,7 @@ class FSStatusDB:
 
         blob = _read_status_blob(person)
 
-        self.fsid = (str(blob.get("fsid")).strip() if blob.get("fsid") else None)
+        self.fsid = str(blob.get("fsid")).strip() if blob.get("fsid") else None
         self.is_root = _as_bool(blob.get("is_root"))
 
         self.status_ts = _as_int(blob.get("status_ts"))

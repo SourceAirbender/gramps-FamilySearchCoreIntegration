@@ -23,7 +23,7 @@ from __future__ import annotations
 from gramps.gen.config import config
 from gramps.gen.plug import Gramplet
 
-# Mixins 
+# Mixins
 from .mixins.helpers import AuthMixin
 from .mixins.compare_gtk import CompareGtkMixin
 from .mixins.sources_dialog import SourcesDialogMixin
