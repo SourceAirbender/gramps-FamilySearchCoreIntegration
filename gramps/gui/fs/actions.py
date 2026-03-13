@@ -1456,6 +1456,38 @@ def sync_from_familysearch(
     )
 
 
+def export_basic_to_familysearch(
+    dbstate, uistate, track, person, session, parent, editor=None
+) -> None:
+    """
+    Create missing people on FamilySearch (basic) and link relationships.
+    This is the Gramps -> FamilySearch "create" path.
+    """
+    _bind_global_session(session)
+
+    # require saved person context
+    me_handle = _require_ready_person(dbstate, parent, person)
+    if not me_handle:
+        return
+
+    try:
+        from . import sync_directions
+    except Exception as e:
+        _error(parent, _("FamilySearch"), _("Export module missing: {e}").format(e=e))
+        return
+
+    try:
+        sync_directions.export_basic_people_to_familysearch(
+            dbstate, uistate, track, person, session, parent, editor=editor
+        )
+    except Exception as e:
+        _error(
+            parent,
+            _("FamilySearch"),
+            _("Export to FamilySearch failed: {e}").format(e=e),
+        )
+
+
 def sync_to_familysearch(
     dbstate, uistate, track, person, session, parent, editor=None
 ) -> None:
