@@ -269,7 +269,9 @@ def toggle_tools_window(session: Any, dbstate: Any = None, uistate: Any = None) 
     _SINGLETON.present()
 
 
-def present_tools_window(session: Any, dbstate: Any = None, uistate: Any = None) -> None:
+def present_tools_window(
+    session: Any, dbstate: Any = None, uistate: Any = None
+) -> None:
     global _SINGLETON
 
     _install_editperson_hook()
@@ -337,7 +339,9 @@ class FamilySearchToolsWindow:
 
         self._size_group = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.BOTH)
 
-        sec_person, box_person = self._make_section(_("Person actions"), "fs-sec-person")
+        sec_person, box_person = self._make_section(
+            _("Person actions"), "fs-sec-person"
+        )
         outer.pack_start(sec_person, False, False, 0)
 
         self.btn_link = Gtk.Button(label=_("Link FamilySearch ID"))
@@ -352,7 +356,9 @@ class FamilySearchToolsWindow:
 
         self.btn_export_basic = Gtk.Button(label=_("Export to FamilySearch (basic)..."))
         self.btn_export_basic.set_tooltip_text(
-            _("Create missing people on FamilySearch and link relationships (name + birth/death).")
+            _(
+                "Create missing people on FamilySearch and link relationships (name + birth/death)."
+            )
         )
 
         for button in (
@@ -364,7 +370,9 @@ class FamilySearchToolsWindow:
         ):
             self._add_btn(box_person, button)
 
-        sec_import, box_import = self._make_section(_("Import relatives"), "fs-sec-import")
+        sec_import, box_import = self._make_section(
+            _("Import relatives"), "fs-sec-import"
+        )
         outer.pack_start(sec_import, False, False, 0)
 
         self.btn_imp_par = Gtk.Button(label=_("Import Parents"))
@@ -464,7 +472,9 @@ class FamilySearchToolsWindow:
         """
         fs_ui.install_css_once("fs.tools_window", css)
 
-    def _make_section(self, title: str, css_class: str) -> tuple[Gtk.Widget, Gtk.FlowBox]:
+    def _make_section(
+        self, title: str, css_class: str
+    ) -> tuple[Gtk.Widget, Gtk.FlowBox]:
         wrapper = Gtk.EventBox()
         wrapper.set_visible_window(True)
 
@@ -575,7 +585,9 @@ class FamilySearchToolsWindow:
         if original_width <= 0 or original_height <= 0:
             return
 
-        available_width = max(1, int(container_width) - (self._BANNER_SIDE_PAD * 2) - 24)
+        available_width = max(
+            1, int(container_width) - (self._BANNER_SIDE_PAD * 2) - 24
+        )
         scale = available_width / float(original_width)
 
         new_width = int(original_width * scale)
@@ -652,7 +664,8 @@ class FamilySearchToolsWindow:
 
         if gramps_id:
             self.active_label.set_text(
-                _("Editor person: %(name)s  [%(gid)s]") % {
+                _("Editor person: %(name)s  [%(gid)s]")
+                % {
                     "name": display_name,
                     "gid": gramps_id,
                 }
@@ -808,6 +821,7 @@ class FamilySearchToolsWindow:
 
         try:
             from . import actions
+
             fn = getattr(actions, "export_basic_to_familysearch", None)
             if callable(fn):
                 self._call_action(fn, "Export failed", ctx)
@@ -817,6 +831,7 @@ class FamilySearchToolsWindow:
 
         try:
             from . import sync_directions as fs_syncdir
+
             fn = getattr(fs_syncdir, "export_basic_people_to_familysearch", None)
             if callable(fn):
                 self._call_action(fn, "Export failed", ctx)
@@ -825,7 +840,9 @@ class FamilySearchToolsWindow:
             _show_error(self.window, "FamilySearch", f"Export failed: {exc}")
             return
 
-        _show_error(self.window, "FamilySearch", "Export failed: no export function found.")
+        _show_error(
+            self.window, "FamilySearch", "Export failed: no export function found."
+        )
 
     def _on_link(self, *_args: Any) -> None:
         ctx = self._ctx()
@@ -833,6 +850,7 @@ class FamilySearchToolsWindow:
             return
 
         from . import actions
+
         self._call_action(actions.link_familysearch_id, "Link failed", ctx)
 
     def _on_compare(self, *_args: Any) -> None:
@@ -841,6 +859,7 @@ class FamilySearchToolsWindow:
             return
 
         from . import actions
+
         self._call_action(actions.compare_person, "Compare failed", ctx)
 
     def _on_sync(self, *_args: Any) -> None:
@@ -872,6 +891,7 @@ class FamilySearchToolsWindow:
 
         try:
             from . import actions
+
             fn = getattr(actions, "sync_to_familysearch", None)
             if callable(fn):
                 self._call_action(fn, "Sync to FamilySearch failed", ctx)
@@ -881,12 +901,15 @@ class FamilySearchToolsWindow:
 
         try:
             from . import sync_directions as fs_syncdir
+
             fn = getattr(fs_syncdir, "sync_to_familysearch", None)
             if callable(fn):
                 self._call_action(fn, "Sync to FamilySearch failed", ctx)
                 return
         except Exception as exc:
-            _show_error(self.window, "FamilySearch", f"Sync to FamilySearch failed: {exc}")
+            _show_error(
+                self.window, "FamilySearch", f"Sync to FamilySearch failed: {exc}"
+            )
             return
 
         _show_error(
@@ -901,6 +924,7 @@ class FamilySearchToolsWindow:
             return
 
         from . import actions
+
         self._call_action(actions.import_parents, "Import parents failed", ctx)
 
     def _on_import_spouse(self, *_args: Any) -> None:
@@ -909,6 +933,7 @@ class FamilySearchToolsWindow:
             return
 
         from . import actions
+
         self._call_action(actions.import_spouse, "Import spouse failed", ctx)
 
     def _on_import_children(self, *_args: Any) -> None:
@@ -917,6 +942,7 @@ class FamilySearchToolsWindow:
             return
 
         from . import actions
+
         self._call_action(actions.import_children, "Import children failed", ctx)
 
     def _on_tags(self, *_args: Any) -> None:
@@ -925,6 +951,7 @@ class FamilySearchToolsWindow:
             return
 
         from . import actions
+
         self._call_action(actions.tags_dialog, "Tags failed", ctx)
 
     def _on_clear_cache(self, *_args: Any) -> None:
@@ -933,4 +960,5 @@ class FamilySearchToolsWindow:
             return
 
         from . import actions
+
         self._call_action(actions.clear_cache, "Clear cache failed", ctx)

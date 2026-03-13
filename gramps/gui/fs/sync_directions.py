@@ -309,24 +309,23 @@ def _ensure_fs_tree(session: Any) -> Optional[Any]:
     except Exception:
         return None
 
-    tree_obj = getattr(fsg_sync.FSG_Sync, "fs_Tree", None)
-    if tree_obj is not None:
-        return tree_obj
+    existing_tree: Optional[Any] = getattr(fsg_sync.FSG_Sync, "fs_Tree", None)
+    if existing_tree is not None:
+        return existing_tree
 
     try:
         from . import tree as fs_tree_mod
     except Exception:
         return None
 
-    tree_obj = fs_tree_mod.Tree()
+    new_tree: Any = fs_tree_mod.Tree()
     try:
-        setattr(tree_obj, "_getsources", False)
+        setattr(new_tree, "_getsources", False)
     except Exception:
         pass
 
-    fsg_sync.FSG_Sync.fs_Tree = tree_obj
-    return tree_obj
-
+    fsg_sync.FSG_Sync.fs_Tree = new_tree
+    return new_tree
 
 def _prime_person_cache(session: Any, fsid: str, force: bool = False) -> Optional[Any]:
     # The compare layer leans on shared cache state. If we do not refresh it
@@ -1796,7 +1795,7 @@ def sync_to_familysearch(
             WarningDialog(_("Not connected to FamilySearch."), parent=parent)
             return
 
-        # Always prefer the DB copy. In-editor objects can be stale.
+        # Always prefer the DB copy. In-editor objects can be stale & It wont report any pushable changes
         handle = _person_handle(person)
         if handle:
             db_person = dbstate.db.get_person_from_handle(handle)
@@ -1907,22 +1906,22 @@ def sync_to_familysearch(
                 fsid = fsid_head
                 payload = _build_person_payload(fsid, chosen_overview, change_message)
 
-            headers: Dict[str, str] = {}
+            person_headers: Dict[str, str] = {}
             if head_resp is not None:
                 response_headers = _response_headers(head_resp)
                 etag = str(response_headers.get("Etag") or response_headers.get("ETag") or "").strip()
                 last_modified = str(response_headers.get("Last-Modified") or "").strip()
-
+            
                 if etag:
-                    headers["If-Match"] = etag
+                    person_headers["If-Match"] = etag
                 if last_modified:
-                    headers["If-Unmodified-Since"] = last_modified
-
+                    person_headers["If-Unmodified-Since"] = last_modified
+            
             resp = _session_post_json(
                 session,
                 f"/platform/tree/persons/{fsid}",
                 payload,
-                headers=headers,
+                headers=person_headers,
             )
             if resp is None or _response_status(resp) not in (200, 201, 204):
                 message = _err_text(resp) if resp is not None else ""
@@ -1980,7 +1979,6 @@ def sync_to_familysearch(
 
                 created_refs.append(_build_source_ref(session, sdid, default_tags, change_message))
 
-                # If this local link-back fails, the actual FS write already succeeded.
                 link_fn = getattr(fs_utilities, "link_gramps_fs_id", None)
                 if callable(link_fn):
                     try:
@@ -1993,19 +1991,24 @@ def sync_to_familysearch(
                 if fsid_head and fsid_head != fsid:
                     fsid = fsid_head
 
-                headers: Dict[str, str] = {}
+                source_headers: Dict[str, str] = {}
                 if head_resp is not None:
                     response_headers = _response_headers(head_resp)
                     etag = str(response_headers.get("Etag") or response_headers.get("ETag") or "").strip()
                     last_modified = str(response_headers.get("Last-Modified") or "").strip()
-
+                
                     if etag:
-                        headers["If-Match"] = etag
+                        source_headers["If-Match"] = etag
                     if last_modified:
-                        headers["If-Unmodified-Since"] = last_modified
-
+                        source_headers["If-Unmodified-Since"] = last_modified
+                
                 payload = _build_person_sources_payload(session, fsid, created_refs, change_message)
-                resp = _session_post_json(session, f"/platform/tree/persons/{fsid}", payload, headers=headers)
+                resp = _session_post_json(
+                    session,
+                    f"/platform/tree/persons/{fsid}",
+                    payload,
+                    headers=source_headers,
+                )
                 if resp is None or _response_status(resp) not in (200, 201, 204):
                     message = _err_text(resp) if resp is not None else ""
                     WarningDialog(
@@ -2216,14 +2219,17 @@ def _event_to_fact(db: Any, event: Any, fact_type_uri: str) -> Optional[Dict[str
 def _birth_death_facts(db: Any, gr_person: Person) -> List[Dict[str, Any]]:
     facts: List[Dict[str, Any]] = []
 
-    try:
-        from gramps.gen.utils.db import get_birth_or_fallback, get_death_or_fallback
-    except Exception:
-        get_birth_or_fallback = None
-        get_death_or_fallback = None
+    birth_lookup: Any = None
+    death_lookup: Any = None
 
-    birth_event = get_birth_or_fallback(db, gr_person) if callable(get_birth_or_fallback) else None
-    death_event = get_death_or_fallback(db, gr_person) if callable(get_death_or_fallback) else None
+    try:
+        from gramps.gen.utils.db import get_birth_or_fallback as birth_lookup
+        from gramps.gen.utils.db import get_death_or_fallback as death_lookup
+    except Exception:
+        pass
+
+    birth_event = birth_lookup(db, gr_person) if callable(birth_lookup) else None
+    death_event = death_lookup(db, gr_person) if callable(death_lookup) else None
 
     birth_fact = _event_to_fact(db, birth_event, "http://gedcomx.org/Birth")
     if birth_fact:
@@ -2410,7 +2416,7 @@ def _post_child_and_parents(
         "attribution": {"changeMessage": message},
     }
 
-    # Default to biological links unless the plugin later grows relationship controls.
+    # biological links 
     if parent1_fsid:
         capr["parent1"] = {
             "resource": f"{base}/platform/tree/persons/{parent1_fsid}",
@@ -2850,8 +2856,7 @@ def export_basic_people_to_familysearch(
                 parent=parent,
             )
 
-        # Cache refresh is post-work polish. Failure here should not invalidate a
-        # successful export.
+        # Cache refresh is post-work polish. Failure here should not invalidate asuccessful export.
         if me_fsid:
             try:
                 _prime_person_cache(session, me_fsid, force=True)
