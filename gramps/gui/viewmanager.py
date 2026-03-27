@@ -349,7 +349,6 @@ class ViewManager(CLIManager):
         except Exception:
             pass
 
-
         # Create history objects
         for nav_type in (
             "Person",
@@ -398,19 +397,25 @@ class ViewManager(CLIManager):
         """
         from gramps.gui.fs.manager import get_session
         from gramps.gui.fs.tools_window import toggle_tools_window
-    
+
         sess = get_session(dbstate=self.dbstate, uistate=self.uistate)
-        if not sess or not (getattr(sess, "access_token", None) or getattr(sess, "connected", False)):
+        if not sess or not (
+            getattr(sess, "access_token", None) or getattr(sess, "connected", False)
+        ):
             # You said: only after login. So we just show info.
             try:
                 from gramps.gui.dialog import ErrorDialog
-                ErrorDialog(_("FamilySearch"), _("Not logged in to FamilySearch."), parent=self.uistate.window)
+
+                ErrorDialog(
+                    _("FamilySearch"),
+                    _("Not logged in to FamilySearch."),
+                    parent=self.uistate.window,
+                )
             except Exception:
                 pass
             return
-    
-        toggle_tools_window(sess)
 
+        toggle_tools_window(sess)
 
     def __setup_navigator(self):
         """

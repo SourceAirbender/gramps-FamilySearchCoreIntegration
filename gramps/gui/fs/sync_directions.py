@@ -76,6 +76,7 @@ COL_XFS2 = 12
 # small response helpers
 # ----------------------------
 
+
 def _response_status(resp: Any) -> int:
     try:
         return int(getattr(resp, "status_code", 0) or 0)
@@ -113,6 +114,7 @@ def _person_handle(obj: Any) -> Optional[str]:
 # ----------------------------
 # FamilySearch / cache helpers
 # ----------------------------
+
 
 def _extract_sdid_from_refish(obj: Any) -> str:
     # Source refs come back in a few shapes depending on endpoint and payload style.
@@ -244,7 +246,9 @@ def _head_source_description(session: Any, sdid: str) -> Tuple[str, Any]:
 
         new_id = str(headers.get("X-Entity-Forwarded-Id") or "").strip()
         if not new_id:
-            location = str(headers.get("Location") or headers.get("location") or "").strip()
+            location = str(
+                headers.get("Location") or headers.get("location") or ""
+            ).strip()
             if location:
                 match = re.search(r"/descriptions/([^/?#]+)", location)
                 if match:
@@ -326,6 +330,7 @@ def _ensure_fs_tree(session: Any) -> Optional[Any]:
 
     fsg_sync.FSG_Sync.fs_Tree = new_tree
     return new_tree
+
 
 def _prime_person_cache(session: Any, fsid: str, force: bool = False) -> Optional[Any]:
     # The compare layer leans on shared cache state. If we do not refresh it
@@ -447,7 +452,10 @@ def _walk(model: Any) -> Iterable[Any]:
 # memory helpers
 # ----------------------------
 
-def _session_post_binary(session: Any, endpoint: str, data: bytes, headers: Dict[str, str]) -> Any:
+
+def _session_post_binary(
+    session: Any, endpoint: str, data: bytes, headers: Dict[str, str]
+) -> Any:
     endpoint = endpoint if endpoint.startswith("/") else ("/" + endpoint)
 
     post = getattr(session, "post", None)
@@ -489,7 +497,11 @@ def _session_post_binary(session: Any, endpoint: str, data: bytes, headers: Dict
     token = getattr(session, "access_token", "") or ""
 
     final_headers = dict(headers)
-    if token and "Authorization" not in final_headers and "authorization" not in final_headers:
+    if (
+        token
+        and "Authorization" not in final_headers
+        and "authorization" not in final_headers
+    ):
         final_headers["Authorization"] = f"Bearer {token}"
 
     try:
@@ -535,7 +547,9 @@ def _resolve_media_path(db: Any, media_obj: Any) -> Optional[str]:
             break
 
     if not path:
-        path = str(getattr(media_obj, "path", "") or getattr(media_obj, "filename", "") or "").strip()
+        path = str(
+            getattr(media_obj, "path", "") or getattr(media_obj, "filename", "") or ""
+        ).strip()
 
     if not path:
         return None
@@ -717,6 +731,7 @@ def _upload_person_memory(
 # HTTP wrappers
 # ----------------------------
 
+
 def _debug_dump_compare_model(model: Any) -> None:
     if not _debug_enabled():
         return
@@ -799,7 +814,9 @@ def _session_get_json(session: Any, endpoint: str) -> Optional[dict]:
                 return resp.json() or {}
         except TypeError:
             try:
-                resp = get_url(endpoint, headers={"Accept": "application/x-gedcomx-v1+json"})
+                resp = get_url(
+                    endpoint, headers={"Accept": "application/x-gedcomx-v1+json"}
+                )
                 if resp and hasattr(resp, "json"):
                     return resp.json() or {}
             except Exception:
@@ -925,7 +942,11 @@ def _err_text(resp: Any) -> str:
 
     try:
         data = resp.json()
-        if isinstance(data, dict) and isinstance(data.get("errors"), list) and data["errors"]:
+        if (
+            isinstance(data, dict)
+            and isinstance(data.get("errors"), list)
+            and data["errors"]
+        ):
             first = data["errors"][0]
             message = (first.get("message") or "").strip()
             code = (first.get("code") or "").strip()
@@ -944,6 +965,7 @@ def _err_text(resp: Any) -> str:
 # ----------------------------
 # model builders
 # ----------------------------
+
 
 def _make_overview_model() -> ListModel:
     treeview = Gtk.TreeView()
@@ -968,6 +990,7 @@ def _make_overview_model() -> ListModel:
 # ----------------------------
 # collect push items
 # ----------------------------
+
 
 def _resolve_active_person(session: Any, fsid: str) -> Tuple[str, str]:
     # Returns (resolved_id, state)
@@ -1054,10 +1077,12 @@ def _collect_overview_push_items(model: Any) -> List[Dict[str, Any]]:
         fs_val = str(raw.get_value(row_iter, COL_FS_VAL) or "")
         xfs_id = str(raw.get_value(row_iter, COL_XFS_ID) or "").strip()
 
-        is_name_row = (
-            x_type in ("primary_name", "name", "preferred_name", "primary name")
-            or label_norm in ("name", "preferred name", "primary name")
-        )
+        is_name_row = x_type in (
+            "primary_name",
+            "name",
+            "preferred_name",
+            "primary name",
+        ) or label_norm in ("name", "preferred name", "primary name")
 
         fact_type = _fact_type_from_label(label)
         is_fact_row = x_type in ("fact", "event", "events") or bool(fact_type)
@@ -1215,7 +1240,9 @@ def _collect_note_push_items(
             items.append(
                 {
                     "kind": "note_create",
-                    "label": _("Note: {title}").format(title=gr_subject or _("(untitled)")),
+                    "label": _("Note: {title}").format(
+                        title=gr_subject or _("(untitled)")
+                    ),
                     "fs_id": "",
                     "fs_val": _("(missing)"),
                     "gr_val": gr_text or _("(empty)"),
@@ -1229,7 +1256,10 @@ def _collect_note_push_items(
         fs_text = _normalize_note_text(getattr(fs_match, "text", "") or "")
         fs_id = (getattr(fs_match, "id", "") or "").strip()
 
-        if _normalize_note_text(gr_text) == _normalize_note_text(fs_text) and gr_subject == fs_subject:
+        if (
+            _normalize_note_text(gr_text) == _normalize_note_text(fs_text)
+            and gr_subject == fs_subject
+        ):
             continue
 
         items.append(
@@ -1258,13 +1288,16 @@ def _collect_source_push_items(
 
     try:
         import gramps.gui.fs.import_ as fs_import_mod
+
         fs_import = cast(ModuleType, fs_import_mod)
     except Exception:
         fs_import = None
 
     attached_person_sdids: Optional[Set[str]] = None
     if session is not None and person_fsid:
-        attached_person_sdids = _load_attached_person_source_description_ids(session, person_fsid)
+        attached_person_sdids = _load_attached_person_source_description_ids(
+            session, person_fsid
+        )
 
     citation_handles: Set[str] = set()
     citation_scope: Dict[str, str] = {}
@@ -1312,7 +1345,9 @@ def _collect_source_push_items(
 
         if raw_sd_id:
             if session is not None:
-                resolved_sd_id, sd_state = _resolve_active_source_description(session, raw_sd_id)
+                resolved_sd_id, sd_state = _resolve_active_source_description(
+                    session, raw_sd_id
+                )
             else:
                 sd_state = "unknown"
 
@@ -1340,7 +1375,11 @@ def _collect_source_push_items(
                 if is_attached_to_person is True and sd_state in ("ok", "merged"):
                     continue
 
-                if is_attached_to_person is None and sd_state in ("ok", "merged", "unknown"):
+                if is_attached_to_person is None and sd_state in (
+                    "ok",
+                    "merged",
+                    "unknown",
+                ):
                     continue
             else:
                 if sd_state in ("ok", "merged", "unknown"):
@@ -1408,7 +1447,10 @@ def _collect_source_push_items(
 # prompt UI
 # ----------------------------
 
-def _prompt(parent: Gtk.Window, items: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
+
+def _prompt(
+    parent: Gtk.Window, items: List[Dict[str, Any]]
+) -> Tuple[str, List[Dict[str, Any]]]:
     dialog = Gtk.Dialog(title=_("Sync to FamilySearch"), transient_for=parent, flags=0)
     dialog.set_modal(True)
     dialog.set_default_size(820, 620)
@@ -1550,6 +1592,7 @@ def _prompt(parent: Gtk.Window, items: List[Dict[str, Any]]) -> Tuple[str, List[
 # payload builders
 # ----------------------------
 
+
 def _build_person_payload(
     fsid: str, chosen: List[Dict[str, Any]], change_message: str
 ) -> Dict[str, Any]:
@@ -1603,7 +1646,9 @@ def _build_person_payload(
                 fs_person = deserialize.Person._index.get(fsid)
                 if fs_person and getattr(fs_person, "facts", None):
                     for fact_obj in fs_person.facts:
-                        if getattr(fact_obj, "id", None) == fact_id and getattr(fact_obj, "type", None):
+                        if getattr(fact_obj, "id", None) == fact_id and getattr(
+                            fact_obj, "type", None
+                        ):
                             fact_type = str(fact_obj.type)
                             break
 
@@ -1728,7 +1773,9 @@ def _create_source_description(
         data = None
 
     if isinstance(data, dict):
-        source_descriptions = data.get("sourceDescriptions") or data.get("sourceDescription") or []
+        source_descriptions = (
+            data.get("sourceDescriptions") or data.get("sourceDescription") or []
+        )
         if isinstance(source_descriptions, list) and source_descriptions:
             sdid = (source_descriptions[0].get("id") or "").strip()
             if sdid:
@@ -1777,6 +1824,7 @@ def _build_source_ref(
 # main push entry point
 # ----------------------------
 
+
 def sync_to_familysearch(
     dbstate: Any,
     uistate: Any,
@@ -1804,7 +1852,9 @@ def sync_to_familysearch(
 
         fsid_raw = fs_utilities.get_fsftid(person)
         if not fsid_raw:
-            WarningDialog(_("No FamilySearch Person ID is set for this person."), parent=parent)
+            WarningDialog(
+                _("No FamilySearch Person ID is set for this person."), parent=parent
+            )
             return
 
         resolved_fsid, fs_state = _resolve_active_person(session, fsid_raw)
@@ -1882,16 +1932,30 @@ def sync_to_familysearch(
         if not chosen:
             return
 
-        chosen_overview = [item for item in chosen if item.get("kind") in ("primary_name", "fact")]
-        chosen_notes = [item for item in chosen if item.get("kind") in ("note_create", "note_update")]
-        chosen_sources = [item for item in chosen if item.get("kind") == "source_create"]
-        chosen_memories = [item for item in chosen if item.get("kind") == "memory_create"]
+        chosen_overview = [
+            item for item in chosen if item.get("kind") in ("primary_name", "fact")
+        ]
+        chosen_notes = [
+            item
+            for item in chosen
+            if item.get("kind") in ("note_create", "note_update")
+        ]
+        chosen_sources = [
+            item for item in chosen if item.get("kind") == "source_create"
+        ]
+        chosen_memories = [
+            item for item in chosen if item.get("kind") == "memory_create"
+        ]
 
         if chosen_overview:
             payload = _build_person_payload(fsid, chosen_overview, change_message)
-            person_payload = (payload.get("persons") or [])[0] if payload.get("persons") else {}
+            person_payload = (
+                (payload.get("persons") or [])[0] if payload.get("persons") else {}
+            )
 
-            if not person_payload or (len(person_payload.keys()) <= 1 and "id" in person_payload):
+            if not person_payload or (
+                len(person_payload.keys()) <= 1 and "id" in person_payload
+            ):
                 WarningDialog(
                     _(
                         "Differences were found, but none could be converted into a valid "
@@ -1909,14 +1973,16 @@ def sync_to_familysearch(
             person_headers: Dict[str, str] = {}
             if head_resp is not None:
                 response_headers = _response_headers(head_resp)
-                etag = str(response_headers.get("Etag") or response_headers.get("ETag") or "").strip()
+                etag = str(
+                    response_headers.get("Etag") or response_headers.get("ETag") or ""
+                ).strip()
                 last_modified = str(response_headers.get("Last-Modified") or "").strip()
-            
+
                 if etag:
                     person_headers["If-Match"] = etag
                 if last_modified:
                     person_headers["If-Unmodified-Since"] = last_modified
-            
+
             resp = _session_post_json(
                 session,
                 f"/platform/tree/persons/{fsid}",
@@ -1926,7 +1992,8 @@ def sync_to_familysearch(
             if resp is None or _response_status(resp) not in (200, 201, 204):
                 message = _err_text(resp) if resp is not None else ""
                 WarningDialog(
-                    _("FamilySearch update failed (names/facts).") + (("\n" + message) if message else ""),
+                    _("FamilySearch update failed (names/facts).")
+                    + (("\n" + message) if message else ""),
                     parent=parent,
                 )
                 return
@@ -1936,11 +2003,14 @@ def sync_to_familysearch(
         if chosen_notes:
             notes_payload = _build_notes_payload(fsid, chosen_notes, change_message)
             if notes_payload:
-                resp = _session_post_json(session, f"/platform/tree/persons/{fsid}/notes", notes_payload)
+                resp = _session_post_json(
+                    session, f"/platform/tree/persons/{fsid}/notes", notes_payload
+                )
                 if resp is None or _response_status(resp) not in (200, 201, 204):
                     message = _err_text(resp) if resp is not None else ""
                     WarningDialog(
-                        _("FamilySearch update failed (notes).") + (("\n" + message) if message else ""),
+                        _("FamilySearch update failed (notes).")
+                        + (("\n" + message) if message else ""),
                         parent=parent,
                     )
                     return
@@ -1969,15 +2039,21 @@ def sync_to_familysearch(
                 if note_text:
                     citation_text += "\n" + note_text
 
-                sdid = _create_source_description(session, title, citation_text, url, change_message)
+                sdid = _create_source_description(
+                    session, title, citation_text, url, change_message
+                )
                 if not sdid:
                     WarningDialog(
-                        _("FamilySearch source creation failed for: {t}").format(t=title),
+                        _("FamilySearch source creation failed for: {t}").format(
+                            t=title
+                        ),
                         parent=parent,
                     )
                     return
 
-                created_refs.append(_build_source_ref(session, sdid, default_tags, change_message))
+                created_refs.append(
+                    _build_source_ref(session, sdid, default_tags, change_message)
+                )
 
                 link_fn = getattr(fs_utilities, "link_gramps_fs_id", None)
                 if callable(link_fn):
@@ -1994,15 +2070,23 @@ def sync_to_familysearch(
                 source_headers: Dict[str, str] = {}
                 if head_resp is not None:
                     response_headers = _response_headers(head_resp)
-                    etag = str(response_headers.get("Etag") or response_headers.get("ETag") or "").strip()
-                    last_modified = str(response_headers.get("Last-Modified") or "").strip()
-                
+                    etag = str(
+                        response_headers.get("Etag")
+                        or response_headers.get("ETag")
+                        or ""
+                    ).strip()
+                    last_modified = str(
+                        response_headers.get("Last-Modified") or ""
+                    ).strip()
+
                     if etag:
                         source_headers["If-Match"] = etag
                     if last_modified:
                         source_headers["If-Unmodified-Since"] = last_modified
-                
-                payload = _build_person_sources_payload(session, fsid, created_refs, change_message)
+
+                payload = _build_person_sources_payload(
+                    session, fsid, created_refs, change_message
+                )
                 resp = _session_post_json(
                     session,
                     f"/platform/tree/persons/{fsid}",
@@ -2012,7 +2096,8 @@ def sync_to_familysearch(
                 if resp is None or _response_status(resp) not in (200, 201, 204):
                     message = _err_text(resp) if resp is not None else ""
                     WarningDialog(
-                        _("FamilySearch update failed (sources).") + (("\n" + message) if message else ""),
+                        _("FamilySearch update failed (sources).")
+                        + (("\n" + message) if message else ""),
                         parent=parent,
                     )
                     return
@@ -2020,6 +2105,7 @@ def sync_to_familysearch(
         if chosen_memories:
             try:
                 from gramps.gen.display.name import displayer as name_displayer
+
                 person_name = str(name_displayer.display(person) or "").strip()
             except Exception:
                 person_name = ""
@@ -2059,7 +2145,10 @@ def sync_to_familysearch(
                     for media_handle, mem_id in uploaded:
                         media_obj = None
 
-                        for getter_name in ("get_media_from_handle", "get_media_object_from_handle"):
+                        for getter_name in (
+                            "get_media_from_handle",
+                            "get_media_object_from_handle",
+                        ):
                             getter = getattr(db, getter_name, None)
                             if not callable(getter):
                                 continue
@@ -2098,7 +2187,11 @@ def sync_to_familysearch(
 
                         media_obj.set_attribute_list(kept)
 
-                        for commit_name in ("commit_media_object", "commit_media", "commit_object"):
+                        for commit_name in (
+                            "commit_media_object",
+                            "commit_media",
+                            "commit_object",
+                        ):
                             commit = getattr(db, commit_name, None)
                             if not callable(commit):
                                 continue
@@ -2110,7 +2203,8 @@ def sync_to_familysearch(
 
             if memory_errors:
                 WarningDialog(
-                    _("Some memories failed to upload:\n\n%s") % "\n".join(memory_errors[:12]),
+                    _("Some memories failed to upload:\n\n%s")
+                    % "\n".join(memory_errors[:12]),
                     parent=parent,
                 )
 
@@ -2127,6 +2221,7 @@ def sync_to_familysearch(
 # ----------------------------
 # export helpers
 # ----------------------------
+
 
 def _get_or_set_person_fsid(db: Any, txn: Any, gr_person: Person, fsid: str) -> None:
     fsid = (fsid or "").strip()
@@ -2200,6 +2295,7 @@ def _event_to_fact(db: Any, event: Any, fact_type_uri: str) -> Optional[Dict[str
     if getattr(event, "place", None):
         try:
             from gramps.gen.display.place import displayer as place_displayer
+
             place = db.get_place_from_handle(event.place)
             place_text = (place_displayer.display(db, place) or "").strip()
         except Exception:
@@ -2245,7 +2341,9 @@ def _birth_death_facts(db: Any, gr_person: Person) -> List[Dict[str, Any]]:
 def _extract_created_person_id(resp: Any) -> str:
     headers = _response_headers(resp)
 
-    person_id = str(headers.get("X-Entity-Id") or headers.get("X-entity-id") or "").strip()
+    person_id = str(
+        headers.get("X-Entity-Id") or headers.get("X-entity-id") or ""
+    ).strip()
     if person_id:
         return person_id
 
@@ -2416,7 +2514,7 @@ def _post_child_and_parents(
         "attribution": {"changeMessage": message},
     }
 
-    # biological links 
+    # biological links
     if parent1_fsid:
         capr["parent1"] = {
             "resource": f"{base}/platform/tree/persons/{parent1_fsid}",
@@ -2560,13 +2658,16 @@ def _export_picker_dialog(
     row.pack_start(chk_children, False, False, 0)
     box.pack_start(row, False, False, 0)
 
-    box.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0)
+    box.pack_start(
+        Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0
+    )
 
     store = Gtk.ListStore(bool, str, str, bool)
 
     def display_label(prefix: str, person_obj: Any) -> Tuple[str, bool]:
         try:
             from gramps.gen.display.name import displayer as name_displayer
+
             name = str(name_displayer.display(person_obj) or "")
         except Exception:
             name = _("(person)")
@@ -2693,7 +2794,9 @@ def export_basic_people_to_familysearch(
 
         me = db.get_person_from_handle(me_handle)
         if not me:
-            WarningDialog(_("Could not resolve this person from the database."), parent=parent)
+            WarningDialog(
+                _("Could not resolve this person from the database."), parent=parent
+            )
             return
 
         _bind_global_session(session)
@@ -2755,10 +2858,14 @@ def export_basic_people_to_familysearch(
                             _get_or_set_person_fsid(db, txn, person_obj, resolved_fsid)
                         continue
 
-                fsid_new = _fs_create_person_basic(session, db, person_obj, change_message)
+                fsid_new = _fs_create_person_basic(
+                    session, db, person_obj, change_message
+                )
                 if not fsid_new:
                     WarningDialog(
-                        _("FamilySearch create failed for a person. Check name and connection."),
+                        _(
+                            "FamilySearch create failed for a person. Check name and connection."
+                        ),
                         parent=parent,
                     )
                     return
@@ -2786,7 +2893,11 @@ def export_basic_people_to_familysearch(
             parent2 = ""
 
             parents_family_handle = me.get_main_parents_family_handle()
-            family = db.get_family_from_handle(parents_family_handle) if parents_family_handle else None
+            family = (
+                db.get_family_from_handle(parents_family_handle)
+                if parents_family_handle
+                else None
+            )
 
             if family:
                 father = family.get_father_handle()
@@ -2804,7 +2915,9 @@ def export_basic_people_to_familysearch(
 
             if parent1 or parent2:
                 attempted_relationships = True
-                ok, err = _post_child_and_parents(session, me_fsid, parent1, parent2, change_message)
+                ok, err = _post_child_and_parents(
+                    session, me_fsid, parent1, parent2, change_message
+                )
                 if not ok:
                     rel_errors.append(f"Parent link failed for me={me_fsid}: {err}")
 
@@ -2815,11 +2928,15 @@ def export_basic_people_to_familysearch(
                     continue
 
                 spouse_handle = _family_other_parent_handle(family, me.handle)
-                spouse_fsid = handle_to_fsid.get(spouse_handle or "", "") if spouse_handle else ""
+                spouse_fsid = (
+                    handle_to_fsid.get(spouse_handle or "", "") if spouse_handle else ""
+                )
 
                 if do_spouses and spouse_fsid:
                     attempted_relationships = True
-                    ok, err = _post_couple_relationship(session, me_fsid, spouse_fsid, change_message)
+                    ok, err = _post_couple_relationship(
+                        session, me_fsid, spouse_fsid, change_message
+                    )
                     if not ok:
                         rel_errors.append(
                             f"Spouse link failed me={me_fsid} spouse={spouse_fsid}: {err}"
@@ -2865,12 +2982,16 @@ def export_basic_people_to_familysearch(
 
         if created_any:
             WarningDialog(
-                _("Export complete: created people and linked relationships on FamilySearch."),
+                _(
+                    "Export complete: created people and linked relationships on FamilySearch."
+                ),
                 parent=parent,
             )
         elif attempted_relationships:
             WarningDialog(
-                _("Export complete: no new people were created; relationships were attempted."),
+                _(
+                    "Export complete: no new people were created; relationships were attempted."
+                ),
                 parent=parent,
             )
         else:

@@ -1062,12 +1062,12 @@ class GrampsPreferences(ConfigureDialog):
         scroll_window.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         grid = self.create_grid()
         scroll_window.add(grid)
-    
+
         label = self.add_text(
             grid, _("FamilySearch"), 0, line_wrap=True, bold=True, start=0, stop=3
         )
         label.set_margin_top(10)
-    
+
         row = 1
         obox = Gtk.ComboBoxText()
         options = [_("Beta"), _("Live")]
@@ -1082,11 +1082,11 @@ class GrampsPreferences(ConfigureDialog):
         grid.attach(lwidget, 1, row, 1, 1)
         grid.attach(obox, 2, row, 2, 1)
         row += 1
-    
+
         # App key (no defaults / no hardcoding)
         self.add_entry(grid, _("App key"), row, "familysearch.app-key", col_attach=1)
         row += 1
-    
+
         # Redirect URL (default loopback if empty)
         default_redirect = "http://127.0.0.1:57938/familysearch-auth"
         try:
@@ -1098,15 +1098,16 @@ class GrampsPreferences(ConfigureDialog):
                 config.set("familysearch.redirect", default_redirect)
             except Exception:
                 pass
-    
-        self.add_entry(grid, _("Redirect URL"), row, "familysearch.redirect", col_attach=1)
+
+        self.add_entry(
+            grid, _("Redirect URL"), row, "familysearch.redirect", col_attach=1
+        )
         row += 1
-    
+
         return _("Integrations"), grid
-    
+
     def _server_changed(self, obj):
         config.set("familysearch.server", obj.get_active())
-
 
     def _build_name_format_model(self, active):
         """
