@@ -8,6 +8,7 @@
 # Copyright (C) 2010       Jakim Friant
 # Copyright (C) 2012       Gary Burton
 # Copyright (C) 2012       Doug Blank <doug.blank@gmail.com>
+# Copyright (C) 2026       Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -133,8 +134,7 @@ from gramps.gui.editors import (
 from gramps.gen.db.exceptions import DbWriteFailure
 from gramps.gen.filters import reload_custom_filters
 from .managedwindow import ManagedWindow
-from .dbloader import GrampsLoginDialog
-from .fs.session import Session, FSException, FSPermission
+from .fs.session import Session
 
 # -------------------------------------------------------------------------
 #
@@ -544,53 +544,38 @@ class ViewManager(CLIManager):
         """
         Login to FamilySearch.
         """
-        session = Session(
-            config.get("familysearch.server"),
-            config.get("familysearch.app-key"),
-            "http://127.0.0.1:57938/familysearch-auth",
-        )
-
-        login = GrampsLoginDialog(self.uistate)
-        credentials = login.run()
-        if credentials is None:
-            return
-        username, password = credentials
-
-        try:
-            session.login(username, password)
-        except FSException:
-            ErrorDialog(_("FamilySearch"), _("Login error"), parent=self.uistate.window)
-            self.statusbar.set_fs_online(False)
-            return
+        session = Session.from_config()
 
         self.uistate.set_busy_cursor(True)
+        self.statusbar.set_fs_online(False)
+
         try:
-            auth_code = session.authorize(username)
-        except FSPermission as exc:
-            webbrowser.open(str(exc), new=1, autoraise=True)
-            try:
-                auth_code = session.listen()
-            except FSException:
-                # ErrorDialog(_("FamilySearch"),
-                # _("User consent declined"),
-                # parent=self.uistate.window)
-                self.uistate.set_busy_cursor(False)
-                self.statusbar.set_fs_online(False)
+            auth_code = session.authorize()
+            if not auth_code:
+                ErrorDialog(
+                    _("FamilySearch"),
+                    _("User consent declined"),
+                    parent=self.uistate.window,
+                )
                 return
 
-        except FSException:
-            ErrorDialog(
-                _("FamilySearch"), _("Authorization error"), parent=self.uistate.window
-            )
+            if not session.get_token(auth_code):
+                ErrorDialog(
+                    _("FamilySearch"),
+                    _("Authorization error"),
+                    parent=self.uistate.window,
+                )
+                return
+
+        finally:
             self.uistate.set_busy_cursor(False)
-            self.statusbar.set_fs_online(False)
-            return
 
-        if auth_code:
-            session.get_token(auth_code)
-
-        self.uistate.set_busy_cursor(False)
-        self.statusbar.set_fs_online(True)
+        self.statusbar.set_fs_online(
+            bool(
+                getattr(session, "connected", False)
+                or getattr(session, "access_token", None)
+            )
+        )
 
     def run_book(self, *action):
         """

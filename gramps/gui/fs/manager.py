@@ -117,7 +117,7 @@ def get_session(dbstate=None, uistate=None):
     except Exception:
         config = None
 
-    app_key = (_cfg_get(config, "familysearch.app_key", "") or "").strip()
+    app_key = (_cfg_get(config, "familysearch.app-key", "") or "").strip()
     redirect = (_cfg_get(config, "familysearch.redirect", "") or "").strip()
     server_raw = _cfg_get(config, "familysearch.server", 0)
 
