@@ -44,11 +44,7 @@ from . import ui as fs_ui
 
 logger = logging.getLogger(__name__)
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
+_ = glocale.translation.gettext
 
 FS_ATTR_CANON = "_FSFTID"
 FS_ATTR_OLD = "_FSTID"

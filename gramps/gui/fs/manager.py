@@ -20,7 +20,6 @@
 from __future__ import annotations
 
 import os
-import sys
 import logging
 
 from .session import Session, get_active_session
@@ -28,33 +27,6 @@ from .session import Session, get_active_session
 logger = logging.getLogger(__name__)
 
 _SESSION = None
-
-
-def _scan_for_session():
-    candidates = []
-    for mod in list(sys.modules.values()):
-        if not mod:
-            continue
-        for name in ("GLOBAL_SESSION", "SESSION", "_SESSION", "session"):
-            sess = getattr(mod, name, None)
-            if sess and hasattr(sess, "access_token"):
-                candidates.append(sess)
-
-        cls = getattr(mod, "Session", None)
-        if cls:
-            for name in ("_shared", "_last_instance", "_singleton", "_instance"):
-                sess = getattr(cls, name, None)
-                if sess and hasattr(sess, "access_token"):
-                    candidates.append(sess)
-
-    if not candidates:
-        return None
-
-    for s in candidates:
-        if getattr(s, "connected", False) or getattr(s, "access_token", None):
-            return s
-
-    return candidates[0]
 
 
 def _discover_from_grampsgui():
@@ -103,7 +75,7 @@ def _cfg_get(config, key: str, default=None):
 def get_session(dbstate=None, uistate=None):
     global _SESSION
 
-    sess = get_active_session() or _scan_for_session()
+    sess = _SESSION or get_active_session()
     if sess is not None:
         _SESSION = sess
         _bind_session_context(sess, dbstate=dbstate, uistate=uistate)

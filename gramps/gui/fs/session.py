@@ -60,6 +60,7 @@ from gi.repository import Gtk, GLib  # noqa: E402
 
 sys.modules.setdefault("gramps.gui.fs.session", sys.modules[__name__])
 LOG = logging.getLogger(__name__)
+_DEBUG_LOGGING_CONFIGURED = False
 
 
 def _debug_enabled() -> bool:
@@ -72,16 +73,23 @@ def _debug_enabled() -> bool:
         return False
 
 
-if _debug_enabled():
+def _configure_debug_logging() -> None:
+    global _DEBUG_LOGGING_CONFIGURED
+
+    if _DEBUG_LOGGING_CONFIGURED or not _debug_enabled():
+        return
+
     LOG.setLevel(logging.DEBUG)
     if not LOG.handlers and not logging.getLogger().handlers:
-        _h = logging.StreamHandler(stream=sys.stderr)
-        _h.setLevel(logging.DEBUG)
-        _h.setFormatter(
+        handler = logging.StreamHandler(stream=sys.stderr)
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(
             logging.Formatter("[FS DEBUG %(asctime)s] %(message)s", "%Y-%m-%d %H:%M:%S")
         )
-        LOG.addHandler(_h)
+        LOG.addHandler(handler)
         LOG.propagate = False
+
+    _DEBUG_LOGGING_CONFIGURED = True
 
 
 GLOBAL_SESSION: "Session | None" = None
@@ -99,6 +107,9 @@ class FSPermission(Exception):
 
 
 def _dbg(msg: str) -> None:
+    if not _debug_enabled():
+        return
+    _configure_debug_logging()
     LOG.debug(msg)
 
 

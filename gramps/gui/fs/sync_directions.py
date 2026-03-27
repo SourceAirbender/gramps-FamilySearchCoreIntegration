@@ -52,11 +52,7 @@ from . import compare as fs_compare
 from . import utilities as fs_utilities
 from .import_ import deserializer as deserialize
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
+_ = glocale.translation.gettext
 
 
 # These match the ListModel layout built in _make_overview_model().
