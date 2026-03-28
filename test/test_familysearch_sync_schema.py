@@ -8,7 +8,6 @@ from gramps.gen.lib import Person
 from gramps.gui.fs.datab_familysearch import FSStatusDB
 from gramps.plugins.db.dbapi.sqlite import SQLite
 
-
 EXPECTED_COLUMNS = {
     "p_handle",
     "fsid",
@@ -136,7 +135,9 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
 
             cols = {
                 r[1]
-                for r in con.execute("PRAGMA table_info('familysearch_sync')").fetchall()
+                for r in con.execute(
+                    "PRAGMA table_info('familysearch_sync')"
+                ).fetchall()
             }
 
         self.assertEqual(cols, EXPECTED_COLUMNS)
