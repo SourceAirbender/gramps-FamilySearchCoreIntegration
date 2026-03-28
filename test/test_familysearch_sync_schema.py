@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import tempfile
@@ -29,6 +30,54 @@ class FakeDb:
 
     def delete_familysearch_person_status(self, person_handle, transaction=None):
         self.rows.pop(person_handle, None)
+
+
+class FamilySearchSyncPersonModelTest(unittest.TestCase):
+    def test_person_serialize_unserialize_round_trip_with_familysearch_sync(self):
+        person = Person()
+        sync = person.get_familysearch_sync()
+        sync.from_status_dict(
+            {
+                "fsid": "GSVF-SGV",
+                "is_root": True,
+                "status_ts": 123,
+                "confirmed_ts": 456,
+                "gramps_modified_ts": 789,
+                "fs_modified_ts": 999,
+                "essential_conflict": True,
+                "conflict": True,
+            }
+        )
+        person.set_familysearch_sync(sync)
+
+        loaded = Person()
+        loaded.unserialize(person.serialize())
+
+        self.assertEqual(
+            loaded.get_familysearch_sync().to_status_dict(),
+            {
+                "fsid": "GSVF-SGV",
+                "is_root": True,
+                "status_ts": 123,
+                "confirmed_ts": 456,
+                "gramps_modified_ts": 789,
+                "fs_modified_ts": 999,
+                "essential_conflict": True,
+                "conflict": True,
+            },
+        )
+
+    def test_person_unserialize_v21_tuple_defaults_empty_familysearch_sync(self):
+        person = Person()
+
+        # Simulate the old v21 tuple shape without the appended
+        # familysearch_sync field.
+        old_v21_data = person.serialize()[:-1]
+
+        loaded = Person()
+        loaded.unserialize(old_v21_data)
+
+        self.assertEqual(loaded.get_familysearch_sync().to_status_dict(), {})
 
 
 class FSStatusDBUnitTest(unittest.TestCase):
@@ -83,7 +132,6 @@ class FSStatusDBUnitTest(unittest.TestCase):
         }
 
         status = FSStatusDB(db, "P1")
-        # leave all fields at defaults => should delete
         status.commit(txn=object())
 
         self.assertNotIn("P1", db.rows)
@@ -112,11 +160,11 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
             self.db.add_person(person, txn)
         return person
 
-    def test_person_table_has_familysearch_sync_column(self):
+    def test_person_table_has_no_familysearch_sync_column(self):
         with sqlite3.connect(self._sqlite_path()) as con:
             cols = {r[1] for r in con.execute("PRAGMA table_info('person')").fetchall()}
 
-        self.assertIn("familysearch_sync_data", cols)
+        self.assertNotIn("familysearch_sync_data", cols)
 
     def test_db_api_round_trip_and_delete(self):
         person = self._create_person()
@@ -153,6 +201,40 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
         self.db.delete_familysearch_person_status(person.handle)
         self.assertEqual(self.db.get_familysearch_person_status(person.handle, {}), {})
 
+    def test_person_object_round_trip(self):
+        person = self._create_person()
+
+        self.db.set_familysearch_person_status(
+            person.handle,
+            {
+                "fsid": "WXYZ-123",
+                "is_root": True,
+                "status_ts": 1000,
+                "confirmed_ts": 2000,
+                "gramps_modified_ts": 3000,
+                "fs_modified_ts": 4000,
+                "essential_conflict": True,
+                "conflict": True,
+            },
+        )
+
+        loaded = self.db.get_person_from_handle(person.handle)
+        sync = loaded.get_familysearch_sync()
+
+        self.assertEqual(
+            sync.to_status_dict(),
+            {
+                "fsid": "WXYZ-123",
+                "is_root": True,
+                "status_ts": 1000,
+                "confirmed_ts": 2000,
+                "gramps_modified_ts": 3000,
+                "fs_modified_ts": 4000,
+                "essential_conflict": True,
+                "conflict": True,
+            },
+        )
+
     def test_fsstatusdb_integration_round_trip(self):
         person = self._create_person()
 
@@ -179,7 +261,6 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
         self.assertTrue(loaded.essential_conflict)
         self.assertTrue(loaded.conflict)
 
-        # Now clear everything and ensure the stored data is removed
         cleared = FSStatusDB(self.db, person.handle)
         cleared.commit()
 
@@ -187,55 +268,45 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
 
 
 class FamilySearchSyncUpgradeIntegrationTest(unittest.TestCase):
-    def _rebuild_person_table_without_fs_column(self, sqlite_path):
-        """
-        Simulate a v21 database by rebuilding the person table without the
-        familysearch_sync_data column, preserving all other columns.
-        """
+    def _remove_familysearch_sync_from_person_json(self, sqlite_path, handle):
         with sqlite3.connect(sqlite_path) as con:
-            cols = con.execute("PRAGMA table_info('person')").fetchall()
+            row = con.execute(
+                "SELECT json_data FROM person WHERE handle = ?",
+                [handle],
+            ).fetchone()
+            self.assertIsNotNone(row)
 
-            old_columns = []
-            create_defs = []
+            data = json.loads(row[0])
+            data.pop("familysearch_sync", None)
 
-            for cid, name, col_type, notnull, default_value, pk in cols:
-                if name == "familysearch_sync_data":
-                    continue
-
-                old_columns.append(name)
-
-                col_def = f'"{name}" {col_type}' if col_type else f'"{name}"'
-                if pk:
-                    col_def += " PRIMARY KEY"
-                if notnull:
-                    col_def += " NOT NULL"
-                if default_value is not None:
-                    col_def += f" DEFAULT {default_value}"
-                create_defs.append(col_def)
-
-            con.execute("ALTER TABLE person RENAME TO person_old")
-            con.execute(f"CREATE TABLE person ({', '.join(create_defs)})")
             con.execute(
-                f'INSERT INTO person ({", ".join(old_columns)}) '
-                f'SELECT {", ".join(old_columns)} FROM person_old'
+                "UPDATE person SET json_data = ? WHERE handle = ?",
+                [json.dumps(data, separators=(",", ":")), handle],
             )
-            con.execute("DROP TABLE person_old")
             con.commit()
 
-    def test_upgrade_from_v21_adds_familysearch_sync_person_column(self):
+    def test_upgrade_from_v21_rewrites_person_json_with_familysearch_sync(self):
         with tempfile.TemporaryDirectory() as dbdir:
             db = SQLite()
             db.load(dbdir)
+
+            person = Person()
+            with DbTxn("Add test person", db) as txn:
+                db.add_person(person, txn)
+
+            person_handle = person.handle
             db.close()
 
             sqlite_path = os.path.join(dbdir, "sqlite.db")
-            self._rebuild_person_table_without_fs_column(sqlite_path)
+            self._remove_familysearch_sync_from_person_json(sqlite_path, person_handle)
 
             with sqlite3.connect(sqlite_path) as con:
-                cols = {
-                    r[1] for r in con.execute("PRAGMA table_info('person')").fetchall()
-                }
-                self.assertNotIn("familysearch_sync_data", cols)
+                row = con.execute(
+                    "SELECT json_data FROM person WHERE handle = ?",
+                    [person_handle],
+                ).fetchone()
+                data = json.loads(row[0])
+                self.assertNotIn("familysearch_sync", data)
 
             downgraded = SQLite()
             downgraded.load(dbdir)
@@ -248,16 +319,20 @@ class FamilySearchSyncUpgradeIntegrationTest(unittest.TestCase):
             try:
                 self.assertEqual(upgraded.get_schema_version(), 22)
 
+                loaded = upgraded.get_person_from_handle(person_handle)
+                self.assertEqual(loaded.get_familysearch_sync().to_status_dict(), {})
+
                 with sqlite3.connect(sqlite_path) as con:
-                    cols = {
-                        r[1]
-                        for r in con.execute("PRAGMA table_info('person')").fetchall()
-                    }
+                    row = con.execute(
+                        "SELECT json_data FROM person WHERE handle = ?",
+                        [person_handle],
+                    ).fetchone()
+                    data = json.loads(row[0])
 
                 self.assertIn(
-                    "familysearch_sync_data",
-                    cols,
-                    "familysearch_sync_data column was not added by upgrade",
+                    "familysearch_sync",
+                    data,
+                    "familysearch_sync was not added back to person JSON by upgrade",
                 )
             finally:
                 upgraded.close()

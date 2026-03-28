@@ -66,14 +66,26 @@ def gramps_upgrade_22(self):
     """
     Upgrade database from version 21 to 22.
 
-    Add FamilySearch sync JSON storage to the person table.
+    Rewrite Person JSON data so every Person has a FamilySearch sync
+    secondary object, defaulting to empty state when missing.
     """
-    if not hasattr(self, "_ensure_familysearch_sync_person_column"):
-        return
+    self.set_serializer("json")
+
+    length = self.get_number_of_people()
+    self.set_total(length)
 
     self._txn_begin()
     try:
-        self._ensure_familysearch_sync_person_column()
+        for handle in self.get_person_handles():
+            person = self.get_person_from_handle(handle)
+
+            # Loading through the Person model normalizes old v21 records
+            # by creating a default empty FamilySearchSync object when absent.
+            json_data = self.serializer.object_to_data(person)
+            self._commit_raw(json_data, PERSON_KEY)
+            self.update()
+
+        self._set_metadata("version", 22, use_txn=False)
         self._txn_commit()
     except Exception:
         self._txn_abort()

@@ -5,6 +5,7 @@
 # Copyright (C) 2010            Michiel D. Nauta
 # Copyright (C) 2010,2017,2024  Nick Hall
 # Copyright (C) 2011            Tim G L Lyons
+# Copyright (C) 2026            Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -46,6 +47,8 @@ from .personref import PersonRef
 from .primaryobj import PrimaryObject
 from .tagbase import TagBase
 from .urlbase import UrlBase
+from .fs.familysearchsync import FamilySearchSync
+from .fs.familysearchsyncbase import FamilySearchSyncBase
 
 _ = glocale.translation.gettext
 
@@ -64,6 +67,7 @@ class Person(
     AddressBase,
     UrlBase,
     LdsOrdBase,
+    FamilySearchSyncBase,
     PrimaryObject,
 ):
     """
@@ -104,6 +108,7 @@ class Person(
         AddressBase.__init__(self)
         UrlBase.__init__(self)
         LdsOrdBase.__init__(self)
+        FamilySearchSyncBase.__init__(self)
         self.primary_name = Name()
         self.family_list = []
         self.parent_family_list = []
@@ -165,6 +170,7 @@ class Person(
             TagBase.serialize(self),  # 18
             self.private,  # 19
             [pr.serialize() for pr in self.person_ref_list],  # 20
+            FamilySearchSyncBase.serialize(self),  # 21
         )
 
     @classmethod
@@ -270,6 +276,7 @@ class Person(
                     "items": PersonRef.get_schema(),
                     "title": _("Person references"),
                 },
+                "familysearch_sync": FamilySearchSync.get_schema(),
             },
         }
 
@@ -282,29 +289,56 @@ class Person(
                      Person object
         :type data: tuple
         """
-        (
-            self.handle,  #  0
-            self.gramps_id,  #  1
-            self.__gender,  #  2
-            primary_name,  #  3
-            alternate_names,  #  4
-            self.death_ref_index,  #  5
-            self.birth_ref_index,  #  6
-            event_ref_list,  #  7
-            self.family_list,  #  8
-            self.parent_family_list,  #  9
-            media_list,  # 10
-            address_list,  # 11
-            attribute_list,  # 12
-            urls,  # 13
-            lds_ord_list,  # 14
-            citation_list,  # 15
-            note_list,  # 16
-            self.change,  # 17
-            tag_list,  # 18
-            self.private,  # 19
-            person_ref_list,  # 20
-        ) = data
+        if len(data) == 21:
+            (
+                self.handle,  #  0
+                self.gramps_id,  #  1
+                self.__gender,  #  2
+                primary_name,  #  3
+                alternate_names,  #  4
+                self.death_ref_index,  #  5
+                self.birth_ref_index,  #  6
+                event_ref_list,  #  7
+                self.family_list,  #  8
+                self.parent_family_list,  #  9
+                media_list,  # 10
+                address_list,  # 11
+                attribute_list,  # 12
+                urls,  # 13
+                lds_ord_list,  # 14
+                citation_list,  # 15
+                note_list,  # 16
+                self.change,  # 17
+                tag_list,  # 18
+                self.private,  # 19
+                person_ref_list,  # 20
+            ) = data
+            familysearch_sync = None
+        else:
+            (
+                self.handle,  #  0
+                self.gramps_id,  #  1
+                self.__gender,  #  2
+                primary_name,  #  3
+                alternate_names,  #  4
+                self.death_ref_index,  #  5
+                self.birth_ref_index,  #  6
+                event_ref_list,  #  7
+                self.family_list,  #  8
+                self.parent_family_list,  #  9
+                media_list,  # 10
+                address_list,  # 11
+                attribute_list,  # 12
+                urls,  # 13
+                lds_ord_list,  # 14
+                citation_list,  # 15
+                note_list,  # 16
+                self.change,  # 17
+                tag_list,  # 18
+                self.private,  # 19
+                person_ref_list,  # 20
+                familysearch_sync,  # 21
+            ) = data
 
         self.primary_name = Name()
         self.primary_name.unserialize(primary_name)
@@ -319,6 +353,7 @@ class Person(
         CitationBase.unserialize(self, citation_list)
         NoteBase.unserialize(self, note_list)
         TagBase.unserialize(self, tag_list)
+        FamilySearchSyncBase.unserialize(self, familysearch_sync)
         return self
 
     def get_object_state(self):
@@ -329,6 +364,7 @@ class Person(
         """
         attr_dict = super().get_object_state()
         attr_dict["gender"] = self.__gender
+        attr_dict["familysearch_sync"] = self.get_familysearch_sync()
         return attr_dict
 
     def set_object_state(self, attr_dict):
@@ -339,7 +375,13 @@ class Person(
         We override this method to handle the `gender` property.
         """
         self.__gender = attr_dict.pop("gender")
+        self.familysearch_sync = FamilySearchSync()
         super().set_object_state(attr_dict)
+
+        if not hasattr(self, "familysearch_sync") or self.familysearch_sync is None:
+            self.familysearch_sync = FamilySearchSync()
+        elif not isinstance(self.familysearch_sync, FamilySearchSync):
+            self.familysearch_sync = FamilySearchSync(self.familysearch_sync)
 
     def _has_handle_reference(self, classname, handle):
         """
@@ -496,7 +538,11 @@ class Person(
         :returns: Returns the list of all textual attributes of the object.
         :rtype: list
         """
-        return [self.gramps_id]
+        check_list = [self.gramps_id]
+        sync = self.get_familysearch_sync()
+        if sync:
+            check_list.extend(sync.get_text_data_list())
+        return [_f for _f in check_list if _f]
 
     def get_text_data_child_list(self):
         """
