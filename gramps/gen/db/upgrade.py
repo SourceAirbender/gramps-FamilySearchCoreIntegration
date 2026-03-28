@@ -4,6 +4,7 @@
 # Copyright (C) 2020-2016 Gramps Development Team
 # Copyright (C) 2020      Paul Culley
 # Copyright (C) 2024      Doug Blank
+# Copyright (C) 2026      Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -59,6 +60,22 @@ from .conversion_tools import convert_21
 _ = glocale.translation.gettext
 
 LOG = logging.getLogger(".upgrade")
+
+
+def gramps_upgrade_22(db):
+    """
+    Add the FamilySearch sync status table to the schema.
+    """
+    if not hasattr(db, "_create_familysearch_sync_schema"):
+        return
+
+    db._txn_begin()
+    try:
+        db._create_familysearch_sync_schema()
+        db._txn_commit()
+    except Exception:
+        db._txn_abort()
+        raise
 
 
 def gramps_upgrade_21(self):

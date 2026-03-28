@@ -3,6 +3,7 @@
 #
 # Copyright (C) 2015-2016,2024 Douglas S. Blank <doug.blank@gmail.com>
 # Copyright (C) 2016-2017      Nick Hall
+# Copyright (C) 2026           Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -226,6 +227,7 @@ class DBAPI(DbGeneric):
             ")"
         )
 
+        self._create_familysearch_sync_schema()
         self._create_secondary_columns()
 
         ## Indices:
@@ -1207,3 +1209,149 @@ class DBAPI(DbGeneric):
         in the appropriate type.
         """
         return [v if not isinstance(v, bool) else int(v) for v in values]
+
+    def _create_familysearch_sync_schema(self):
+        """
+        Create the FamilySearch sync status table if it does not already exist.
+        """
+        if self.dbapi.table_exists("familysearch_sync"):
+            return
+
+        self.dbapi.execute(
+            "CREATE TABLE familysearch_sync "
+            "("
+            "p_handle VARCHAR(50) PRIMARY KEY NOT NULL, "
+            "fsid VARCHAR(20), "
+            "is_root INTEGER NOT NULL DEFAULT 0, "
+            "status_ts INTEGER, "
+            "confirmed_ts INTEGER, "
+            "gramps_modified_ts INTEGER, "
+            "fs_modified_ts INTEGER, "
+            "essential_conflict INTEGER NOT NULL DEFAULT 0, "
+            "conflict INTEGER NOT NULL DEFAULT 0"
+            ")"
+        )
+        self.dbapi.execute(
+            "CREATE INDEX familysearch_sync_fsid ON familysearch_sync(fsid)"
+        )
+
+    def get_familysearch_person_status(self, person_handle, default=None):
+        """
+        Return FamilySearch sync status for the given Person handle.
+        """
+        if not person_handle:
+            return {} if default is None else default
+
+        self.dbapi.execute(
+            "SELECT fsid, is_root, status_ts, confirmed_ts, "
+            "gramps_modified_ts, fs_modified_ts, "
+            "essential_conflict, conflict "
+            "FROM familysearch_sync WHERE p_handle = ?",
+            [person_handle],
+        )
+        row = self.dbapi.fetchone()
+        if not row:
+            return {} if default is None else default
+
+        return {
+            "fsid": row[0],
+            "is_root": bool(row[1]),
+            "status_ts": row[2],
+            "confirmed_ts": row[3],
+            "gramps_modified_ts": row[4],
+            "fs_modified_ts": row[5],
+            "essential_conflict": bool(row[6]),
+            "conflict": bool(row[7]),
+        }
+
+    def set_familysearch_person_status(self, person_handle, status, transaction=None):
+        """
+        Persist FamilySearch sync status for the given Person handle.
+
+        Passing an empty dict removes the stored status row.
+        """
+        if not person_handle:
+            return
+
+        if status is None:
+            status = {}
+        if not isinstance(status, dict):
+            raise TypeError("status must be a dict")
+
+        if not status:
+            self.delete_familysearch_person_status(person_handle, transaction)
+            return
+
+        def _as_int(value):
+            if value is None or value == "":
+                return None
+            try:
+                return int(value)
+            except (TypeError, ValueError, OverflowError):
+                return None
+
+        fsid = status.get("fsid")
+        if fsid is not None:
+            fsid = str(fsid).strip() or None
+
+        values = [
+            fsid,
+            1 if bool(status.get("is_root")) else 0,
+            _as_int(status.get("status_ts")),
+            _as_int(status.get("confirmed_ts")),
+            _as_int(status.get("gramps_modified_ts")),
+            _as_int(status.get("fs_modified_ts")),
+            1 if bool(status.get("essential_conflict")) else 0,
+            1 if bool(status.get("conflict")) else 0,
+        ]
+
+        self._txn_begin()
+        try:
+            self.dbapi.execute(
+                "SELECT 1 FROM familysearch_sync WHERE p_handle = ?",
+                [person_handle],
+            )
+            row = self.dbapi.fetchone()
+
+            if row:
+                self.dbapi.execute(
+                    "UPDATE familysearch_sync SET "
+                    "fsid = ?, is_root = ?, status_ts = ?, confirmed_ts = ?, "
+                    "gramps_modified_ts = ?, fs_modified_ts = ?, "
+                    "essential_conflict = ?, conflict = ? "
+                    "WHERE p_handle = ?",
+                    values + [person_handle],
+                )
+            else:
+                self.dbapi.execute(
+                    "INSERT INTO familysearch_sync "
+                    "("
+                    "p_handle, fsid, is_root, status_ts, confirmed_ts, "
+                    "gramps_modified_ts, fs_modified_ts, "
+                    "essential_conflict, conflict"
+                    ") "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [person_handle] + values,
+                )
+            self._txn_commit()
+        except Exception:
+            self._txn_abort()
+            raise
+
+    def delete_familysearch_person_status(self, person_handle, transaction=None):
+        """
+        Remove FamilySearch sync status for the given Person handle.
+        """
+        if not person_handle:
+            return
+
+        self._txn_begin()
+        try:
+            self.dbapi.execute(
+                "DELETE FROM familysearch_sync WHERE p_handle = ?",
+                [person_handle],
+            )
+            self._txn_commit()
+        except Exception:
+            self._txn_abort()
+            raise
