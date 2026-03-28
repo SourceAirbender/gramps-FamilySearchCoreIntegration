@@ -56,12 +56,7 @@ except Exception:
     fs_source_image = None
     _has_img_picker = False
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
-
+_ = glocale.translation.gettext
 
 if TYPE_CHECKING:
     from typing import Protocol

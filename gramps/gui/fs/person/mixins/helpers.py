@@ -2,7 +2,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,12 +33,7 @@ import gramps.gui.fs.utilities as fs_utilities
 
 from gramps.gui.fs.import_ import deserializer as deserialize
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
-
+_ = glocale.translation.gettext
 
 FS_DIRECT_TAGS = {
     "http://gedcomx.org/Birth",

@@ -37,12 +37,7 @@ from gramps.gui.dialog import ErrorDialog
 from . import ui as fs_ui
 from .tags import build_tag_color_note_widget
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
-
+_ = glocale.translation.gettext
 
 _SINGLETON: Optional["FamilySearchToolsWindow"] = None
 _EDITPERSON_HOOK_INSTALLED = False

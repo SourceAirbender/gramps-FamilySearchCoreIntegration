@@ -23,11 +23,7 @@ MAX_PERSONS = 200
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
+_ = glocale.translation.gettext
 
 # https://www.familysearch.org/developers/docs/guides/facts
 # https://github.com/FamilySearch/gedcomx/blob/master/specifications/fact-types-specification.md

@@ -35,12 +35,7 @@ import gramps.gui.fs.import_ as fs_import
 from gramps.gui.fs import tags as fs_tags
 from gramps.gui.fs.import_ import deserializer as deserialize
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
-
+_ = glocale.translation.gettext
 
 class CompareGtkMixin:
     # --- mypy-facing declarations for mixin-heavy runtime design ---

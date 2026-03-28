@@ -36,12 +36,7 @@ import gramps.gui.fs.import_ as fs_import
 import gramps.gui.fs.utilities as fs_utilities
 from gramps.gui.fs.import_ import deserializer as deserialize
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
-
+_ = glocale.translation.gettext
 
 def _is_fs_web_url(url: str) -> bool:
     if not url:
