@@ -1466,7 +1466,7 @@ class DbReadBase:
 
     def get_familysearch_person_status(self, person_handle, default=None):
         """
-        Return FamilySearch sync status for the given Person handle to comply with Nick & Doug's requirements
+        Return FamilySearch sync status for the given Person handle
 
         Returns a dict with these keys when present:
             fsid

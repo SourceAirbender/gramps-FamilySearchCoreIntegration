@@ -640,7 +640,7 @@ class FamilySearchToolsWindow:
         # The DB copy is the one that matters for compare/sync logic.
         person_handle = _LAST_EDITOR.person_handle
         dbstate = _LAST_EDITOR.dbstate
-    
+
         if person_handle and dbstate is not None:
             db = getattr(dbstate, "db", None)
             if db is not None:
@@ -649,12 +649,14 @@ class FamilySearchToolsWindow:
                 except HandleError:
                     pass
                 except Exception as exc:
-                    _dbg(f"Could not get person from db for handle {person_handle}: {exc}")
-    
+                    _dbg(
+                        f"Could not get person from db for handle {person_handle}: {exc}"
+                    )
+
         person = _LAST_EDITOR.person_obj()
         if person is not None:
             return person
-    
+
         return None
 
     def _update_label(self) -> None:
@@ -772,7 +774,7 @@ class FamilySearchToolsWindow:
         if not self._fs_connected():
             _show_info(self.window, "FamilySearch", "Not connected to FamilySearch.")
             return None
-    
+
         if _LAST_EDITOR.dbstate is None or _LAST_EDITOR.uistate is None:
             _show_info(
                 self.window,
@@ -780,11 +782,11 @@ class FamilySearchToolsWindow:
                 "No UI context yet.\nOpen an Edit Person window first.",
             )
             return None
-    
+
         person = None
         person_handle = _LAST_EDITOR.person_handle
         db = getattr(_LAST_EDITOR.dbstate, "db", None)
-    
+
         if person_handle and db is not None:
             try:
                 person = db.get_person_from_handle(person_handle)
@@ -793,10 +795,10 @@ class FamilySearchToolsWindow:
             except Exception as exc:
                 _dbg(f"Could not get db-only person for handle {person_handle}: {exc}")
                 person = None
-    
+
         if person is None:
             person = _LAST_EDITOR.person_obj()
-    
+
         return {
             "dbstate": _LAST_EDITOR.dbstate,
             "uistate": _LAST_EDITOR.uistate,
