@@ -37,11 +37,7 @@ from .formatters import person_dates_str, fs_person_dates_str
 
 logger = logging.getLogger(__name__)
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
+_ = glocale.translation.gettext
 
 
 def compare_gender(gr_person: Person, fs_person) -> Tuple:

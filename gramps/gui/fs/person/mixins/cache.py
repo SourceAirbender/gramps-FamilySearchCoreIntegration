@@ -33,6 +33,7 @@ from gramps.gui.fs.import_ import deserializer as deserialize
 
 _ = glocale.translation.gettext
 
+
 class _FsCacheEntry:
     """In-memory metadata for an FSID cached on disk."""
 

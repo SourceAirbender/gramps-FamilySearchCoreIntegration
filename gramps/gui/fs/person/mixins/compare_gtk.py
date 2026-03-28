@@ -37,6 +37,7 @@ from gramps.gui.fs.import_ import deserializer as deserialize
 
 _ = glocale.translation.gettext
 
+
 class CompareGtkMixin:
     # --- mypy-facing declarations for mixin-heavy runtime design ---
     # Initialized at runtime by the addon/session:

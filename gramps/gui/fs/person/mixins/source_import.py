@@ -38,6 +38,7 @@ from gramps.gui.fs.import_ import deserializer as deserialize
 
 _ = glocale.translation.gettext
 
+
 def _is_fs_web_url(url: str) -> bool:
     if not url:
         return False

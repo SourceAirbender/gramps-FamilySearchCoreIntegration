@@ -25,11 +25,7 @@ import gramps.gui.fs.utilities as fs_utilities
 from gramps.gen.lib import Date, EventType
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
+_ = glocale.translation.gettext
 
 
 def person_dates_str(db, gr_person) -> str:
