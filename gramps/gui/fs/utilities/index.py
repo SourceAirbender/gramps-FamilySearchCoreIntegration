@@ -24,11 +24,7 @@ from gramps.gen.lib import Person
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gui.dialog import QuestionDialog2
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
+_ = glocale.translation.gettext
 
 FS_INDEX_PEOPLE: Dict[str, str] = {}
 FS_INDEX_PLACES: Dict[str, str] = {}

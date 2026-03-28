@@ -22,11 +22,7 @@ from typing import Optional
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
-try:
-    _trans = glocale.get_addon_translator(__file__)
-except ValueError:
-    _trans = glocale.translation
-_ = _trans.gettext
+_ = glocale.translation.gettext
 
 
 def _iter_attrs(gr_obj):
