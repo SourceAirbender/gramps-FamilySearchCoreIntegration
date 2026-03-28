@@ -33,6 +33,7 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.const import IMAGE_DIR as _GRAMPS_IMAGE_DIR
 from gramps.gen.display.name import displayer as name_displayer
 from gramps.gui.dialog import ErrorDialog
+from gramps.gen.errors import HandleError
 
 from . import ui as fs_ui
 from .tags import build_tag_color_note_widget
@@ -77,14 +78,24 @@ def _person_handle(person: Any) -> Optional[str]:
 
 def _person_exists_in_db(dbstate: Any, handle: str) -> bool:
     db = getattr(dbstate, "db", None)
-    if db is None:
+    if db is None or not handle:
         return False
 
     has_person_handle = getattr(db, "has_person_handle", None)
     if callable(has_person_handle):
-        return bool(has_person_handle(handle))
+        try:
+            return bool(has_person_handle(handle))
+        except Exception:
+            return False
 
-    return db.get_person_from_handle(handle) is not None
+    # exceptions so it doesnt crash when there's a new tree with no one in it & FS is connected
+    try:
+        db.get_person_from_handle(handle)
+        return True
+    except HandleError:
+        return False
+    except Exception:
+        return False
 
 
 def _get_editor_window(editor: Any) -> Any:
@@ -629,18 +640,21 @@ class FamilySearchToolsWindow:
         # The DB copy is the one that matters for compare/sync logic.
         person_handle = _LAST_EDITOR.person_handle
         dbstate = _LAST_EDITOR.dbstate
-
+    
         if person_handle and dbstate is not None:
             db = getattr(dbstate, "db", None)
             if db is not None:
-                person = db.get_person_from_handle(person_handle)
-                if person is not None:
-                    return person
-
+                try:
+                    return db.get_person_from_handle(person_handle)
+                except HandleError:
+                    pass
+                except Exception as exc:
+                    _dbg(f"Could not get person from db for handle {person_handle}: {exc}")
+    
         person = _LAST_EDITOR.person_obj()
         if person is not None:
             return person
-
+    
         return None
 
     def _update_label(self) -> None:
@@ -758,7 +772,7 @@ class FamilySearchToolsWindow:
         if not self._fs_connected():
             _show_info(self.window, "FamilySearch", "Not connected to FamilySearch.")
             return None
-
+    
         if _LAST_EDITOR.dbstate is None or _LAST_EDITOR.uistate is None:
             _show_info(
                 self.window,
@@ -766,17 +780,23 @@ class FamilySearchToolsWindow:
                 "No UI context yet.\nOpen an Edit Person window first.",
             )
             return None
-
+    
         person = None
         person_handle = _LAST_EDITOR.person_handle
         db = getattr(_LAST_EDITOR.dbstate, "db", None)
-
+    
         if person_handle and db is not None:
-            person = db.get_person_from_handle(person_handle)
-
+            try:
+                person = db.get_person_from_handle(person_handle)
+            except HandleError:
+                person = None
+            except Exception as exc:
+                _dbg(f"Could not get db-only person for handle {person_handle}: {exc}")
+                person = None
+    
         if person is None:
             person = _LAST_EDITOR.person_obj()
-
+    
         return {
             "dbstate": _LAST_EDITOR.dbstate,
             "uistate": _LAST_EDITOR.uistate,

@@ -8,18 +8,6 @@ from gramps.gen.lib import Person
 from gramps.gui.fs.datab_familysearch import FSStatusDB
 from gramps.plugins.db.dbapi.sqlite import SQLite
 
-EXPECTED_COLUMNS = {
-    "p_handle",
-    "fsid",
-    "is_root",
-    "status_ts",
-    "confirmed_ts",
-    "gramps_modified_ts",
-    "fs_modified_ts",
-    "essential_conflict",
-    "conflict",
-}
-
 
 class FakeDb:
     """
@@ -124,23 +112,11 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
             self.db.add_person(person, txn)
         return person
 
-    def test_schema_table_exists_with_expected_columns(self):
+    def test_person_table_has_familysearch_sync_column(self):
         with sqlite3.connect(self._sqlite_path()) as con:
-            cur = con.execute(
-                "SELECT name FROM sqlite_master "
-                "WHERE type='table' AND name='familysearch_sync'"
-            )
-            row = cur.fetchone()
-            self.assertIsNotNone(row, "familysearch_sync table was not created")
+            cols = {r[1] for r in con.execute("PRAGMA table_info('person')").fetchall()}
 
-            cols = {
-                r[1]
-                for r in con.execute(
-                    "PRAGMA table_info('familysearch_sync')"
-                ).fetchall()
-            }
-
-        self.assertEqual(cols, EXPECTED_COLUMNS)
+        self.assertIn("familysearch_sync_data", cols)
 
     def test_db_api_round_trip_and_delete(self):
         person = self._create_person()
@@ -203,7 +179,7 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
         self.assertTrue(loaded.essential_conflict)
         self.assertTrue(loaded.conflict)
 
-        # Now clear everything and ensure the row is removed
+        # Now clear everything and ensure the stored data is removed
         cleared = FSStatusDB(self.db, person.handle)
         cleared.commit()
 
@@ -211,25 +187,60 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
 
 
 class FamilySearchSyncUpgradeIntegrationTest(unittest.TestCase):
-    def test_upgrade_from_v21_recreates_familysearch_sync_table(self):
+    def _rebuild_person_table_without_fs_column(self, sqlite_path):
+        """
+        Simulate a v21 database by rebuilding the person table without the
+        familysearch_sync_data column, preserving all other columns.
+        """
+        with sqlite3.connect(sqlite_path) as con:
+            cols = con.execute("PRAGMA table_info('person')").fetchall()
+
+            old_columns = []
+            create_defs = []
+
+            for cid, name, col_type, notnull, default_value, pk in cols:
+                if name == "familysearch_sync_data":
+                    continue
+
+                old_columns.append(name)
+
+                col_def = f'"{name}" {col_type}' if col_type else f'"{name}"'
+                if pk:
+                    col_def += " PRIMARY KEY"
+                if notnull:
+                    col_def += " NOT NULL"
+                if default_value is not None:
+                    col_def += f" DEFAULT {default_value}"
+                create_defs.append(col_def)
+
+            con.execute("ALTER TABLE person RENAME TO person_old")
+            con.execute(f"CREATE TABLE person ({', '.join(create_defs)})")
+            con.execute(
+                f'INSERT INTO person ({", ".join(old_columns)}) '
+                f'SELECT {", ".join(old_columns)} FROM person_old'
+            )
+            con.execute("DROP TABLE person_old")
+            con.commit()
+
+    def test_upgrade_from_v21_adds_familysearch_sync_person_column(self):
         with tempfile.TemporaryDirectory() as dbdir:
             db = SQLite()
             db.load(dbdir)
-
-            # Simulate an older v21 database and preserve that version on disk
-            db.set_schema_version(21)
-            db.close(update=False)
+            db.close()
 
             sqlite_path = os.path.join(dbdir, "sqlite.db")
-            with sqlite3.connect(sqlite_path) as con:
-                con.execute("DROP TABLE IF EXISTS familysearch_sync")
-                con.commit()
+            self._rebuild_person_table_without_fs_column(sqlite_path)
 
-                row = con.execute(
-                    "SELECT name FROM sqlite_master "
-                    "WHERE type='table' AND name='familysearch_sync'"
-                ).fetchone()
-                self.assertIsNone(row)
+            with sqlite3.connect(sqlite_path) as con:
+                cols = {
+                    r[1] for r in con.execute("PRAGMA table_info('person')").fetchall()
+                }
+                self.assertNotIn("familysearch_sync_data", cols)
+
+            downgraded = SQLite()
+            downgraded.load(dbdir)
+            downgraded.set_schema_version(21)
+            downgraded.close(update=False)
 
             upgraded = SQLite()
             upgraded.load(dbdir, force_schema_upgrade=True)
@@ -238,20 +249,15 @@ class FamilySearchSyncUpgradeIntegrationTest(unittest.TestCase):
                 self.assertEqual(upgraded.get_schema_version(), 22)
 
                 with sqlite3.connect(sqlite_path) as con:
-                    row = con.execute(
-                        "SELECT name FROM sqlite_master "
-                        "WHERE type='table' AND name='familysearch_sync'"
-                    ).fetchone()
-                    self.assertIsNotNone(
-                        row, "familysearch_sync table was recreated by upgrade"
-                    )
-
                     cols = {
                         r[1]
-                        for r in con.execute(
-                            "PRAGMA table_info('familysearch_sync')"
-                        ).fetchall()
+                        for r in con.execute("PRAGMA table_info('person')").fetchall()
                     }
-                    self.assertEqual(cols, EXPECTED_COLUMNS)
+
+                self.assertIn(
+                    "familysearch_sync_data",
+                    cols,
+                    "familysearch_sync_data column was not added by upgrade",
+                )
             finally:
                 upgraded.close()

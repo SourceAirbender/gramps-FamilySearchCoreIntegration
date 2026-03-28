@@ -66,14 +66,14 @@ def gramps_upgrade_22(self):
     """
     Upgrade database from version 21 to 22.
 
-    Add the FamilySearch sync status table to the schema.
+    Add FamilySearch sync JSON storage to the person table.
     """
-    if not hasattr(self, "_create_familysearch_sync_schema"):
+    if not hasattr(self, "_ensure_familysearch_sync_person_column"):
         return
 
     self._txn_begin()
     try:
-        self._create_familysearch_sync_schema()
+        self._ensure_familysearch_sync_person_column()
         self._txn_commit()
     except Exception:
         self._txn_abort()

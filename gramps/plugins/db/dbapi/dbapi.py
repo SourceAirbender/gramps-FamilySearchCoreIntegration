@@ -126,7 +126,8 @@ class DBAPI(DbGeneric):
             "handle VARCHAR(50) PRIMARY KEY NOT NULL, "
             "given_name TEXT, "
             "surname TEXT, "
-            f"{col_data}"
+            f"{col_data}, "
+            "familysearch_sync_data TEXT"
             ")"
         )
         self.dbapi.execute(
@@ -227,7 +228,6 @@ class DBAPI(DbGeneric):
             ")"
         )
 
-        self._create_familysearch_sync_schema()
         self._create_secondary_columns()
 
         ## Indices:
@@ -1210,30 +1210,14 @@ class DBAPI(DbGeneric):
         """
         return [v if not isinstance(v, bool) else int(v) for v in values]
 
-    def _create_familysearch_sync_schema(self):
+    def _ensure_familysearch_sync_person_column(self):
         """
-        Create the FamilySearch sync status table if it does not already exist.
+        Ensure the person table has the FamilySearch sync JSON column.
         """
-        if self.dbapi.table_exists("familysearch_sync"):
-            return
-
-        self.dbapi.execute(
-            "CREATE TABLE familysearch_sync "
-            "("
-            "p_handle VARCHAR(50) PRIMARY KEY NOT NULL, "
-            "fsid VARCHAR(20), "
-            "is_root INTEGER NOT NULL DEFAULT 0, "
-            "status_ts INTEGER, "
-            "confirmed_ts INTEGER, "
-            "gramps_modified_ts INTEGER, "
-            "fs_modified_ts INTEGER, "
-            "essential_conflict INTEGER NOT NULL DEFAULT 0, "
-            "conflict INTEGER NOT NULL DEFAULT 0"
-            ")"
-        )
-        self.dbapi.execute(
-            "CREATE INDEX familysearch_sync_fsid ON familysearch_sync(fsid)"
-        )
+        if not self.dbapi.column_exists("person", "familysearch_sync_data"):
+            self.dbapi.execute(
+                "ALTER TABLE person ADD COLUMN familysearch_sync_data TEXT"
+            )
 
     def get_familysearch_person_status(self, person_handle, default=None):
         """
@@ -1243,32 +1227,37 @@ class DBAPI(DbGeneric):
             return {} if default is None else default
 
         self.dbapi.execute(
-            "SELECT fsid, is_root, status_ts, confirmed_ts, "
-            "gramps_modified_ts, fs_modified_ts, "
-            "essential_conflict, conflict "
-            "FROM familysearch_sync WHERE p_handle = ?",
+            "SELECT familysearch_sync_data FROM person WHERE handle = ?",
             [person_handle],
         )
         row = self.dbapi.fetchone()
-        if not row:
+        if not row or not row[0]:
+            return {} if default is None else default
+
+        try:
+            data = json.loads(row[0])
+        except (TypeError, ValueError):
+            return {} if default is None else default
+
+        if not isinstance(data, dict):
             return {} if default is None else default
 
         return {
-            "fsid": row[0],
-            "is_root": bool(row[1]),
-            "status_ts": row[2],
-            "confirmed_ts": row[3],
-            "gramps_modified_ts": row[4],
-            "fs_modified_ts": row[5],
-            "essential_conflict": bool(row[6]),
-            "conflict": bool(row[7]),
+            "fsid": data.get("fsid"),
+            "is_root": bool(data.get("is_root")),
+            "status_ts": data.get("status_ts"),
+            "confirmed_ts": data.get("confirmed_ts"),
+            "gramps_modified_ts": data.get("gramps_modified_ts"),
+            "fs_modified_ts": data.get("fs_modified_ts"),
+            "essential_conflict": bool(data.get("essential_conflict")),
+            "conflict": bool(data.get("conflict")),
         }
 
     def set_familysearch_person_status(self, person_handle, status, transaction=None):
         """
         Persist FamilySearch sync status for the given Person handle.
 
-        Passing an empty dict removes the stored status row.
+        Passing an empty dict removes the stored status data.
         """
         if not person_handle:
             return
@@ -1294,45 +1283,36 @@ class DBAPI(DbGeneric):
         if fsid is not None:
             fsid = str(fsid).strip() or None
 
-        values = [
-            fsid,
-            1 if bool(status.get("is_root")) else 0,
-            _as_int(status.get("status_ts")),
-            _as_int(status.get("confirmed_ts")),
-            _as_int(status.get("gramps_modified_ts")),
-            _as_int(status.get("fs_modified_ts")),
-            1 if bool(status.get("essential_conflict")) else 0,
-            1 if bool(status.get("conflict")) else 0,
-        ]
+        payload = {}
+
+        if fsid:
+            payload["fsid"] = fsid
+
+        if bool(status.get("is_root")):
+            payload["is_root"] = True
+
+        for key in (
+            "status_ts",
+            "confirmed_ts",
+            "gramps_modified_ts",
+            "fs_modified_ts",
+        ):
+            value = _as_int(status.get(key))
+            if value is not None:
+                payload[key] = value
+
+        if bool(status.get("essential_conflict")):
+            payload["essential_conflict"] = True
+
+        if bool(status.get("conflict")):
+            payload["conflict"] = True
 
         self._txn_begin()
         try:
             self.dbapi.execute(
-                "SELECT 1 FROM familysearch_sync WHERE p_handle = ?",
-                [person_handle],
+                "UPDATE person SET familysearch_sync_data = ? WHERE handle = ?",
+                [json.dumps(payload, separators=(",", ":")), person_handle],
             )
-            row = self.dbapi.fetchone()
-
-            if row:
-                self.dbapi.execute(
-                    "UPDATE familysearch_sync SET "
-                    "fsid = ?, is_root = ?, status_ts = ?, confirmed_ts = ?, "
-                    "gramps_modified_ts = ?, fs_modified_ts = ?, "
-                    "essential_conflict = ?, conflict = ? "
-                    "WHERE p_handle = ?",
-                    values + [person_handle],
-                )
-            else:
-                self.dbapi.execute(
-                    "INSERT INTO familysearch_sync "
-                    "("
-                    "p_handle, fsid, is_root, status_ts, confirmed_ts, "
-                    "gramps_modified_ts, fs_modified_ts, "
-                    "essential_conflict, conflict"
-                    ") "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [person_handle] + values,
-                )
             self._txn_commit()
         except Exception:
             self._txn_abort()
@@ -1348,7 +1328,7 @@ class DBAPI(DbGeneric):
         self._txn_begin()
         try:
             self.dbapi.execute(
-                "DELETE FROM familysearch_sync WHERE p_handle = ?",
+                "UPDATE person SET familysearch_sync_data = NULL WHERE handle = ?",
                 [person_handle],
             )
             self._txn_commit()
