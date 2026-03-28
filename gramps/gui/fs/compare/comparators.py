@@ -43,18 +43,18 @@ _ = glocale.translation.gettext
 def compare_gender(gr_person: Person, fs_person) -> Tuple:
     # Compare GRAMPS gender vs FS gender, returns a color-coded tuple
     if gr_person.get_gender() == Person.MALE:
-        gr_gender = _trans.gettext("male")
+        gr_gender = _("male")
     elif gr_person.get_gender() == Person.FEMALE:
-        gr_gender = _trans.gettext("female")
+        gr_gender = _("female")
     else:
-        gr_gender = _trans.gettext("unknown")
+        gr_gender = _("unknown")
 
     if fs_person.gender and fs_person.gender.type == "http://gedcomx.org/Male":
-        fs_gender = _trans.gettext("male")
+        fs_gender = _("male")
     elif fs_person.gender and fs_person.gender.type == "http://gedcomx.org/Female":
-        fs_gender = _trans.gettext("female")
+        fs_gender = _("female")
     else:
-        fs_gender = _trans.gettext("unknown")
+        fs_gender = _("unknown")
 
     color = "green" if gr_gender == fs_gender else "red"
     return (
@@ -145,7 +145,7 @@ def compare_names(gr_person: Person, fs_person) -> List[Tuple]:
     res.append(
         (
             color,
-            _trans.gettext("Name"),
+            _("Name"),
             "",
             gr_primary.get_surname() + ", " + gr_primary.first_name,
             "",
@@ -178,7 +178,7 @@ def compare_names(gr_person: Person, fs_person) -> List[Tuple]:
         res.append(
             (
                 color,
-                "  " + _trans.gettext("Name"),
+                "  " + _("Name"),
                 "",
                 gr_alt.get_surname() + ", " + gr_alt.first_name,
                 "",
@@ -198,7 +198,7 @@ def compare_names(gr_person: Person, fs_person) -> List[Tuple]:
         res.append(
             (
                 color,
-                "  " + _trans.gettext("Name"),
+                "  " + _("Name"),
                 "",
                 "",
                 "",
@@ -293,7 +293,7 @@ def compare_parents(db, gr_person: Person, fs_person) -> List[Tuple]:
         res.append(
             (
                 color,
-                _trans.gettext("Father"),
+                _("Father"),
                 person_dates_str(db, father),
                 " " + father_name + " [" + father_fsid + "]",
                 fs_person_dates_str(db, fs_father),
@@ -317,7 +317,7 @@ def compare_parents(db, gr_person: Person, fs_person) -> List[Tuple]:
         res.append(
             (
                 color,
-                _trans.gettext("Mother"),
+                _("Mother"),
                 person_dates_str(db, mother),
                 " " + mother_name + " [" + mother_fsid + "]",
                 fs_person_dates_str(db, fs_mother),
@@ -392,7 +392,7 @@ def compare_spouse_notes(db, gr_person: Person, fs_person) -> List[Tuple]:
             res.append(
                 (
                     color,
-                    _trans.gettext("Spouse"),
+                    _("Spouse"),
                     person_dates_str(db, spouse),
                     spouse_name.get_surname()
                     + ", "
@@ -441,7 +441,7 @@ def compare_spouse_notes(db, gr_person: Person, fs_person) -> List[Tuple]:
         res.append(
             (
                 color,
-                _trans.gettext("Spouse"),
+                _("Spouse"),
                 "",
                 "",
                 fs_person_dates_str(db, fs_spouse_opt),
@@ -524,7 +524,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
             res.append(
                 (
                     color,
-                    _trans.gettext("Spouse"),
+                    _("Spouse"),
                     person_dates_str(db, spouse),
                     spouse_name.get_surname()
                     + ", "
@@ -736,7 +736,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 res.append(
                     (
                         color,
-                        "    " + _trans.gettext("Child"),
+                        "    " + _("Child"),
                         person_dates_str(db, child),
                         child_name.get_surname()
                         + ", "
@@ -796,7 +796,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                     res.append(
                         (
                             color,
-                            "    " + _trans.gettext("Child"),
+                            "    " + _("Child"),
                             "",
                             "",
                             fs_person_dates_str(db, fs_child_opt),
@@ -844,7 +844,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
         res.append(
             (
                 color,
-                _trans.gettext("Spouse"),
+                _("Spouse"),
                 "",
                 "",
                 fs_person_dates_str(db, fs_spouse_opt),
@@ -896,7 +896,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 res.append(
                     (
                         color,
-                        "    " + _trans.gettext("Child"),
+                        "    " + _("Child"),
                         "",
                         "",
                         fs_person_dates_str(db, fs_child_opt),
@@ -936,7 +936,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
         res.append(
             (
                 color,
-                _trans.gettext("Child"),
+                _("Child"),
                 "",
                 "",
                 fs_person_dates_str(db, fs_child_opt),

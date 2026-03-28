@@ -420,7 +420,7 @@ class DbGeneric(DbWriteBase, DbReadBase, UpdateCallback, Callback):
 
     __callback_map = {}
 
-    VERSION = (21, 0, 0)
+    VERSION = (22, 0, 0)
 
     def __init__(self, directory=None):
         DbReadBase.__init__(self)

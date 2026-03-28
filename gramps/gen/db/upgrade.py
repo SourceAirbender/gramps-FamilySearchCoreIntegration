@@ -62,19 +62,21 @@ _ = glocale.translation.gettext
 LOG = logging.getLogger(".upgrade")
 
 
-def gramps_upgrade_22(db):
+def gramps_upgrade_22(self):
     """
+    Upgrade database from version 21 to 22.
+
     Add the FamilySearch sync status table to the schema.
     """
-    if not hasattr(db, "_create_familysearch_sync_schema"):
+    if not hasattr(self, "_create_familysearch_sync_schema"):
         return
 
-    db._txn_begin()
+    self._txn_begin()
     try:
-        db._create_familysearch_sync_schema()
-        db._txn_commit()
+        self._create_familysearch_sync_schema()
+        self._txn_commit()
     except Exception:
-        db._txn_abort()
+        self._txn_abort()
         raise
 
 
