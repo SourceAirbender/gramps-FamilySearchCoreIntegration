@@ -45,7 +45,7 @@ from . import _
 from gramps.gen.fs.import_ import deserializer as deserialize
 
 from gramps.gen.fs import utilities as fs_utilities
-from gramps.gui.fs import tree
+from gramps.gen.fs import tree
 
 LOG = logging.getLogger(__name__)
 

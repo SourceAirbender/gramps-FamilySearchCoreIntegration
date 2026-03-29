@@ -28,7 +28,7 @@ from typing import Any, ClassVar, Optional, Tuple
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 
-from gramps.gui.fs import tree
+from gramps.gen.fs import tree
 from gramps.gen.fs.import_ import deserializer as deserialize
 
 _ = glocale.translation.gettext

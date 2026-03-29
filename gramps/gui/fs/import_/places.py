@@ -24,7 +24,7 @@ from gramps.gen.lib import Place, PlaceName, PlaceType, Url, UrlType, PlaceRef
 
 from . import _
 from gramps.gen.fs import utilities as fs_utilities
-from gramps.gui.fs import tree
+from gramps.gen.fs import tree
 from gramps.gui.fs.constants import GEDCOMX_TO_GRAMPS_PLACES
 from gramps.gen.fs.import_ import deserializer as deserialize
 

@@ -29,7 +29,7 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.lib import EventType, Person
 
 from gramps.gui.fs import datab_familysearch
-from gramps.gui.fs import tree
+from gramps.gen.fs import tree
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
 from gramps.gen.fs import utilities as fs_utilities
 

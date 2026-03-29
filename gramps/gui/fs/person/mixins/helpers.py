@@ -194,7 +194,7 @@ class AuthMixin:
             )
             if sess:
                 try:
-                    import gramps.gui.fs.tree as tree
+                    import gramps.gen.fs.tree as tree
 
                     tree._fs_session = sess
                 except Exception:
@@ -226,7 +226,7 @@ class AuthMixin:
             return
 
         try:
-            import gramps.gui.fs.tree as tree
+            import gramps.gen.fs.tree as tree
 
             tree._fs_session = sess
         except Exception:

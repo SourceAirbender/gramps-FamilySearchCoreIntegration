@@ -65,7 +65,7 @@ def _canonicalize_fs_web_url(url: str) -> str:
     if not u.startswith(("http://", "https://")):
         return u
     try:
-        from gramps.gui.fs import tree
+        from gramps.gen.fs import tree
 
         sess = getattr(tree, "_fs_session", None)
         if sess and hasattr(sess, "canonical_web_url"):

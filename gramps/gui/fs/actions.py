@@ -65,7 +65,7 @@ def _bind_global_session(session) -> None:
     # many FS code paths still rely on module-global tree._fs_session
     # kept for windows compat
     try:
-        from gramps.gui.fs import tree as fs_tree
+        from gramps.gen.fs import tree as fs_tree
 
         fs_tree._fs_session = session
     except Exception:
@@ -1108,7 +1108,7 @@ def clear_cache(dbstate, uistate, track, person, session, parent, editor=None) -
 
     try:
         import gramps.gui.fs.person.fsg_sync as FSG_Sync
-        from gramps.gui.fs import tree as fs_tree
+        from gramps.gen.fs import tree as fs_tree
 
         try:
             fs_tree._fs_session = session
@@ -1292,7 +1292,7 @@ def sync_this_person(
             fsid = fsid2
 
     try:
-        from gramps.gui.fs import tree as fs_tree
+        from gramps.gen.fs import tree as fs_tree
 
         tmp = fs_tree.Tree()
         try:

@@ -34,7 +34,7 @@ from gramps.gen.errors import HandleError
 
 from . import _
 
-from gramps.gui.fs import tree
+from gramps.gen.fs import tree
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
 from gramps.gen.fs.import_ import deserializer as deserialize
 

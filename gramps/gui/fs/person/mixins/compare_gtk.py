@@ -438,7 +438,7 @@ class CompareGtkMixin:
             WarningDialog(_("Select a person first."))
             return
 
-        from gramps.gui.fs import tree
+        from gramps.gen.fs import tree
 
         if not (tree._fs_session and tree._fs_session.logged):
             WarningDialog(_("You must login first."))
@@ -629,7 +629,7 @@ class CompareGtkMixin:
         if not url:
             return ""
         try:
-            from gramps.gui.fs import tree
+            from gramps.gen.fs import tree
 
             sess = getattr(tree, "_fs_session", None)
             if sess and hasattr(sess, "canonical_web_url"):

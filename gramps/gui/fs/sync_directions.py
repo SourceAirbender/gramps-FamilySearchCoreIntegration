@@ -68,7 +68,7 @@ COL_XFS2 = 12
 
 def _bind_global_session(session: Any) -> None:
     try:
-        from . import tree as fs_tree_mod
+        from gramps.gen.fs import tree as fs_tree_mod
     except Exception:
         return
 
@@ -88,7 +88,7 @@ def _ensure_fs_tree(session: Any) -> Optional[Any]:
         return existing_tree
 
     try:
-        from . import tree as fs_tree_mod
+        from gramps.gen.fs import tree as fs_tree_mod
     except Exception:
         return None
 
