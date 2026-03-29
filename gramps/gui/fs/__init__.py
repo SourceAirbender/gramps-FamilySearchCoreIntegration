@@ -2,7 +2,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@ import importlib
 from typing import Any
 
 _LAZY_MODULES = {
-    "tree": ".tree",
     "session": ".session",
 }
 
@@ -60,4 +59,4 @@ def __dir__():
     )
 
 
-__all__ = ["tree", "session", "Session", "get_active_session"]
+__all__ = ["session", "Session", "get_active_session"]
