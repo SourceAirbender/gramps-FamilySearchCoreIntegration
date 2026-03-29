@@ -27,7 +27,7 @@ from . import _
 from .places import get_place_by_id, add_place
 from .notes import add_note
 from gramps.gen.fs.utilities import fs_date_to_gramps_date, get_fsftid
-from gramps.gui.fs.constants import GEDCOMX_TO_GRAMPS_FACTS
+from gramps.gen.fs.constants import GEDCOMX_TO_GRAMPS_FACTS
 
 
 def update_event(db, txn, fs_fact, gr_event):

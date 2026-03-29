@@ -23,13 +23,13 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 # In-core Gramps module: use the core translator (not addon translator)
 _ = glocale.translation.gettext
 
-from .events import add_event, update_event
+from gramps.gen.fs.import_.events import add_event, update_event
 from .importer import FSToGrampsImporter
-from .names import add_name, add_names
-from .notes import add_note
+from gramps.gen.fs.import_.names import add_name, add_names
+from gramps.gen.fs.import_.notes import add_note
 from .options import FSImportOptions
-from .places import create_place, add_place, get_place_by_id
-from .sources import fetch_source_dates, add_source, IntermediateSource
+from gramps.gen.fs.import_.places import create_place, add_place, get_place_by_id
+from gramps.gen.fs.import_.sources import fetch_source_dates, add_source, IntermediateSource
 from .tool import FSImportTool
 
 __all__ = [

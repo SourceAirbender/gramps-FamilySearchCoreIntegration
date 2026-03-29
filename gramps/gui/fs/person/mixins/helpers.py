@@ -27,7 +27,6 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.lib import Person
 from gramps.gui.dialog import OkDialog, WarningDialog, ErrorDialog
 
-import gramps.gui.fs.import_ as fs_import
 from gramps.gen.fs import utilities as fs_utilities
 
 

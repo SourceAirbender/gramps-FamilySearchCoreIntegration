@@ -461,7 +461,6 @@ def _collect_source_push_items(
     items: List[Dict[str, Any]] = []
 
     try:
-        import gramps.gui.fs.import_ as fs_import_mod
 
         fs_import = cast(ModuleType, fs_import_mod)
     except Exception:

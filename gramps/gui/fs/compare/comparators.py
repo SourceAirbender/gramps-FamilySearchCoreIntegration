@@ -26,7 +26,7 @@ from typing import List, Optional, Tuple
 from gramps.gen.fs.import_ import deserializer as deserialize
 from gramps.gen.fs import utilities as fs_utilities
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
-from gramps.gui.fs.constants import GEDCOMX_TO_GRAMPS_FACTS
+from gramps.gen.fs.constants import GEDCOMX_TO_GRAMPS_FACTS
 
 from gramps.gen.lib import EventRoleType, EventType, Person
 from gramps.gen.display.place import displayer as _pd
