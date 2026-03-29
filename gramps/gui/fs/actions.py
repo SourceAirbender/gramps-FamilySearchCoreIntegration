@@ -328,7 +328,7 @@ def _pick_fsid_list(parent, title: str, rows: list[tuple[str, str, bool]]) -> li
 
 
 def _import_full_person(dbstate, uistate, fsid: str, verbosity: int = 0) -> None:
-    from . import import_ as fs_import
+    from gramps.gui.fs.import_.importer import FSToGrampsImporter
 
     _ensure_status_schema(dbstate.db)
 
@@ -339,7 +339,7 @@ def _import_full_person(dbstate, uistate, fsid: str, verbosity: int = 0) -> None
 
     caller = _Caller(dbstate, uistate)
 
-    importer = fs_import.FSToGrampsImporter()
+    importer = FSToGrampsImporter()
     importer.noreimport = False
     importer.asc = 0
     importer.desc = 0
@@ -961,8 +961,7 @@ def _refresh_editor_person_views(editor) -> None:
 def sync_this_person(
     dbstate, uistate, track, person, session, parent, editor=None
 ) -> None:
-    # Sync the *selected existing Gramps person* from FamilySearch
-    # facts/events (dates + place) + notes
+    # Sync the *selected existing Gramps person* from FamilySearch - facts/events (dates + place) + notes
     _bind_global_session(session)
 
     fsid = _get_fs_id(person)
@@ -1035,25 +1034,30 @@ def sync_this_person(
             )
             return
 
-    except Exception as err:
+    except Exception as e:
         _error(
             parent,
             _("FamilySearch"),
-            _("Failed to download from FamilySearch: {e}").format(e=err),
+            _("Failed to download from FamilySearch: {e}").format(e=e),
         )
         return
 
     try:
-        from .import_.events import add_event
-        from .import_.notes import add_note
-        from . import compare as fs_compare
-    except Exception as err:
+        from gramps.gen.fs.import_.events import add_event
+        from gramps.gen.fs.import_.notes import add_note
+    except Exception as e:
         _error(
             parent,
             _("FamilySearch"),
-            _("Sync pipeline import helpers missing: {e}").format(e=err),
+            _("Sync pipeline import helpers missing: {e}").format(e=e),
         )
         return
+
+    fs_compare = None
+    try:
+        import gramps.gui.fs.compare as fs_compare  # type: ignore
+    except Exception as e:
+        _dbg(f"sync_this_person: compare import skipped: {e}")
 
     try:
         with DbTxn(_("FamilySearch: Sync this person"), db) as txn:
@@ -1108,15 +1112,16 @@ def sync_this_person(
                     gr_person.add_note(note.handle)
                     existing_notes.add(note.handle)
 
-            try:
-                fs_compare.compare_fs_to_gramps(fs_person, gr_person, db, None)
-            except Exception:
-                pass
+            if fs_compare is not None:
+                try:
+                    fs_compare.compare_fs_to_gramps(fs_person, gr_person, db, None)
+                except Exception:
+                    pass
 
             db.commit_person(gr_person, txn)
 
-    except Exception as err:
-        _error(parent, _("FamilySearch"), _("Sync failed: {e}").format(e=err))
+    except Exception as e:
+        _error(parent, _("FamilySearch"), _("Sync failed: {e}").format(e=e))
         return
 
     _refresh_editor_person_views(editor)
