@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,34 +18,33 @@
 #
 
 from __future__ import annotations
-from typing import Dict, Optional
 
-from gramps.gen.lib import Person
+from typing import Optional
+
 from gramps.gen.const import GRAMPS_LOCALE as glocale
+from gramps.gen.lib import Person
 from gramps.gui.dialog import QuestionDialog2
+
+from gramps.gen.fs.utilities.attributes import get_fsftid
+from gramps.gen.fs.utilities.index import FS_INDEX_PEOPLE, FS_INDEX_PLACES
 
 _ = glocale.translation.gettext
 
-FS_INDEX_PEOPLE: Dict[str, str] = {}
-FS_INDEX_PLACES: Dict[str, str] = {}
-
 
 def build_fs_index(caller, progress, total_steps: int) -> None:
-    """Build fast lookup indexes for the FSFTID  handle.
+    """Build fast lookup indexes for the FSFTID -> handle.
 
     Creates two dictionaries that map FamilySearch identifiers to Gramps handles:
       * FS_INDEX_PEOPLE[fsid] = person_handle
-      * FS_INDEX_PLACES[url]  = place_handle  (only for URLs tagged "FamilySearch")
+      * FS_INDEX_PLACES[url]  = place_handle (only for URLs tagged "FamilySearch")
     """
-    global FS_INDEX_PEOPLE, FS_INDEX_PLACES
-
     db = caller.dbstate.db
 
     dup_warning = True
     FS_INDEX_PEOPLE.clear()
 
     progress.set_pass(
-        _(f"Build FSID list (1/{total_steps})"),
+        _("Build FSID list (1/%(total)d)") % {"total": total_steps},
         db.get_number_of_people(),
     )
     for person_handle in db.get_person_handles():
@@ -71,7 +70,7 @@ def build_fs_index(caller, progress, total_steps: int) -> None:
 
     FS_INDEX_PLACES.clear()
     progress.set_pass(
-        _(f"Build FSID list for places (2/{total_steps})"),
+        _("Build FSID list for places (2/%(total)d)") % {"total": total_steps},
         db.get_number_of_places(),
     )
     for place_handle in db.get_place_handles():
@@ -80,7 +79,3 @@ def build_fs_index(caller, progress, total_steps: int) -> None:
         for url in getattr(place, "urls", []) or []:
             if str(getattr(url, "type", "")) == "FamilySearch":
                 FS_INDEX_PLACES[getattr(url, "path", "")] = place_handle
-
-
-# local import to avoid circular import
-from .attributes import get_fsftid

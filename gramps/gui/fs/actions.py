@@ -39,7 +39,7 @@ from gramps.gen.lib import (
 from gramps.gen.db import DbTxn
 from gramps.gen.errors import HandleError
 
-from .import_ import deserializer as deserialize
+from gramps.gen.fs.import_ import deserializer as deserialize
 from . import ui as fs_ui
 
 logger = logging.getLogger(__name__)
@@ -593,7 +593,7 @@ def _find_person_by_fsid(db, fsid: str):
         return None
 
     try:
-        import gramps.gui.fs.utilities as fs_utilities
+        from gramps.gen.fs import utilities as fs_utilities
 
         idx = getattr(fs_utilities, "FS_INDEX_PEOPLE", {})
         h = idx.get(fsid)
@@ -606,7 +606,7 @@ def _find_person_by_fsid(db, fsid: str):
         pass
 
     try:
-        import gramps.gui.fs.utilities as fs_utilities
+        from gramps.gen.fs import utilities as fs_utilities
 
         get_fsftid = getattr(fs_utilities, "get_fsftid", None)
     except Exception:

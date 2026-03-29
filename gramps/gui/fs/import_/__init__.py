@@ -23,7 +23,6 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 # In-core Gramps module: use the core translator (not addon translator)
 _ = glocale.translation.gettext
 
-from . import deserializer as deserialize
 from .events import add_event, update_event
 from .importer import FSToGrampsImporter
 from .names import add_name, add_names

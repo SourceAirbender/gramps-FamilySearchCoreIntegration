@@ -33,7 +33,7 @@ from gramps.gen.db import DbTxn
 from gramps.gui.fs import tree
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
 from gramps.gui.fs import datab_familysearch
-import gramps.gui.fs.utilities as fs_utilities
+from gramps.gen.fs import utilities as fs_utilities
 
 logger = logging.getLogger(__name__)
 

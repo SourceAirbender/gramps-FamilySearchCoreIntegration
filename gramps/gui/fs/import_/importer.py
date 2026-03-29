@@ -34,12 +34,14 @@ from gramps.gen.errors import HandleError
 
 from . import _
 
-import gramps.gui.fs.utilities as fs_utilities
 from gramps.gui.fs import tree
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
-from . import deserializer as deserialize
+from gramps.gen.fs.import_ import deserializer as deserialize
 
-from gramps.gui.fs.utilities import get_fsftid
+from gramps.gen.fs import utilities as fs_utilities
+from gramps.gui.fs.utilities.index import build_fs_index
+
+from gramps.gen.fs.utilities import get_fsftid
 from .names import add_names
 from .events import add_event
 from .notes import add_note
@@ -308,7 +310,7 @@ class FSToGrampsImporter:
 
         # build FS-Gramps index if needed
         if not fs_utilities.FS_INDEX_PEOPLE:
-            fs_utilities.build_fs_index(caller, progress, 11)
+            build_fs_index(caller, progress, 11)
 
         print("download")
         if self.fs_TreeImp:

@@ -46,7 +46,7 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.db import DbTxn
 from gramps.gen.lib import Person, Tag
 
-import gramps.gui.fs.utilities as fs_utilities
+from gramps.gen.fs import utilities as fs_utilities
 
 _ = glocale.translation.gettext
 

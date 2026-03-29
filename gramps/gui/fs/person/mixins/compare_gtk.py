@@ -29,11 +29,11 @@ from gramps.gui.dialog import WarningDialog
 from gramps.gui.listmodel import ListModel, NOSORT, COLOR, TOGGLE
 from gramps.gen.lib import Person
 
-import gramps.gui.fs.utilities as fs_utilities
+from gramps.gen.fs import utilities as fs_utilities
 import gramps.gui.fs.compare as fs_compare
 import gramps.gui.fs.import_ as fs_import
 from gramps.gui.fs import tags as fs_tags
-from gramps.gui.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.import_ import deserializer as deserialize
 
 _ = glocale.translation.gettext
 

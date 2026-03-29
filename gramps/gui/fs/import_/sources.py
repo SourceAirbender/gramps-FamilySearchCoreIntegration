@@ -42,9 +42,9 @@ from gramps.gen.lib import (
 )
 
 from . import _
-from . import deserializer as deserialize
+from gramps.gen.fs.import_ import deserializer as deserialize
 
-import gramps.gui.fs.utilities as fs_utilities
+from gramps.gen.fs import utilities as fs_utilities
 from gramps.gui.fs import tree
 
 LOG = logging.getLogger(__name__)
@@ -731,7 +731,7 @@ class IntermediateSource:
                 citation.set_confidence_level(Citation.CONF_VERY_LOW)
 
         if self.date:
-            from gramps.gui.fs.utilities import fs_date_to_gramps_date
+            from gramps.gen.fs.utilities import fs_date_to_gramps_date
 
             citation.date = fs_date_to_gramps_date(self.date)
 

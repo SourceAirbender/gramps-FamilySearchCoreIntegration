@@ -31,7 +31,7 @@ from gramps.gen.lib import EventType, Person
 from gramps.gui.fs import datab_familysearch
 from gramps.gui.fs import tree
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
-import gramps.gui.fs.utilities as fs_utilities
+from gramps.gen.fs import utilities as fs_utilities
 
 from .comparators import (
     compare_fact,

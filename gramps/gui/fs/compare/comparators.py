@@ -23,8 +23,8 @@ import logging
 from urllib.parse import unquote
 from typing import List, Optional, Tuple
 
-from gramps.gui.fs.import_ import deserializer as deserialize
-import gramps.gui.fs.utilities as fs_utilities
+from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs import utilities as fs_utilities
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
 from gramps.gui.fs.constants import GEDCOMX_TO_GRAMPS_FACTS
 

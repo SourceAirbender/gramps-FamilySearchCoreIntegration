@@ -40,8 +40,8 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gui.dialog import OkDialog, WarningDialog
 
 import gramps.gui.fs.import_ as fs_import
-import gramps.gui.fs.utilities as fs_utilities
-from gramps.gui.fs.import_ import deserializer as deserialize
+from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs.import_ import deserializer as deserialize
 from gramps.gui.fs import ui as fs_ui
 
 _has_img_picker = False

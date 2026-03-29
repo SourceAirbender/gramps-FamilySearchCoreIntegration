@@ -49,8 +49,8 @@ from gramps.gui.dialog import WarningDialog
 from gramps.gui.listmodel import COLOR, NOSORT, TOGGLE, ListModel
 
 from . import compare as fs_compare
-from . import utilities as fs_utilities
-from .import_ import deserializer as deserialize
+from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs.import_ import deserializer as deserialize
 
 _ = glocale.translation.gettext
 
