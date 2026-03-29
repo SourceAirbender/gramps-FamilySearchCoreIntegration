@@ -29,7 +29,12 @@ import time
 from gramps.gen.fs.import_ import deserializer as deserialize
 from gramps.gen.fs.import_.deserializer import deserialize_json, to_string, DateFormal
 from gramps.gen.fs.import_.deserializer import all_annotations, init_class
-from gramps.gen.fs.import_.deserializer import deserialize_json, serialize_json, to_string, parse
+from gramps.gen.fs.import_.deserializer import (
+    deserialize_json,
+    serialize_json,
+    to_string,
+    parse,
+)
 
 from .constants import MAX_PERSONS
 

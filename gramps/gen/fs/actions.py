@@ -115,9 +115,7 @@ def _platform_json(session, endpoint: str) -> dict:
                 return resp.json() or {}
         except TypeError:
             try:
-                resp = fn(
-                    endpoint, headers={"Accept": "application/x-gedcomx-v1+json"}
-                )
+                resp = fn(endpoint, headers={"Accept": "application/x-gedcomx-v1+json"})
                 if resp and hasattr(resp, "json"):
                     return resp.json() or {}
             except Exception:
@@ -347,7 +345,7 @@ def _resolve_redirected_fsid(session, fsid: str) -> str:
 
 
 def _ensure_status_schema(db) -> None:
-    # status is stored on Person now, not in a DB table. 
+    # status is stored on Person now, not in a DB table.
     return
 
 

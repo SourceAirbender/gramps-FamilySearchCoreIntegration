@@ -424,9 +424,7 @@ def _collect_note_push_items(
             continue
 
         fs_subject = getattr(fs_match, "subject", "") or ""
-        fs_text = fs_sync_core._normalize_note_text(
-            getattr(fs_match, "text", "") or ""
-        )
+        fs_text = fs_sync_core._normalize_note_text(getattr(fs_match, "text", "") or "")
         fs_id = (getattr(fs_match, "id", "") or "").strip()
 
         if (
@@ -468,8 +466,10 @@ def _collect_source_push_items(
 
     attached_person_sdids: Optional[Set[str]] = None
     if session is not None and person_fsid:
-        attached_person_sdids = fs_sync_core._load_attached_person_source_description_ids(
-            session, person_fsid
+        attached_person_sdids = (
+            fs_sync_core._load_attached_person_source_description_ids(
+                session, person_fsid
+            )
         )
 
     citation_handles: Set[str] = set()
@@ -518,8 +518,8 @@ def _collect_source_push_items(
 
         if raw_sd_id:
             if session is not None:
-                resolved_sd_id, sd_state = fs_sync_core._resolve_active_source_description(
-                    session, raw_sd_id
+                resolved_sd_id, sd_state = (
+                    fs_sync_core._resolve_active_source_description(session, raw_sd_id)
                 )
             else:
                 sd_state = "unknown"
@@ -923,7 +923,11 @@ def sync_to_familysearch(
                 payload,
                 headers=person_headers,
             )
-            if resp is None or fs_sync_core._response_status(resp) not in (200, 201, 204):
+            if resp is None or fs_sync_core._response_status(resp) not in (
+                200,
+                201,
+                204,
+            ):
                 message = fs_sync_core._err_text(resp) if resp is not None else ""
                 WarningDialog(
                     _("FamilySearch update failed (names/facts).")
@@ -942,7 +946,11 @@ def sync_to_familysearch(
                 resp = fs_sync_core._session_post_json(
                     session, f"/platform/tree/persons/{fsid}/notes", notes_payload
                 )
-                if resp is None or fs_sync_core._response_status(resp) not in (200, 201, 204):
+                if resp is None or fs_sync_core._response_status(resp) not in (
+                    200,
+                    201,
+                    204,
+                ):
                     message = fs_sync_core._err_text(resp) if resp is not None else ""
                     WarningDialog(
                         _("FamilySearch update failed (notes).")
@@ -1031,7 +1039,11 @@ def sync_to_familysearch(
                     payload,
                     headers=source_headers,
                 )
-                if resp is None or fs_sync_core._response_status(resp) not in (200, 201, 204):
+                if resp is None or fs_sync_core._response_status(resp) not in (
+                    200,
+                    201,
+                    204,
+                ):
                     message = fs_sync_core._err_text(resp) if resp is not None else ""
                     WarningDialog(
                         _("FamilySearch update failed (sources).")
@@ -1364,7 +1376,9 @@ def export_basic_people_to_familysearch(
             if not raw_fsid:
                 return
 
-            resolved_fsid, state = fs_sync_core._resolve_active_person(session, raw_fsid)
+            resolved_fsid, state = fs_sync_core._resolve_active_person(
+                session, raw_fsid
+            )
             if state in ("ok", "merged") and resolved_fsid:
                 handle_to_fsid[handle] = resolved_fsid
                 if state == "merged" and resolved_fsid != raw_fsid:
