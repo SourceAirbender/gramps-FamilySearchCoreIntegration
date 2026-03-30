@@ -442,7 +442,7 @@ class CLIDbManager:
 
     def remove_database(self, dbname, user=None):
         """
-        Deletes a database folder given a pattenr that matches
+        Deletes a database folder given a pattern that matches
         its proper name.
         """
         dbdir = os.path.expanduser(config.get("database.path"))
