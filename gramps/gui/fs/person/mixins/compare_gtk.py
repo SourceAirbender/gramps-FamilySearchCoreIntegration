@@ -30,7 +30,7 @@ from gramps.gui.listmodel import ListModel, NOSORT, COLOR, TOGGLE
 from gramps.gen.lib import Person
 
 from gramps.gen.fs import utilities as fs_utilities
-import gramps.gui.fs.compare as fs_compare
+from gramps.gen.fs.compare import compare_fs_to_gramps
 import gramps.gen.fs.import_ as fs_import
 from gramps.gui.fs import tags as fs_tags
 from gramps.gen.fs.import_ import deserializer as deserialize
@@ -697,7 +697,7 @@ class CompareGtkMixin:
     def _fill_overview(self, model: ListModel, gr: Person, fsid: str):
         fs_person = deserialize.Person._index.get(fsid) or deserialize.Person()
         try:
-            fs_compare.compare_fs_to_gramps(
+            compare_fs_to_gramps(
                 fs_person, gr, self.dbstate.db, model=model, dupdoc=True
             )
         except Exception as e:

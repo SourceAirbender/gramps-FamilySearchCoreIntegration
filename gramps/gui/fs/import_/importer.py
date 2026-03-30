@@ -34,7 +34,7 @@ from gramps.gen.fs import utilities as fs_utilities
 
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
 from gramps.gui.fs.utilities.index import build_fs_index
-import gramps.gui.fs.compare as fs_compare
+from gramps.gen.fs.compare import compare_fs_to_gramps
 
 
 class FSToGrampsImporter(CoreFSToGrampsImporter):
@@ -245,9 +245,7 @@ class FSToGrampsImporter(CoreFSToGrampsImporter):
                     continue
                 gr_person = caller.dbstate.db.get_person_from_handle(gr_handle)
                 if gr_person:
-                    fs_compare.compare_fs_to_gramps(
-                        fs_person, gr_person, caller.dbstate.db, None
-                    )
+                    compare_fs_to_gramps(fs_person, gr_person, caller.dbstate.db, None)
         except Exception:
             pass
 

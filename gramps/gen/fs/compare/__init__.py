@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2024-2025  Gabriel Rios
+# Copyright (C) 2024-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,11 +19,27 @@
 
 from __future__ import annotations
 
-from .options import CompareOptions
-from .window import FSCompareWindow, CompareWindow
+from .formatters import person_dates_str, fs_person_dates_str
+from .comparators import (
+    compare_gender,
+    compare_fact,
+    compare_names,
+    compare_parents,
+    compare_spouse_notes,
+    compare_spouses,
+    compare_other_facts,
+)
+from .aggregate import compare_fs_to_gramps
 
 __all__ = [
-    "CompareOptions",
-    "FSCompareWindow",
-    "CompareWindow",
+    "person_dates_str",
+    "fs_person_dates_str",
+    "compare_gender",
+    "compare_fact",
+    "compare_names",
+    "compare_parents",
+    "compare_spouse_notes",
+    "compare_spouses",
+    "compare_other_facts",
+    "compare_fs_to_gramps",
 ]

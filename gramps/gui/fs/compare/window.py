@@ -32,7 +32,8 @@ from gramps.gen.db import DbTxn
 
 from gramps.gen.fs import tree
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
-from gramps.gui.fs import datab_familysearch
+from gramps.gen.fs import datab_familysearch
+from gramps.gen.fs.compare import compare_fs_to_gramps
 from gramps.gen.fs import utilities as fs_utilities
 
 logger = logging.getLogger(__name__)
@@ -217,7 +218,7 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
         return _("FamilySearch Compare")
 
     def initial_frame(self):
-        return _trans.gettext("Options")
+        return _("Options")
 
     def run(self):
         logger.info("FSCompareWindow.run: starting")
@@ -229,7 +230,7 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
 
         progress = ProgressMeter(
             _("FamilySearch: Compare"),
-            _trans.gettext("Starting"),
+            _("Starting"),
             can_cancel=True,
             parent=self.uistate.window,
         )
@@ -332,8 +333,6 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
             logger.info("Processing %s %s", person.gramps_id, fsid_local)
             if fsid_local in FSG_Sync.FSG_Sync.fs_Tree._persons:
                 fs_person = FSG_Sync.FSG_Sync.fs_Tree._persons.get(fsid_local)
-                from .aggregate import compare_fs_to_gramps
-
                 compare_fs_to_gramps(fs_person, person, self.db, dupdoc=True)
             else:
                 logger.warning("FS ID %s not found in cache", fsid_local)

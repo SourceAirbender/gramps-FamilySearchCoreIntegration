@@ -25,7 +25,7 @@ from typing import List, Optional, Tuple
 
 from gramps.gen.fs.import_ import deserializer as deserialize
 from gramps.gen.fs import utilities as fs_utilities
-import gramps.gui.fs.person.fsg_sync as FSG_Sync
+from gramps.gen.fs import tree as fs_tree_mod
 from gramps.gen.fs.constants import GEDCOMX_TO_GRAMPS_FACTS
 
 from gramps.gen.lib import EventRoleType, EventType, Person
@@ -38,6 +38,41 @@ from .formatters import person_dates_str, fs_person_dates_str
 logger = logging.getLogger(__name__)
 
 _ = glocale.translation.gettext
+
+
+def _ensure_fs_people(person_ids: set[str]) -> None:
+    wanted = {pid for pid in (person_ids or set()) if pid}
+    if not wanted:
+        return
+
+    missing = {pid for pid in wanted if pid not in deserialize.Person._index}
+    if not missing:
+        return
+
+    if getattr(fs_tree_mod, "_fs_session", None) is None:
+        return
+
+    try:
+        helper_tree = fs_tree_mod.Tree()
+        helper_tree._getsources = False
+        helper_tree.add_persons(missing)
+    except Exception:
+        logger.debug(
+            "Failed to load related FS people: %s",
+            sorted(missing),
+            exc_info=True,
+        )
+
+
+def _fs_person_opt(fsid: str):
+    if not fsid:
+        return None
+    _ensure_fs_people({fsid})
+    return deserialize.Person._index.get(fsid)
+
+
+def _fs_person_or_blank(fsid: str):
+    return _fs_person_opt(fsid) or deserialize.Person()
 
 
 def compare_gender(gr_person: Person, fs_person) -> Tuple:
@@ -243,10 +278,7 @@ def compare_parents(db, gr_person: Person, fs_person) -> List[Tuple]:
             parent_ids.add(couple.person2.resourceId)
         parent_ids.remove(fs_person.id)
 
-        # fs_Tree can be None (per typing); guard it
-        fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-        if fs_tree is not None:
-            fs_tree.add_persons(parent_ids)
+        _ensure_fs_people(parent_ids)
 
         fs_father_id = ""
         fs_father = None
@@ -382,11 +414,7 @@ def compare_spouse_notes(db, gr_person: Person, fs_person) -> List[Tuple]:
             if spouse_handle is None and fs_spouse_id == "":
                 color = "green"
 
-            fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-            if fs_tree is not None:
-                fs_spouse = fs_tree._persons.get(fs_spouse_id) or deserialize.Person()
-            else:
-                fs_spouse = deserialize.Person()
+            fs_spouse = _fs_person_or_blank(fs_spouse_id)
 
             fs_name = fs_spouse.preferred_name()
             res.append(
@@ -427,10 +455,7 @@ def compare_spouse_notes(db, gr_person: Person, fs_person) -> List[Tuple]:
         else:
             fs_spouse_id = ""
 
-        fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-        fs_spouse_opt = None
-        if fs_tree is not None:
-            fs_spouse_opt = fs_tree._persons.get(fs_spouse_id)
+        fs_spouse_opt = _fs_person_opt(fs_spouse_id)
 
         # mypy-proof: never call preferred_name() on an Optional
         fs_spouse_for_name = (
@@ -514,11 +539,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
             if spouse_handle is None and fs_spouse_id == "":
                 color = "green"
 
-            fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-            if fs_tree is not None:
-                fs_spouse = fs_tree._persons.get(fs_spouse_id) or deserialize.Person()
-            else:
-                fs_spouse = deserialize.Person()
+            fs_spouse = _fs_person_or_blank(fs_spouse_id)
 
             fs_name = fs_spouse.preferred_name()
             res.append(
@@ -726,11 +747,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 if fs_child_id != "" and fs_child_id == child_fsid:
                     color = "green"
 
-                fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-                if fs_tree is not None:
-                    fs_child = fs_tree._persons.get(fs_child_id) or deserialize.Person()
-                else:
-                    fs_child = deserialize.Person()
+                fs_child = _fs_person_or_blank(fs_child_id)
 
                 fs_name = fs_child.preferred_name()
                 res.append(
@@ -780,10 +797,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                     fs_child_id = triple.child.resourceId
                     color = "yellow3"
 
-                    fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-                    fs_child_opt = None
-                    if fs_tree is not None:
-                        fs_child_opt = fs_tree._persons.get(fs_child_id)
+                    fs_child_opt = _fs_person_opt(fs_child_id)
 
                     # mypy-proof
                     fs_child_for_name = (
@@ -830,10 +844,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
         else:
             fs_spouse_id = ""
 
-        fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-        fs_spouse_opt = None
-        if fs_tree is not None:
-            fs_spouse_opt = fs_tree._persons.get(fs_spouse_id)
+        fs_spouse_opt = _fs_person_opt(fs_spouse_id)
 
         # mypy-proof
         fs_spouse_for_name = (
@@ -882,10 +893,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
             ):
                 fs_child_id = triple.child.resourceId
 
-                fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-                fs_child_opt = None
-                if fs_tree is not None:
-                    fs_child_opt = fs_tree._persons.get(fs_child_id)
+                fs_child_opt = _fs_person_opt(fs_child_id)
 
                 # mypy-proof
                 fs_child_for_name = (
@@ -922,10 +930,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
     for triple in fs_children:
         fs_child_id = triple.child.resourceId
 
-        fs_tree = FSG_Sync.FSG_Sync.fs_Tree
-        fs_child_opt = None
-        if fs_tree is not None:
-            fs_child_opt = fs_tree._persons.get(fs_child_id)
+        fs_child_opt = _fs_person_opt(fs_child_id)
 
         # mypy-proof
         fs_child_for_name = (

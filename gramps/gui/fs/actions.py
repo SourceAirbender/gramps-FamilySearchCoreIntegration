@@ -1055,7 +1055,7 @@ def sync_this_person(
 
     fs_compare = None
     try:
-        import gramps.gui.fs.compare as fs_compare  # type: ignore
+        from gramps.gen.fs.compare import compare_fs_to_gramps  # type: ignore
     except Exception as e:
         _dbg(f"sync_this_person: compare import skipped: {e}")
 
@@ -1114,7 +1114,7 @@ def sync_this_person(
 
             if fs_compare is not None:
                 try:
-                    fs_compare.compare_fs_to_gramps(fs_person, gr_person, db, None)
+                    compare_fs_to_gramps(fs_person, gr_person, db, None)
                 except Exception:
                     pass
 

@@ -836,7 +836,7 @@ def sync_to_familysearch(
             return
 
         compare_model = _make_overview_model()
-        fs_compare.compare_fs_to_gramps(
+        compare_fs_to_gramps(
             fs_person,
             person,
             dbstate.db,

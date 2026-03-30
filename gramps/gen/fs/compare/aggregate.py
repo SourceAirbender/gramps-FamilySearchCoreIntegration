@@ -28,9 +28,8 @@ from typing import Any, Optional, Tuple
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.lib import EventType, Person
 
-from gramps.gui.fs import datab_familysearch
+from gramps.gen.fs import datab_familysearch
 from gramps.gen.fs import tree
-import gramps.gui.fs.person.fsg_sync as FSG_Sync
 from gramps.gen.fs import utilities as fs_utilities
 
 from .comparators import (
@@ -156,9 +155,7 @@ def compare_fs_to_gramps(
     # mypy: session can be None
     fs_session = getattr(tree, "_fs_session", None)
 
-    connected = (
-        bool(getattr(FSG_Sync.FSG_Sync, "fs_Tree", None)) and fs_session is not None
-    )
+    connected = fs_session is not None
     hdr_gr = _("Gramps")
     hdr_fs = _("FamilySearch") if connected else _("Not connected to FamilySearch")
 
