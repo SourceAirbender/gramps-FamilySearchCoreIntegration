@@ -46,10 +46,10 @@ from gramps.gen.lib import Attribute, AttributeType, Person
 from gramps.gui.dialog import WarningDialog
 from gramps.gui.listmodel import COLOR, NOSORT, TOGGLE, ListModel
 
-from . import compare as fs_compare
 from gramps.gen.fs import sync_directions as fs_sync_core
 from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.compare import compare_fs_to_gramps
 
 _ = glocale.translation.gettext
 
