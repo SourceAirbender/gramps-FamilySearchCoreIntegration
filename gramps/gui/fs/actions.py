@@ -853,7 +853,7 @@ def clear_cache(dbstate, uistate, track, person, session, parent, editor=None) -
         _dbg(f"clear_cache: fs_Tree reset failed: {err}")
 
     try:
-        from .person.mixins import cache as cache_mod
+        import gramps.gen.fs.person.mixins.cache as cache_mod
 
         cache_dir = os.path.dirname(cache_mod.__file__)
         disk_path = cache_dir

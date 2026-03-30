@@ -106,8 +106,8 @@ class CompareWindow:
         person_handle = getattr(self.person, "handle", None) or self.person
 
         from gramps.gui.fs.person.mixins.compare_gtk import CompareGtkMixin
-        from gramps.gui.fs.person.mixins.cache import CacheMixin, _FsCache
-        from gramps.gui.fs.person.mixins.helpers import HelpersMixin
+        from gramps.gen.fs.person.mixins.cache import CacheMixin, _FsCache
+        from gramps.gen.fs.person.mixins.helpers import HelpersMixin
         from gramps.gui.fs.person.mixins.sources_dialog import SourcesDialogMixin
         from gramps.gui.fs.person.mixins.source_import import SourceImportMixin
 
@@ -196,7 +196,7 @@ class CompareWindow:
         # Ensure cache exists (CacheMixin uses self.__class__._cache)
         if not getattr(_Shim, "_cache", None):
             import os
-            import gramps.gui.fs.person.mixins.cache as cache_mod
+            import gramps.gen.fs.person.mixins.cache as cache_mod
 
             base_dir = os.path.dirname(cache_mod.__file__)
             _Shim._cache = _FsCache(base_dir)

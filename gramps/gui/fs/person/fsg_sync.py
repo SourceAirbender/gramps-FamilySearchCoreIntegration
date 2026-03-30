@@ -28,8 +28,8 @@ from .mixins.helpers import AuthMixin
 from .mixins.compare_gtk import CompareGtkMixin
 from .mixins.sources_dialog import SourcesDialogMixin
 from .mixins.source_import import SourceImportMixin
-from .mixins.cache import CacheMixin
-from .mixins.helpers import HelpersMixin
+from gramps.gen.fs.person.mixins.cache import CacheMixin
+from gramps.gen.fs.person.mixins.helpers import HelpersMixin
 
 
 class FSG_Sync(
