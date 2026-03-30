@@ -94,6 +94,9 @@ class AuthMixin:
             WarningDialog(_("Login failed:\n{err}").format(err=str(e)))
 
         try:
-            self._refresh_status()
+            refresh_status = getattr(self, "_refresh_status", None)
+            if callable(refresh_status):
+                refresh_status()
         except Exception:
             pass
+            

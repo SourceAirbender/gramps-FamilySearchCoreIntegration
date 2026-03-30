@@ -305,6 +305,14 @@ class Session(requests.Session):
     _shared: ClassVar["Session | None"] = None
     _last_instance: ClassVar["Session | None"] = None
 
+    status_indicator: Any
+    _status_state: str
+    _status_detail: str
+    _status_http: int | None
+    _tools_window_shown: bool
+    _auth_win: Any
+    listener: Listener | None
+
     def __init__(self, server: int = 0, app_key: str = "", redirect: str = ""):
         super().__init__()
 
@@ -336,11 +344,11 @@ class Session(requests.Session):
         )
 
         self.status_indicator = NullStatusIndicator()
-        self._status_state = "DISCONNECTED"
-        self._status_detail = "No token yet"
-        self._status_http = None
-        self._tools_window_shown = False
-        self._auth_win = None
+        self._status_state: str = "DISCONNECTED"
+        self._status_detail: str = "No token yet"
+        self._status_http: int | None = None
+        self._tools_window_shown: bool = False
+        self._auth_win: Any = None
 
         env = (
             os.environ.get("GRAMPS_FS_ENV", "").strip().lower()

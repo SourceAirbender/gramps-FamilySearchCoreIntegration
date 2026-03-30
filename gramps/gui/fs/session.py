@@ -198,6 +198,11 @@ class FSStatusIndicator:
 
 
 class Session(fs_session_core.Session):
+    status_indicator: Any
+    _status_state: str
+    _status_detail: str
+    _status_http: int | None
+
     def __init__(self, server: int = 0, app_key: str = "", redirect: str = ""):
         super().__init__(server=server, app_key=app_key, redirect=redirect)
 
@@ -373,7 +378,7 @@ class Session(fs_session_core.Session):
         outer.pack_start(sc, True, True, 0)
         win_.add(outer)
 
-        handler_ids = {"decide": None, "load": None}
+        handler_ids: dict[str, int | None] = {"decide": None, "load": None}
 
         def _shutdown_now():
             try:

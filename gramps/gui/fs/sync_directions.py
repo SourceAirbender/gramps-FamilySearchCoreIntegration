@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import os
 import re
-from types import ModuleType
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from gi.repository import Gtk
@@ -50,6 +49,7 @@ from gramps.gen.fs import sync_directions as fs_sync_core
 from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs.import_ import deserializer as deserialize
 from gramps.gen.fs.compare import compare_fs_to_gramps
+import gramps.gen.fs.import_ as fs_import_mod
 
 _ = glocale.translation.gettext
 
@@ -458,11 +458,7 @@ def _collect_source_push_items(
 ) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
 
-    try:
-
-        fs_import = cast(ModuleType, fs_import_mod)
-    except Exception:
-        fs_import = None
+    fs_import = fs_import_mod
 
     attached_person_sdids: Optional[Set[str]] = None
     if session is not None and person_fsid:
