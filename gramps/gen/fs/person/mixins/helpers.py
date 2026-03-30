@@ -53,6 +53,7 @@ class HelpersMixin:
     dbstate: Any
 
     if TYPE_CHECKING:
+
         def _ensure_sources_cached(self, fsid: str) -> None: ...
 
         def _ensure_person_cached(

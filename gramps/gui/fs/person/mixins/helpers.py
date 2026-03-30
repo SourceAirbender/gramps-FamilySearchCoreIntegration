@@ -99,4 +99,3 @@ class AuthMixin:
                 refresh_status()
         except Exception:
             pass
-            
