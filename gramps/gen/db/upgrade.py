@@ -62,6 +62,35 @@ _ = glocale.translation.gettext
 LOG = logging.getLogger(".upgrade")
 
 
+def _default_familysearch_sync_json_22():
+    """
+    Return the raw v22 FamilySearch sync JSON structure for Person records.
+    """
+    return {
+        "_class": "FamilySearchSync",
+        "fsid": None,
+        "is_root": False,
+        "status_ts": None,
+        "confirmed_ts": None,
+        "gramps_modified_ts": None,
+        "fs_modified_ts": None,
+        "essential_conflict": False,
+        "conflict": False,
+    }
+
+
+def _upgrade_person_json_22(person_data):
+    """
+    Upgrade raw Person JSON data from version 21 to 22 in place.
+    """
+    if person_data.get("familysearch_sync") is not None:
+        return False
+
+    person_data["familysearch_sync"] = _default_familysearch_sync_json_22()
+
+    return True
+
+
 def gramps_upgrade_22(self):
     """
     Upgrade database from version 21 to 22.
@@ -77,12 +106,9 @@ def gramps_upgrade_22(self):
     self._txn_begin()
     try:
         for handle in self.get_person_handles():
-            person = self.get_person_from_handle(handle)
-
-            # Loading through the Person model normalizes old v21 records
-            # by creating a default empty FamilySearchSync object when absent.
-            json_data = self.serializer.object_to_data(person)
-            self._commit_raw(json_data, PERSON_KEY)
+            json_data = self.get_raw_person_data(handle)
+            if _upgrade_person_json_22(json_data):
+                self._commit_raw(json_data, PERSON_KEY)
             self.update()
 
         self._set_metadata("version", 22, use_txn=False)
