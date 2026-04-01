@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Callable, Optional
+from typing import Any
 
 import gi
 
@@ -29,6 +29,8 @@ from gi.repository import Gtk, Gdk  # noqa: F401 (Gdk used in some UI flows)
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.db import DbTxn
+from gramps.gen.fs import tags as fs_tags
+from gramps.gen.fs import tree as fs_tree
 from gramps.gen.lib import Family, Person, EventRef, EventRoleType, EventType
 from gramps.gen.fs.actions import (
     _bind_global_session,
@@ -48,34 +50,34 @@ from gramps.gen.fs.actions import (
     _set_fs_id,
     _strip_unknowns_inplace,
 )
+from gramps.gen.fs.compare import compare_fs_to_gramps
+from gramps.gen.fs.import_.events import add_event
 from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.import_.notes import add_note
+import gramps.gen.fs.person.mixins.cache as cache_mod
+from gramps.gui.dialog import ErrorDialog, OkDialog
 
+from . import sync_directions
 from . import ui as fs_ui
+from .compare.window import CompareWindow
+from .import_.importer import FSToGrampsImporter
+from .person import fsg_sync as FSG_Sync
 
 _ = glocale.translation.gettext
 
 
 def _info(parent: Any, title: str, body: str) -> None:
-    OkDialogFn: Optional[Callable[..., Any]]
     try:
-        from gramps.gui.dialog import OkDialog as _OkDialog  # type: ignore
-
-        OkDialogFn = _OkDialog
-    except Exception:
-        OkDialogFn = None
-
-    if OkDialogFn is not None:
+        OkDialog(title, body, parent=parent)
+        return
+    except TypeError:
         try:
-            OkDialogFn(title, body, parent=parent)
+            OkDialog(title, body, parent)
             return
-        except TypeError:
-            try:
-                OkDialogFn(title, body, parent)
-                return
-            except Exception:
-                pass
         except Exception:
             pass
+    except Exception:
+        pass
 
     try:
         fs_ui.info_dialog(parent, title, body)
@@ -93,26 +95,17 @@ def _info(parent: Any, title: str, body: str) -> None:
 
 
 def _error(parent: Any, title: str, body: str) -> None:
-    ErrorDialogFn: Optional[Callable[..., Any]]
     try:
-        from gramps.gui.dialog import ErrorDialog as _ErrorDialog  # type: ignore
-
-        ErrorDialogFn = _ErrorDialog
-    except Exception:
-        ErrorDialogFn = None
-
-    if ErrorDialogFn is not None:
+        ErrorDialog(title, body, parent=parent)
+        return
+    except TypeError:
         try:
-            ErrorDialogFn(title, body, parent=parent)
+            ErrorDialog(title, body, parent)
             return
-        except TypeError:
-            try:
-                ErrorDialogFn(title, body, parent)
-                return
-            except Exception:
-                pass
         except Exception:
             pass
+    except Exception:
+        pass
 
     try:
         fs_ui.error_dialog(parent, title, body)
@@ -194,8 +187,6 @@ def compare_person(dbstate, uistate, track, person, session, parent, editor=None
         return
 
     _ensure_status_schema(dbstate.db)
-
-    from .compare.window import CompareWindow
 
     try:
         CompareWindow(
@@ -328,8 +319,6 @@ def _pick_fsid_list(parent, title: str, rows: list[tuple[str, str, bool]]) -> li
 
 
 def _import_full_person(dbstate, uistate, fsid: str, verbosity: int = 0) -> None:
-    from gramps.gui.fs.import_.importer import FSToGrampsImporter
-
     _ensure_status_schema(dbstate.db)
 
     class _Caller:
@@ -834,9 +823,6 @@ def clear_cache(dbstate, uistate, track, person, session, parent, editor=None) -
         _dbg(f"clear_cache: gedcomx index clear failed: {err}")
 
     try:
-        from .person import fsg_sync as FSG_Sync
-        from gramps.gen.fs import tree as fs_tree
-
         try:
             fs_tree._fs_session = session
         except Exception:
@@ -853,8 +839,6 @@ def clear_cache(dbstate, uistate, track, person, session, parent, editor=None) -
         _dbg(f"clear_cache: fs_Tree reset failed: {err}")
 
     try:
-        import gramps.gen.fs.person.mixins.cache as cache_mod
-
         cache_dir = os.path.dirname(cache_mod.__file__)
         disk_path = cache_dir
         FsCache = getattr(cache_mod, "_FsCache", None)
@@ -914,8 +898,6 @@ def tags_dialog(dbstate, uistate, track, person, session, parent, editor=None) -
         return
 
     try:
-        from gramps.gen.fs import tags as fs_tags
-
         db = dbstate.db
         total, linked, not_linked, changed = fs_tags.retag_all_link_status(db)
         _info(
@@ -992,8 +974,6 @@ def sync_this_person(
             fsid = fsid2
 
     try:
-        from gramps.gen.fs import tree as fs_tree
-
         tmp = fs_tree.Tree()
         try:
             tmp._getsources = False
@@ -1041,23 +1021,6 @@ def sync_this_person(
             _("Failed to download from FamilySearch: {e}").format(e=e),
         )
         return
-
-    try:
-        from gramps.gen.fs.import_.events import add_event
-        from gramps.gen.fs.import_.notes import add_note
-    except Exception as e:
-        _error(
-            parent,
-            _("FamilySearch"),
-            _("Sync pipeline import helpers missing: {e}").format(e=e),
-        )
-        return
-
-    fs_compare = None
-    try:
-        from gramps.gen.fs.compare import compare_fs_to_gramps  # type: ignore
-    except Exception as e:
-        _dbg(f"sync_this_person: compare import skipped: {e}")
 
     try:
         with DbTxn(_("FamilySearch: Sync this person"), db) as txn:
@@ -1112,11 +1075,10 @@ def sync_this_person(
                     gr_person.add_note(note.handle)
                     existing_notes.add(note.handle)
 
-            if fs_compare is not None:
-                try:
-                    compare_fs_to_gramps(fs_person, gr_person, db, None)
-                except Exception:
-                    pass
+            try:
+                compare_fs_to_gramps(fs_person, gr_person, db, None)
+            except Exception:
+                pass
 
             db.commit_person(gr_person, txn)
 
@@ -1167,16 +1129,6 @@ def export_basic_to_familysearch(
         return
 
     try:
-        from . import sync_directions
-    except Exception as err:
-        _error(
-            parent,
-            _("FamilySearch"),
-            _("Export module missing: {e}").format(e=err),
-        )
-        return
-
-    try:
         sync_directions.export_basic_people_to_familysearch(
             dbstate, uistate, track, person, session, parent, editor=editor
         )
@@ -1204,16 +1156,6 @@ def sync_to_familysearch(
 
     me_handle = _require_ready_person(dbstate, parent, person)
     if not me_handle:
-        return
-
-    try:
-        from . import sync_directions
-    except Exception as err:
-        _error(
-            parent,
-            _("FamilySearch"),
-            _("Sync-to module missing: {e}").format(e=err),
-        )
         return
 
     try:
