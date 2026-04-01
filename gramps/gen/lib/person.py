@@ -289,56 +289,30 @@ class Person(
                      Person object
         :type data: tuple
         """
-        if len(data) == 21:
-            (
-                self.handle,  #  0
-                self.gramps_id,  #  1
-                self.__gender,  #  2
-                primary_name,  #  3
-                alternate_names,  #  4
-                self.death_ref_index,  #  5
-                self.birth_ref_index,  #  6
-                event_ref_list,  #  7
-                self.family_list,  #  8
-                self.parent_family_list,  #  9
-                media_list,  # 10
-                address_list,  # 11
-                attribute_list,  # 12
-                urls,  # 13
-                lds_ord_list,  # 14
-                citation_list,  # 15
-                note_list,  # 16
-                self.change,  # 17
-                tag_list,  # 18
-                self.private,  # 19
-                person_ref_list,  # 20
-            ) = data
-            familysearch_sync = None
-        else:
-            (
-                self.handle,  #  0
-                self.gramps_id,  #  1
-                self.__gender,  #  2
-                primary_name,  #  3
-                alternate_names,  #  4
-                self.death_ref_index,  #  5
-                self.birth_ref_index,  #  6
-                event_ref_list,  #  7
-                self.family_list,  #  8
-                self.parent_family_list,  #  9
-                media_list,  # 10
-                address_list,  # 11
-                attribute_list,  # 12
-                urls,  # 13
-                lds_ord_list,  # 14
-                citation_list,  # 15
-                note_list,  # 16
-                self.change,  # 17
-                tag_list,  # 18
-                self.private,  # 19
-                person_ref_list,  # 20
-                familysearch_sync,  # 21
-            ) = data
+        (
+            self.handle,  #  0
+            self.gramps_id,  #  1
+            self.__gender,  #  2
+            primary_name,  #  3
+            alternate_names,  #  4
+            self.death_ref_index,  #  5
+            self.birth_ref_index,  #  6
+            event_ref_list,  #  7
+            self.family_list,  #  8
+            self.parent_family_list,  #  9
+            media_list,  # 10
+            address_list,  # 11
+            attribute_list,  # 12
+            urls,  # 13
+            lds_ord_list,  # 14
+            citation_list,  # 15
+            note_list,  # 16
+            self.change,  # 17
+            tag_list,  # 18
+            self.private,  # 19
+            person_ref_list,  # 20
+            familysearch_sync,  # 21
+        ) = data
 
         self.primary_name = Name()
         self.primary_name.unserialize(primary_name)
@@ -538,11 +512,7 @@ class Person(
         :returns: Returns the list of all textual attributes of the object.
         :rtype: list
         """
-        check_list = [self.gramps_id]
-        sync = self.get_familysearch_sync()
-        if sync:
-            check_list.extend(sync.get_text_data_list())
-        return [_f for _f in check_list if _f]
+        return [self.gramps_id]
 
     def get_text_data_child_list(self):
         """

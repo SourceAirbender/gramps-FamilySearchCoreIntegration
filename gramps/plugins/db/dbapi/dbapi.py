@@ -31,6 +31,7 @@ Database API interface
 import logging
 import json
 import time
+import copy
 
 # ------------------------------------------------------------------------
 #
@@ -41,6 +42,7 @@ from gramps.gen.db.dbconst import (
     DBLOGNAME,
     KEY_TO_CLASS_MAP,
     KEY_TO_NAME_MAP,
+    PERSON_KEY,
     REFERENCE_KEY,
     TXNADD,
     TXNDEL,
@@ -64,11 +66,117 @@ from gramps.gen.updatecallback import UpdateCallback
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.db import DbTxn
+from gramps.gen.errors import HandleError
 
 LOG = logging.getLogger(".dbapi")
 _LOG = logging.getLogger(DBLOGNAME)
 
 _ = glocale.translation.gettext
+
+
+def _as_int(value):
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _as_bool(value):
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
+
+def _default_familysearch_sync_data():
+    return {
+        "_class": "FamilySearchSync",
+        "fsid": None,
+        "is_root": False,
+        "status_ts": None,
+        "confirmed_ts": None,
+        "gramps_modified_ts": None,
+        "fs_modified_ts": None,
+        "essential_conflict": False,
+        "conflict": False,
+    }
+
+
+def _familysearch_status_from_raw_person_data(person_data):
+    if not isinstance(person_data, dict):
+        return {}
+
+    sync_data = person_data.get("familysearch_sync")
+    if not isinstance(sync_data, dict):
+        return {}
+
+    data = {}
+
+    fsid = sync_data.get("fsid")
+    if fsid:
+        fsid = str(fsid).strip()
+        if fsid:
+            data["fsid"] = fsid
+
+    if _as_bool(sync_data.get("is_root")):
+        data["is_root"] = True
+
+    for key in (
+        "status_ts",
+        "confirmed_ts",
+        "gramps_modified_ts",
+        "fs_modified_ts",
+    ):
+        value = _as_int(sync_data.get(key))
+        if value is not None and value > 0:
+            data[key] = value
+
+    if _as_bool(sync_data.get("essential_conflict")):
+        data["essential_conflict"] = True
+
+    if _as_bool(sync_data.get("conflict")):
+        data["conflict"] = True
+
+    return data
+
+
+def _familysearch_sync_data_from_status(status):
+    data = _default_familysearch_sync_data()
+
+    fsid = status.get("fsid")
+    if fsid:
+        fsid = str(fsid).strip()
+        data["fsid"] = fsid if fsid else None
+
+    data["is_root"] = _as_bool(status.get("is_root"))
+
+    for key in (
+        "status_ts",
+        "confirmed_ts",
+        "gramps_modified_ts",
+        "fs_modified_ts",
+    ):
+        data[key] = _as_int(status.get(key))
+
+    data["essential_conflict"] = _as_bool(status.get("essential_conflict"))
+    data["conflict"] = _as_bool(status.get("conflict"))
+
+    return data
+
+
+def _commit_familysearch_person_raw(self, handle, old_data, new_data, transaction):
+    self._commit_raw(new_data, PERSON_KEY)
+    if not transaction.batch:
+        transaction.add(
+            PERSON_KEY,
+            TXNUPD,
+            handle,
+            old_data,
+            copy.deepcopy(new_data),
+        )
 
 
 # -------------------------------------------------------------------------
@@ -1216,43 +1324,14 @@ class DBAPI(DbGeneric):
         """
         Return FamilySearch sync status for the given Person handle.
         """
-        if not person_handle:
-            return {} if default is None else default
-
         try:
-            person = self.get_person_from_handle(person_handle)
-        except Exception:
+            person_data = self.get_raw_person_data(person_handle)
+        except HandleError:
             return {} if default is None else default
 
-        getter = getattr(person, "get_familysearch_sync", None)
-        if not callable(getter):
+        data = _familysearch_status_from_raw_person_data(person_data)
+        if not data:
             return {} if default is None else default
-
-        sync = getter()
-        if sync is None or sync.is_empty():
-            return {} if default is None else default
-
-        data = {}
-
-        if sync.fsid:
-            fsid = str(sync.fsid).strip()
-            if fsid:
-                data["fsid"] = fsid
-
-        data["is_root"] = bool(sync.is_root)
-
-        for key in (
-            "status_ts",
-            "confirmed_ts",
-            "gramps_modified_ts",
-            "fs_modified_ts",
-        ):
-            value = getattr(sync, key, None)
-            if value is not None:
-                data[key] = value
-
-        data["essential_conflict"] = bool(sync.essential_conflict)
-        data["conflict"] = bool(sync.conflict)
 
         return data
 
@@ -1271,42 +1350,53 @@ class DBAPI(DbGeneric):
             raise TypeError("status must be a dict")
 
         try:
-            person = self.get_person_from_handle(person_handle)
-        except Exception:
+            person_data = self.get_raw_person_data(person_handle)
+        except HandleError:
             return
 
         if not status:
             self.delete_familysearch_person_status(person_handle, transaction)
             return
 
-        sync = person.get_familysearch_sync()
-        sync.from_status_dict(status)
-        person.set_familysearch_sync(sync)
+        if not isinstance(person_data, dict):
+            return
+
+        old_data = copy.deepcopy(person_data)
+        person_data["familysearch_sync"] = _familysearch_sync_data_from_status(status)
 
         if transaction is not None:
-            self.commit_person(person, transaction)
+            _commit_familysearch_person_raw(
+                self, person_handle, old_data, person_data, transaction
+            )
             return
 
         with DbTxn(_("FamilySearch: status update"), self) as txn:
-            self.commit_person(person, txn)
+            _commit_familysearch_person_raw(
+                self, person_handle, old_data, person_data, txn
+            )
 
     def delete_familysearch_person_status(self, person_handle, transaction=None):
         """
         Remove FamilySearch sync status for the given Person handle.
         """
-        if not person_handle:
-            return
-
         try:
-            person = self.get_person_from_handle(person_handle)
-        except Exception:
+            person_data = self.get_raw_person_data(person_handle)
+        except HandleError:
             return
 
-        person.clear_familysearch_sync()
+        if not isinstance(person_data, dict):
+            return
+
+        old_data = copy.deepcopy(person_data)
+        person_data["familysearch_sync"] = _default_familysearch_sync_data()
 
         if transaction is not None:
-            self.commit_person(person, transaction)
+            _commit_familysearch_person_raw(
+                self, person_handle, old_data, person_data, transaction
+            )
             return
 
         with DbTxn(_("FamilySearch: status update"), self) as txn:
-            self.commit_person(person, txn)
+            _commit_familysearch_person_raw(
+                self, person_handle, old_data, person_data, txn
+            )
