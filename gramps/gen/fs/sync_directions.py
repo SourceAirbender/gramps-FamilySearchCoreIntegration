@@ -17,6 +17,12 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 
+"""
+helpers for syncing between Gramps and FamilySearch.
+a lot of this file is fetch/normalize/build for notes, sources, memories,
+and relationship pushes.
+"""
+
 from __future__ import annotations
 
 import mimetypes
@@ -25,9 +31,14 @@ import re
 import urllib.parse
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import requests  # type: ignore
+
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.db import DbTxn
+from gramps.gen.display.place import displayer as place_displayer
 from gramps.gen.lib import Attribute, AttributeType, Family, Person
+from gramps.gen.utils.db import get_birth_or_fallback
+from gramps.gen.utils.db import get_death_or_fallback
 
 from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs.import_ import deserializer as deserialize
@@ -36,6 +47,7 @@ _ = glocale.translation.gettext
 
 
 def _response_status(resp: Any) -> int:
+    """return an int status code"""
     try:
         return int(getattr(resp, "status_code", 0) or 0)
     except (TypeError, ValueError):
@@ -43,6 +55,7 @@ def _response_status(resp: Any) -> int:
 
 
 def _response_headers(resp: Any) -> Dict[str, Any]:
+    """return response headers or an empty dict."""
     headers = getattr(resp, "headers", None)
     return headers if headers is not None else {}
 
@@ -57,6 +70,7 @@ def _debug_enabled() -> bool:
 
 
 def _person_handle(obj: Any) -> Optional[str]:
+    """pull a handle off an object if it exposes one."""
     handle = getattr(obj, "handle", None)
     if handle:
         return str(handle)
@@ -118,6 +132,7 @@ def _extract_sdid_from_refish(obj: Any) -> str:
 def _load_attached_person_source_description_ids(
     session: Any, person_fsid: str
 ) -> Optional[Set[str]]:
+    """Load the source description ids already attached to a person."""
     person_fsid = (person_fsid or "").strip()
     if not person_fsid:
         return set()
@@ -145,6 +160,7 @@ def _load_attached_person_source_description_ids(
         return attached
 
     try:
+        # if the raw dict parse missed it, here the GEDCOM X objects will try once.
         gx = deserialize.Gedcomx()
         try:
             gx.deserialize_json(data)
@@ -167,6 +183,7 @@ def _load_attached_person_source_description_ids(
 
 
 def _head_source_description(session: Any, sdid: str) -> Tuple[str, Any]:
+    """head a source description and follow forwarded ids."""
     sdid = (sdid or "").strip()
     if not sdid:
         return sdid, None
@@ -208,6 +225,7 @@ def _head_source_description(session: Any, sdid: str) -> Tuple[str, Any]:
 
 
 def _resolve_active_source_description(session: Any, sdid: str) -> Tuple[str, str]:
+    """Return the usable source description id plus a rough status."""
     original = (sdid or "").strip()
     if not original:
         return "", "missing"
@@ -236,8 +254,10 @@ def _resolve_active_source_description(session: Any, sdid: str) -> Tuple[str, st
 def _session_post_binary(
     session: Any, endpoint: str, data: bytes, headers: Dict[str, str]
 ) -> Any:
+    """post raw bytes to FamilySearch and hand the response back."""
     endpoint = endpoint if endpoint.startswith("/") else ("/" + endpoint)
 
+    # try the session wrappers first.
     post = getattr(session, "post", None)
     if callable(post):
         try:
@@ -262,11 +282,7 @@ def _session_post_binary(
         except Exception:
             pass
 
-    try:
-        import requests  # type: ignore
-    except Exception:
-        return None
-
+    # plain requests
     base = (
         getattr(session, "api_url", "")
         or getattr(session, "API_URL", "")
@@ -290,6 +306,7 @@ def _session_post_binary(
 
 
 def _extract_memory_ids_from_upload_response(resp: Any) -> Tuple[str, str]:
+    """pull memory ids out of upload response headers."""
     mem_id = ""
     mem_ref_id = ""
 
@@ -310,6 +327,7 @@ def _extract_memory_ids_from_upload_response(resp: Any) -> Tuple[str, str]:
 
 
 def _resolve_media_path(db: Any, media_obj: Any) -> Optional[str]:
+    """Figure out the local file path for a Gramps media object."""
     path = ""
 
     for method_name in ("get_path", "get_file_path", "get_filename", "get_file_name"):
@@ -367,6 +385,7 @@ def _resolve_media_path(db: Any, media_obj: Any) -> Optional[str]:
 
 
 def _collect_memory_push_items(dbstate: Any, person: Any) -> List[Dict[str, Any]]:
+    """build the list of media items that can be pushed as memories."""
     items: List[Dict[str, Any]] = []
     db = dbstate.db
 
@@ -453,6 +472,7 @@ def _upload_person_memory(
     person_name: str,
     artifact_type: str,
 ) -> Tuple[Optional[str], Optional[str], str]:
+    """upload one local media file as a FamilySearch memory."""
     person_fsid = (person_fsid or "").strip()
     if not person_fsid:
         return None, None, "Missing person FSID"
@@ -507,8 +527,10 @@ def _upload_person_memory(
 
 
 def _session_get_json(session: Any, endpoint: str) -> Optional[dict]:
+    """fetch GEDCOM X-ish JSON from a session endpoint."""
     endpoint = endpoint if endpoint.startswith("/") else ("/" + endpoint)
 
+    # session helpers first
     for method_name in ("get_jsonurl", "get_json", "get_gedcomx"):
         method = getattr(session, method_name, None)
         if not callable(method):
@@ -528,6 +550,7 @@ def _session_get_json(session: Any, endpoint: str) -> Optional[dict]:
             except Exception:
                 pass
 
+    # then try the raw response path
     get_url = getattr(session, "get_url", None)
     if callable(get_url):
         try:
@@ -546,11 +569,7 @@ def _session_get_json(session: Any, endpoint: str) -> Optional[dict]:
         except Exception:
             pass
 
-    try:
-        import requests  # type: ignore
-    except Exception:
-        return None
-
+    # build the request directly if all else fails
     base = (
         getattr(session, "api_url", "")
         or getattr(session, "API_URL", "")
@@ -574,6 +593,7 @@ def _session_get_json(session: Any, endpoint: str) -> Optional[dict]:
 def _session_post_json(
     session: Any, endpoint: str, payload: dict, *, headers: Optional[dict] = None
 ) -> Any:
+    """POST JSON to an endpoint and return the raw response."""
     endpoint = endpoint if endpoint.startswith("/") else ("/" + endpoint)
 
     final_headers = {
@@ -583,6 +603,7 @@ def _session_post_json(
     if headers:
         final_headers.update(headers)
 
+    # session wrappers first
     post = getattr(session, "post", None)
     if callable(post):
         try:
@@ -602,11 +623,7 @@ def _session_post_json(
         except Exception:
             pass
 
-    try:
-        import requests  # type: ignore
-    except Exception:
-        return None
-
+    # regular requests
     base = (
         getattr(session, "api_url", "")
         or getattr(session, "API_URL", "")
@@ -625,6 +642,7 @@ def _session_post_json(
 
 
 def _head_person(session: Any, fsid: str) -> Tuple[str, Any]:
+    """head a person endpoint and follow forwarded ids."""
     fsid = (fsid or "").strip()
     if not fsid:
         return fsid, None
@@ -685,6 +703,7 @@ def _err_text(resp: Any) -> str:
 
 
 def _resolve_active_person(session: Any, fsid: str) -> Tuple[str, str]:
+    """return the active person id plus a rough status."""
     original = (fsid or "").strip()
     if not original:
         return "", "missing"
@@ -711,6 +730,7 @@ def _resolve_active_person(session: Any, fsid: str) -> Tuple[str, str]:
 
 
 def _fact_type_from_label(label: str) -> str:
+    """Map Gramps labels to GEDCOM X fact URIs."""
     key = re.sub(r"\s+", " ", (label or "").strip().lower())
 
     mapping = {
@@ -742,6 +762,7 @@ def _fact_type_from_label(label: str) -> str:
 
 
 def _extract_gramps_note_fsid(gr_note_obj: Any) -> str:
+    """Read the linked FS note id from a tagged Gramps note."""
     text_obj = getattr(gr_note_obj, "text", None)
     if text_obj is None or not hasattr(text_obj, "get_tags"):
         return ""
@@ -764,6 +785,7 @@ def _extract_gramps_note_fsid(gr_note_obj: Any) -> str:
 
 
 def _gramps_note_title(gr_note_obj: Any) -> str:
+    """Return display title for Gramps note."""
     note_type = getattr(gr_note_obj, "type", None)
     if note_type is not None and hasattr(note_type, "xml_str"):
         try:
@@ -783,6 +805,7 @@ def _normalize_note_text(text: str) -> str:
 
 
 def _load_fs_person_notes(session: Any, fsid: str) -> List[Any]:
+    """Load notes for a person and deserialize them into Gedcomx objects."""
     data = _session_get_json(session, f"/platform/tree/persons/{fsid}/notes")
     if not data:
         return []
@@ -792,6 +815,7 @@ def _load_fs_person_notes(session: Any, fsid: str) -> List[Any]:
         gx.deserialize_json(data)
     except Exception:
         try:
+            # some payloads only behave through the other deserialize helper.
             deserialize.deserialize_json(gx, data)
         except Exception:
             return []
@@ -810,6 +834,7 @@ def _load_fs_person_notes(session: Any, fsid: str) -> List[Any]:
 def _build_person_payload(
     fsid: str, chosen: List[Dict[str, Any]], change_message: str
 ) -> Dict[str, Any]:
+    """Build the person update payload from the chosen sync items."""
     message = (change_message or "").strip() or _("Updated from Gramps")
 
     person_obj: Dict[str, Any] = {"id": fsid}
@@ -819,6 +844,7 @@ def _build_person_payload(
     for item in chosen:
         kind = item.get("kind")
 
+        # name updates are built as preferred names
         if kind == "primary_name":
             full = str(item.get("gr_val") or "").strip()
             given = str(item.get("gr_given") or "").strip()
@@ -852,6 +878,7 @@ def _build_person_payload(
             names.append(name_obj)
             continue
 
+        # fact updates can carry date, place, or both
         if kind == "fact":
             fact_id = str(item.get("fs_id") or "").strip()
             fact_type = ""
@@ -904,6 +931,7 @@ def _build_person_payload(
 def _build_notes_payload(
     fsid: str, chosen: List[Dict[str, Any]], change_message: str
 ) -> Optional[Dict[str, Any]]:
+    """build the notes payload for note creates/updates"""
     message = (change_message or "").strip() or _("Updated from Gramps")
     notes: List[Dict[str, Any]] = []
 
@@ -950,6 +978,7 @@ def _build_source_description_payload(
 
 
 def _extract_id_from_location(location: str) -> str:
+    """Pull a source description id out of a Location"""
     if not location:
         return ""
 
@@ -964,6 +993,7 @@ def _extract_id_from_location(location: str) -> str:
 def _create_source_description(
     session: Any, title: str, citation_text: str, about: str, change_message: str
 ) -> Optional[str]:
+    """create a source description and return its id if we can find it"""
     resp = _session_post_json(
         session,
         "/platform/sources/descriptions",
@@ -972,6 +1002,7 @@ def _create_source_description(
     if resp is None or _response_status(resp) not in (200, 201):
         return None
 
+    # headers first, -> location, then the JSON body
     headers = _response_headers(resp)
     sdid = str(headers.get("X-Entity-Id") or headers.get("X-entity-id") or "").strip()
     if sdid:
@@ -1001,6 +1032,7 @@ def _create_source_description(
 def _build_person_sources_payload(
     session: Any, fsid: str, source_refs: List[Dict[str, Any]], change_message: str
 ) -> Dict[str, Any]:
+    """wrap source refs into the person payload shape FS expects"""
     message = (change_message or "").strip() or _("Updated from Gramps")
     for source_ref in source_refs:
         source_ref.setdefault("attribution", {"changeMessage": message})
@@ -1019,6 +1051,7 @@ def _api_base(session: Any) -> str:
 def _build_source_ref(
     session: Any, sdid: str, tags: List[str], change_message: str
 ) -> Dict[str, Any]:
+    """Build one person source ref pointed at a source description id."""
     desc_url = f"{_api_base(session)}/platform/sources/descriptions/{sdid}"
     out: Dict[str, Any] = {
         "description": desc_url,
@@ -1035,6 +1068,7 @@ def _build_source_ref(
 
 
 def _get_or_set_person_fsid(db: Any, txn: Any, gr_person: Person, fsid: str) -> None:
+    """ensure the Gramps person carries this FS id."""
     fsid = (fsid or "").strip()
     if not fsid:
         return
@@ -1070,6 +1104,7 @@ def _get_or_set_person_fsid(db: Any, txn: Any, gr_person: Person, fsid: str) -> 
 
 
 def _gramps_name_parts(gr_person: Person) -> Tuple[str, str]:
+    """Return the primary given/surname pair from a Gramps person."""
     name = gr_person.primary_name
     if name is None:
         return "", ""
@@ -1085,6 +1120,7 @@ def _gramps_name_parts(gr_person: Person) -> Tuple[str, str]:
 
 
 def _gender_uri(gr_person: Person) -> str:
+    """Map Gramps gender to a GEDCOM X gender URI."""
     gender = gr_person.get_gender()
     if gender == Person.MALE:
         return "http://gedcomx.org/Male"
@@ -1094,6 +1130,7 @@ def _gender_uri(gr_person: Person) -> str:
 
 
 def _event_to_fact(db: Any, event: Any, fact_type_uri: str) -> Optional[Dict[str, Any]]:
+    """Turn a Gramps event into a simple GEDCOM X fact payload."""
     if event is None:
         return None
 
@@ -1105,8 +1142,6 @@ def _event_to_fact(db: Any, event: Any, fact_type_uri: str) -> Optional[Dict[str
     place_text = ""
     if getattr(event, "place", None):
         try:
-            from gramps.gen.display.place import displayer as place_displayer
-
             place = db.get_place_from_handle(event.place)
             place_text = (place_displayer.display(db, place) or "").strip()
         except Exception:
@@ -1124,19 +1159,11 @@ def _event_to_fact(db: Any, event: Any, fact_type_uri: str) -> Optional[Dict[str
 
 
 def _birth_death_facts(db: Any, gr_person: Person) -> List[Dict[str, Any]]:
+    """Collect birth/death facts we can safely send to FS."""
     facts: List[Dict[str, Any]] = []
 
-    birth_lookup: Any = None
-    death_lookup: Any = None
-
-    try:
-        from gramps.gen.utils.db import get_birth_or_fallback as birth_lookup
-        from gramps.gen.utils.db import get_death_or_fallback as death_lookup
-    except Exception:
-        pass
-
-    birth_event = birth_lookup(db, gr_person) if callable(birth_lookup) else None
-    death_event = death_lookup(db, gr_person) if callable(death_lookup) else None
+    birth_event = get_birth_or_fallback(db, gr_person)
+    death_event = get_death_or_fallback(db, gr_person)
 
     birth_fact = _event_to_fact(db, birth_event, "http://gedcomx.org/Birth")
     if birth_fact:
@@ -1150,6 +1177,7 @@ def _birth_death_facts(db: Any, gr_person: Person) -> List[Dict[str, Any]]:
 
 
 def _extract_created_person_id(resp: Any) -> str:
+    """Pull the new person id from headers or the JSON body."""
     headers = _response_headers(resp)
 
     person_id = str(
@@ -1186,6 +1214,7 @@ def _extract_created_person_id(resp: Any) -> str:
 def _fs_create_person_basic(
     session: Any, db: Any, gr_person: Person, change_message: str
 ) -> Optional[str]:
+    """create a basic FS person from Gramps name/gender/facts data."""
     given, surname = _gramps_name_parts(gr_person)
     full = f"{given} {surname}".strip() if (given or surname) else ""
 
@@ -1259,6 +1288,7 @@ def _ok_or_duplicate(resp: Any) -> bool:
 def _post_couple_relationship(
     session: Any, fsid1: str, fsid2: str, change_message: str
 ) -> Tuple[bool, str]:
+    """Create the couple relationship between two linked FS people."""
     fsid1 = (fsid1 or "").strip()
     fsid2 = (fsid2 or "").strip()
     if not fsid1 or not fsid2:
@@ -1305,6 +1335,7 @@ def _post_child_and_parents(
     parent2_fsid: str,
     change_message: str,
 ) -> Tuple[bool, str]:
+    """Create the child-and-parents relationship and post it."""
     child_fsid = (child_fsid or "").strip()
     parent1_fsid = (parent1_fsid or "").strip()
     parent2_fsid = (parent2_fsid or "").strip()
@@ -1370,6 +1401,7 @@ def _post_child_and_parents(
 
 
 def _family_other_parent_handle(family: Family, me_handle: str) -> Optional[str]:
+    """Given one family member handle, return the other parent."""
     father = family.get_father_handle()
     mother = family.get_mother_handle()
 
@@ -1383,6 +1415,7 @@ def _family_other_parent_handle(family: Family, me_handle: str) -> Optional[str]
 def _collect_relatives(
     db: Any, me: Person
 ) -> Tuple[List[str], List[str], List[str], List[str]]:
+    """collect parent, spouse, child, and family handles for a person."""
     parent_handles: List[str] = []
     spouse_handles: List[str] = []
     child_handles: List[str] = []
