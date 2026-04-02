@@ -19,7 +19,10 @@
 
 from __future__ import annotations
 
+import json
+
 from gramps.gen.db import DbTxn
+from gramps.gui.dialog import WarningDialog
 from gramps.gui.utils import ProgressMeter
 
 from . import _
@@ -61,8 +64,6 @@ class FSToGrampsImporter(CoreFSToGrampsImporter):
             caller.dbstate.db.disable_signals()
 
         if not FSG_Sync.FSG_Sync.ensure_session(caller, self.verbosity):
-            from gramps.gui.dialog import WarningDialog
-
             WarningDialog(_("Not connected to FamilySearch"))
             caller.uistate.set_busy_cursor(False)
             progress.close()
@@ -170,8 +171,6 @@ class FSToGrampsImporter(CoreFSToGrampsImporter):
         if self.verbosity >= 3:
             res = deserialize.to_string(self.fs_TreeImp)
             with open("import.out.json", "w", encoding="utf-8") as handle:
-                import json
-
                 json.dump(res, handle, indent=2)
 
         print(_("Importing…"))
