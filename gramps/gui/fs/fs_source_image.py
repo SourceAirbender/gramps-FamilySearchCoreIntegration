@@ -32,8 +32,9 @@ from gi.repository import (
     Gtk,
     Gdk,
     GLib,
-)  # noqa: F401  (Gdk might be used by downstream)
+)  # noqa: F401
 
+from gramps.gen.fs import tree
 from gramps.gui.fs import ui as fs_ui
 
 
@@ -65,8 +66,6 @@ def _canonicalize_fs_web_url(url: str) -> str:
     if not u.startswith(("http://", "https://")):
         return u
     try:
-        from gramps.gen.fs import tree
-
         sess = getattr(tree, "_fs_session", None)
         if sess and hasattr(sess, "canonical_web_url"):
             return sess.canonical_web_url(u)
@@ -348,7 +347,7 @@ class SourceImageBrowser:
             return
 
         try:
-            # Use a local ctx so mypy never sees Optional here
+            # more mypy w/ local ctx
             ctx = self.webview.get_context()
             hid = ctx.connect("download-started", self._on_download_started)
             self._handlers.append((ctx, hid))
