@@ -62,6 +62,7 @@ label.error {
   padding: 10px;
 }
 
+box.fs-compare-legend,
 .fs-compare-legend {
   padding: 6px 8px;
   border-radius: 10px;
@@ -73,6 +74,7 @@ label.error {
   border-radius: 999px;
   padding: 2px 10px;
   border: 1px solid rgba(0,0,0,0.10);
+  background-image: none;
 }
 
 .fs-legend-pill.fs-match       { background-color: @fs_compare_match_bg; }

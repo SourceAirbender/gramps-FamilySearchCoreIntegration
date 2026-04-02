@@ -20,15 +20,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import os
+import re
 from typing import Any, ClassVar, Optional, TYPE_CHECKING
 
 from gi.repository import Gtk, Gdk, GLib
 
-from gramps.gen.const import GRAMPS_LOCALE as glocale
+from gramps.gen.const import DATA_DIR, GRAMPS_LOCALE as glocale
 from gramps.gui.dialog import WarningDialog
 from gramps.gui.listmodel import ListModel, NOSORT, COLOR, TOGGLE
 from gramps.gen.lib import Person
 
+from gramps.gen.fs import tree
 from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs.compare import compare_fs_to_gramps
 import gramps.gen.fs.import_ as fs_import
@@ -39,8 +42,6 @@ _ = glocale.translation.gettext
 
 
 class CompareGtkMixin:
-    # --- mypy-facing declarations for mixin-heavy runtime design ---
-    # Initialized at runtime by the addon/session:
     fs_Tree: ClassVar[Any] = None
     _UI: ClassVar[dict[str, str]] = {}
 
@@ -95,7 +96,8 @@ class CompareGtkMixin:
         "red": "#FFE3E3",
     }
 
-    _CSS_INSTALLED = True
+    _CSS_INSTALLED = False
+    _CSS_DEFINE_CACHE: ClassVar[Optional[dict[str, str]]] = None
 
     def _ui_color(self, semantic: str) -> str:
         return self._UI.get((semantic or "").strip(), semantic or "")
@@ -112,13 +114,44 @@ class CompareGtkMixin:
         try:
             win = getattr(getattr(self, "uistate", None), "window", None)
             if win is None:
-                return None
+                raise ValueError("no ui window")
             ok, rgba = win.get_style_context().lookup_color(color_name)
             if ok:
                 return rgba
         except Exception:
-            return None
+            pass
+
+        color_value = self._css_define_value(color_name)
+        if color_value:
+            try:
+                rgba = Gdk.RGBA()
+                if rgba.parse(color_value):
+                    return rgba
+            except Exception:
+                pass
         return None
+
+    @classmethod
+    def _css_define_value(cls, color_name: str) -> str:
+        if not color_name:
+            return ""
+
+        cache = cls._CSS_DEFINE_CACHE
+        if cache is None:
+            cache = {}
+            css_path = os.path.join(DATA_DIR, "gramps.css")
+            try:
+                with open(css_path, "r", encoding="utf-8") as handle:
+                    css_text = handle.read()
+                for name, value in re.findall(
+                    r"@define-color\s+([A-Za-z0-9_]+)\s+([^;]+);", css_text
+                ):
+                    cache[name.strip()] = value.strip()
+            except Exception:
+                cache = {}
+            cls._CSS_DEFINE_CACHE = cache
+
+        return cache.get(color_name, "")
 
     def _resolve_tint_rgba(self, token: str) -> Optional[Gdk.RGBA]:
         token = (token or "").strip()
@@ -150,8 +183,20 @@ class CompareGtkMixin:
         return None
 
     def _install_compare_css(self) -> None:
-        # CSS is loaded globally from data/gramps.css by ViewManager.load_css()
-        return
+        if self.__class__._CSS_INSTALLED:
+            return
+
+        try:
+            provider = Gtk.CssProvider()
+            provider.load_from_path(os.path.join(DATA_DIR, "gramps.css"))
+            screen = Gdk.Screen.get_default()
+            if screen is not None:
+                Gtk.StyleContext.add_provider_for_screen(
+                    screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                )
+                self.__class__._CSS_INSTALLED = True
+        except Exception:
+            return
 
     def _wrap_scroller(self, child: Gtk.Widget, min_h: int = 420) -> Gtk.Widget:
         sw = Gtk.ScrolledWindow()
@@ -401,23 +446,27 @@ class CompareGtkMixin:
         wrap = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         wrap.get_style_context().add_class("fs-compare-legend")
 
-        def pill(css_class: str, text: str) -> Gtk.Widget:
-            eb = Gtk.EventBox()
-            eb.set_visible_window(True)
-            ctx = eb.get_style_context()
-            ctx.add_class("fs-legend-pill")
-            ctx.add_class(css_class)
+        def pill(token: str, text: str) -> Gtk.Widget:
+            css_name = self._TINT_COLOR_NAME.get(token, "")
+            color = self._css_define_value(css_name) or self._TINT_FALLBACK_HEX.get(
+                token, "#CCCCCC"
+            )
+            label = Gtk.Label()
+            label.set_use_markup(True)
+            label.set_markup(
+                '<span background="{color}">&#160;&#160;&#160;</span> {text}'.format(
+                    color=GLib.markup_escape_text(color),
+                    text=GLib.markup_escape_text(text),
+                )
+            )
+            label.get_style_context().add_class("fs-legend-label")
+            return label
 
-            lbl = Gtk.Label(label=text)
-            lbl.get_style_context().add_class("fs-legend-label")
-            eb.add(lbl)
-            return eb
-
-        wrap.pack_start(pill("fs-match", _("Match")), False, False, 0)
-        wrap.pack_start(pill("fs-different", _("Different")), False, False, 0)
-        wrap.pack_start(pill("fs-only-gramps", _("Only in Gramps")), False, False, 0)
-        wrap.pack_start(pill("fs-only-fs", _("Only in FamilySearch")), False, False, 0)
-        wrap.pack_start(pill("fs-critical", _("Critical mismatch")), False, False, 0)
+        wrap.pack_start(pill("green", _("Match")), False, False, 0)
+        wrap.pack_start(pill("orange", _("Different")), False, False, 0)
+        wrap.pack_start(pill("yellow", _("Only in Gramps")), False, False, 0)
+        wrap.pack_start(pill("yellow3", _("Only in FamilySearch")), False, False, 0)
+        wrap.pack_start(pill("red", _("Critical mismatch")), False, False, 0)
 
         hint = Gtk.Label(
             label=_(
@@ -437,8 +486,6 @@ class CompareGtkMixin:
         if not active:
             WarningDialog(_("Select a person first."))
             return
-
-        from gramps.gen.fs import tree
 
         if not (tree._fs_session and tree._fs_session.logged):
             WarningDialog(_("You must login first."))
@@ -470,6 +517,7 @@ class CompareGtkMixin:
             return
 
         self._ensure_person_cached(fsid, with_relatives=True)
+        self._install_compare_css()
 
         # ---- Window ----
         win = Gtk.Window()
@@ -629,8 +677,6 @@ class CompareGtkMixin:
         if not url:
             return ""
         try:
-            from gramps.gen.fs import tree
-
             sess = getattr(tree, "_fs_session", None)
             if sess and hasattr(sess, "canonical_web_url"):
                 return sess.canonical_web_url(url)
