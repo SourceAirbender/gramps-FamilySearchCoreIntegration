@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+from gramps.gen.fs import tree
 from gramps.gui.plug import PluginWindows
 
 from . import _
@@ -43,8 +44,6 @@ class FSImportTool(PluginWindows.ToolManagedWindowBatch):
     def run(self):
         # Ensure a shared Tree exists
         if not FSG_Sync.FSG_Sync.fs_Tree:
-            from gramps.gen.fs import tree
-
             FSG_Sync.FSG_Sync.fs_Tree = tree.Tree()
             FSG_Sync.FSG_Sync.fs_Tree._getsources = False
 
