@@ -19,16 +19,16 @@
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 #
 """
-FamilySearch session/auth helper (core, non-GUI).
+session/auth bits for FamilySearch
+handles env/profile setup, oauth, and the small request wrappers for the rest of gen.fs
 
-Environment variables
-- GRAMPS_FS_DEBUG: enable debug logging (1/true/yes/on)
-- GRAMPS_FS_ENV: beta|prod
-- GRAMPS_FS_AUTH_METHOD: auto|webkit|loopback|manual
-- GRAMPS_FS_OAUTH_SCOPE: override OAuth scope
-- GRAMPS_FS_LISTENER_TIMEOUT: seconds for loopback listener / webkit capture timeout
-- GRAMPS_FS_BETA_APP_KEY / GRAMPS_FS_PROD_APP_KEY: override app keys
-- GRAMPS_FS_BETA_REDIRECT / GRAMPS_FS_PROD_REDIRECT: override redirects
+useful env vars:
+- GRAMPS_FS_DEBUG turns on debug logging
+- GRAMPS_FS_ENV picks beta or prod
+- GRAMPS_FS_AUTH_METHOD picks auto/webkit/loopback/manual
+- GRAMPS_FS_LISTENER_TIMEOUT controls the callback wait time
+- GRAMPS_FS_BETA_APP_KEY / GRAMPS_FS_PROD_APP_KEY override app keys
+- GRAMPS_FS_BETA_REDIRECT / GRAMPS_FS_PROD_REDIRECT override redirects
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ import certifi
 import requests
 
 from gramps.gen.config import config
-from gramps.gen.constfunc import lin, win
+from gramps.gen.constfunc import win
 
 LOG = logging.getLogger(__name__)
 _DEBUG_LOGGING_CONFIGURED = False
@@ -158,6 +158,7 @@ def _is_loopback_redirect(uri: str) -> bool:
 
 
 def _extract_code_from_text(text: str) -> str:
+    """Pull the auth code out of pasted text or a full redirect URL."""
     text = (text or "").strip()
     if not text:
         return ""
@@ -171,6 +172,8 @@ def _extract_code_from_text(text: str) -> str:
 
 
 class FamilySearchSession:
+    """Small context holder the GUI can bind state onto"""
+
     def __init__(self, *args, **kwargs):
         self._dbstate = None
         self._uistate = None
@@ -193,6 +196,8 @@ class FamilySearchSession:
 
 
 class NullStatusIndicator:
+    """status indicator for the core sesh layer"""
+
     def __init__(self):
         self.state = "DISCONNECTED"
         self.detail = ""
@@ -211,6 +216,8 @@ class NullStatusIndicator:
 
 
 class Listener(threading.Thread):
+    """listener for oauth redirects."""
+
     def __init__(self, host: str, port: int, expected_path: str, timeout_s: int = 300):
         super().__init__(daemon=True)
         self.host = host
@@ -292,6 +299,7 @@ ENV_PROD = "prod"
 
 @dataclass(frozen=True)
 class EnvProfile:
+
     env: str
     fs_url: str
     ident_url: str
@@ -302,6 +310,8 @@ class EnvProfile:
 
 
 class Session(requests.Session):
+    """Main FamilySearch session used by the core layer"""
+
     _shared: ClassVar["Session | None"] = None
     _last_instance: ClassVar["Session | None"] = None
 
@@ -406,6 +416,7 @@ class Session(requests.Session):
 
     @classmethod
     def from_config(cls) -> "Session":
+        """Build a session from config-backed values."""
         legacy_server = _cfg_get("familysearch.server", 0)
         legacy_app = _cfg_get("familysearch.app-key", "") or ""
         legacy_redirect = (
@@ -414,6 +425,7 @@ class Session(requests.Session):
         return cls(int(legacy_server or 0), str(legacy_app), str(legacy_redirect))
 
     def _build_profile(self, env: str) -> EnvProfile:
+        """Build one beta/prod profile from env + config values."""
         env = (env or "").strip().lower()
         if env not in (ENV_BETA, ENV_PROD):
             env = ENV_PROD
@@ -480,6 +492,7 @@ class Session(requests.Session):
         )
 
     def _apply_profile(self, prof: EnvProfile, clear_state: bool = True) -> None:
+        """Apply the chosen profile and optionally clear auth state."""
         self._profile = prof
         self.fs_url = prof.fs_url
         self.ident_url = prof.ident_url
@@ -627,6 +640,7 @@ class Session(requests.Session):
         self.app_key = (v or "").strip()
 
     def get_jsonurl(self, url: str, headers: dict | None = None):
+        """GET json from an FS endpoint and smooth over the common edge cases."""
         try:
             r = self.get_url(url, headers=headers)
         except requests.exceptions.RequestException as e:
@@ -677,6 +691,7 @@ class Session(requests.Session):
             return None
 
     def _recompute_listener(self) -> None:
+        """Recompute the loopback listener bind settings from the redirect url."""
         r = urlparse(self.redirect or DEFAULT_LOOPBACK_REDIRECT)
         self.listen_timeout = int(
             os.environ.get("GRAMPS_FS_LISTENER_TIMEOUT", str(self.listen_timeout))
@@ -717,6 +732,7 @@ class Session(requests.Session):
         return self.listener.result.get("code", "") if self.listener else ""
 
     def canonical_web_url(self, url: str) -> str:
+        """Normalize FamilySearch web URLs for the current environment."""
         if not url:
             return ""
         url = str(url).strip()
@@ -747,6 +763,7 @@ class Session(requests.Session):
             return url
 
     def probe_api(self, reason: str = "") -> bool:
+        """Hit a simple FS endpoint so we know whether the token still works."""
         if not self.access_token:
             self.connected = False
             self.last_probe_http = None
@@ -829,9 +846,11 @@ class Session(requests.Session):
         return True
 
     def authorize(self, username: str | None = None, *args, **kwargs) -> str:
+        """Pick the active env/method and start oauth"""
         if username:
             self.username = username
 
+        # env can be forced, else we fall back to config.
         forced_env = os.environ.get("GRAMPS_FS_ENV", "").strip().lower()
         env = forced_env or str(_cfg_get("familysearch.env", "") or "").strip().lower()
         if env not in (ENV_BETA, ENV_PROD):
@@ -860,6 +879,7 @@ class Session(requests.Session):
         return self._oauth_authorize_only(effective) or ""
 
     def get_token(self, auth_code: str) -> bool:
+        """Exchange auth code for an access token."""
         if not auth_code:
             self._set_status("ERROR", "No auth code")
             return False
@@ -929,6 +949,7 @@ class Session(requests.Session):
         return base + "?" + urlencode(params)
 
     def _oauth_authorize_only(self, method: str) -> str:
+        """Run just the authorize half of oauth and return the code"""
         method = (method or AUTH_AUTO).strip().lower()
 
         if method == AUTH_LOOPBACK and not _is_loopback_redirect(self.redirect):
@@ -942,6 +963,7 @@ class Session(requests.Session):
         self._oauth_code = ""
         self._oauth_error = ""
 
+        # loopback wins when the redirect is loopback-capable.
         if _is_loopback_redirect(self.redirect):
             return self._authorize_via_loopback(auth_url)
         if method == AUTH_WEBKIT and (not win()):
@@ -949,6 +971,7 @@ class Session(requests.Session):
         return self._authorize_via_manual(auth_url)
 
     def _authorize_via_loopback(self, auth_url: str) -> str:
+        """redirect flow to capture the oauth code"""
         self._set_status("AUTHORIZING", "Preparing loopback listener")
         self._recompute_listener()
         self.listener = Listener(
@@ -988,6 +1011,7 @@ class Session(requests.Session):
         return code
 
     def _authorize_via_webkit_capture(self, auth_url: str, expected_state: str) -> str:
+        """Use embedded webkit to capture the auth code directly."""
         if win():
             self._set_status("ERROR", "WebKit method is not available on Windows")
             return ""
@@ -1027,6 +1051,7 @@ class Session(requests.Session):
         return self._oauth_code
 
     def _authorize_via_manual(self, auth_url: str) -> str:
+        """Open the browser and ask the user to paste the code back. (usually for Windows)"""
         self._set_status("AUTHORIZING", "Opening system browser (manual code entry)")
         webbrowser.open(auth_url, new=1, autoraise=True)
 
