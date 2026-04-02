@@ -23,7 +23,9 @@ from __future__ import annotations
 from typing import Any
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
+from gramps.gen.fs import tree
 from gramps.gui.dialog import ErrorDialog, OkDialog, WarningDialog
+from gramps.gui.fs.manager import get_session
 
 _ = glocale.translation.gettext
 
@@ -33,19 +35,15 @@ class AuthMixin:
     def ensure_session(cls, caller=None, verbosity=5) -> bool:
         """
         Ensure a shared session exists.
-        Returns True if a session exists (logged-in or not).
+        Returns True if a session exists
         """
         try:
-            from gramps.gui.fs.manager import get_session
-
             sess = get_session(
                 getattr(caller, "dbstate", None) if caller else None,
                 getattr(caller, "uistate", None) if caller else None,
             )
             if sess:
                 try:
-                    from gramps.gen.fs import tree
-
                     tree._fs_session = sess
                 except Exception:
                     pass
@@ -58,8 +56,6 @@ class AuthMixin:
         """
         Interactive login button handler (shows OAuth UI).
         """
-        from gramps.gui.fs.manager import get_session
-
         sess = get_session(
             getattr(self, "dbstate", None), getattr(self, "uistate", None)
         )
@@ -76,8 +72,6 @@ class AuthMixin:
             return
 
         try:
-            from gramps.gen.fs import tree
-
             tree._fs_session = sess
         except Exception:
             pass
