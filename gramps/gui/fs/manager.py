@@ -22,6 +22,13 @@ from __future__ import annotations
 import os
 import logging
 
+from gramps.gen.config import config as _config
+
+try:
+    from gramps.gui import grampsgui
+except Exception:
+    grampsgui = None
+
 from .session import Session, get_active_session
 
 logger = logging.getLogger(__name__)
@@ -31,8 +38,6 @@ _SESSION = None
 
 def _discover_from_grampsgui():
     try:
-        from gramps.gui import grampsgui
-
         return getattr(grampsgui, "dbstate", None), getattr(grampsgui, "uistate", None)
     except Exception:
         return None, None
@@ -81,13 +86,7 @@ def get_session(dbstate=None, uistate=None):
         _bind_session_context(sess, dbstate=dbstate, uistate=uistate)
         return sess
 
-    config = None
-    try:
-        from gramps.gen.config import config as _config
-
-        config = _config
-    except Exception:
-        config = None
+    config = _config
 
     app_key = (_cfg_get(config, "familysearch.app-key", "") or "").strip()
     redirect = (_cfg_get(config, "familysearch.redirect", "") or "").strip()
