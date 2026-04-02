@@ -31,16 +31,23 @@
 # - Then create relationships.
 # - Write created FSIDs back into Gramps through _FSFTID.
 
+"""
+gtk-side helpers for pushing changes to FamilySearch and doing the basic export
+the core payload/build/api work lives in gen.fs.sync_directions.
+"""
+
 from __future__ import annotations
 
 import os
 import re
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from gi.repository import Gtk
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.db import DbTxn
+from gramps.gen.display.name import displayer as name_displayer
+from gramps.gen.fs import tree as fs_tree_mod
 from gramps.gen.lib import Attribute, AttributeType, Person
 from gramps.gui.dialog import WarningDialog
 from gramps.gui.listmodel import COLOR, NOSORT, TOGGLE, ListModel
@@ -50,6 +57,7 @@ from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs.import_ import deserializer as deserialize
 from gramps.gen.fs.compare import compare_fs_to_gramps
 import gramps.gen.fs.import_ as fs_import_mod
+import gramps.gui.fs.person.fsg_sync as fsg_sync
 
 _ = glocale.translation.gettext
 
@@ -67,30 +75,17 @@ COL_XFS2 = 12
 
 
 def _bind_global_session(session: Any) -> None:
-    try:
-        from gramps.gen.fs import tree as fs_tree_mod
-    except Exception:
-        return
-
+    """Mirror the active session onto the shared fs tree module."""
     setattr(fs_tree_mod, "_fs_session", session)
 
 
 def _ensure_fs_tree(session: Any) -> Optional[Any]:
+    """Return the shared FS tree object used by the compare/sync UI."""
     _bind_global_session(session)
-
-    try:
-        import gramps.gui.fs.person.fsg_sync as fsg_sync
-    except Exception:
-        return None
 
     existing_tree: Optional[Any] = getattr(fsg_sync.FSG_Sync, "fs_Tree", None)
     if existing_tree is not None:
         return existing_tree
-
-    try:
-        from gramps.gen.fs import tree as fs_tree_mod
-    except Exception:
-        return None
 
     new_tree: Any = fs_tree_mod.Tree()
     try:
@@ -103,6 +98,7 @@ def _ensure_fs_tree(session: Any) -> Optional[Any]:
 
 
 def _prime_person_cache(session: Any, fsid: str, force: bool = False) -> Optional[Any]:
+    """Load one FS person into the shared tree cache, optionally forcing refresh."""
     fsid = (fsid or "").strip()
     if not fsid:
         return None
@@ -149,6 +145,7 @@ def _prime_person_cache(session: Any, fsid: str, force: bool = False) -> Optiona
 
 
 def _unwrap_tree_model(model: Any) -> Optional[Any]:
+    """peel until real gtk tree model"""
     if model is None:
         return None
 
@@ -184,6 +181,7 @@ def _unwrap_tree_model(model: Any) -> Optional[Any]:
 
 
 def _walk(model: Any) -> Iterable[Any]:
+    """walk over the compare tree rows."""
     raw = _unwrap_tree_model(model)
     if raw is None:
         return
@@ -216,6 +214,7 @@ def _walk(model: Any) -> Iterable[Any]:
 
 
 def _debug_dump_compare_model(model: Any) -> None:
+    """dump compare rows to stdout when FS debug mode is on"""
     if not fs_sync_core._debug_enabled():
         return
 
@@ -268,6 +267,7 @@ def _debug_dump_compare_model(model: Any) -> None:
 
 
 def _make_overview_model() -> ListModel:
+    """Build the temporary compare model used for the overview prompt."""
     treeview = Gtk.TreeView()
     titles = [
         (_(""), 1, 18, COLOR),
@@ -288,6 +288,7 @@ def _make_overview_model() -> ListModel:
 
 
 def _collect_overview_push_items(model: Any) -> List[Dict[str, Any]]:
+    """Turn the compare model rows into pushable name/fact items."""
     raw = _unwrap_tree_model(model)
     if raw is None:
         return []
@@ -323,6 +324,7 @@ def _collect_overview_push_items(model: Any) -> List[Dict[str, Any]]:
         fact_type = fs_sync_core._fact_type_from_label(label)
         is_fact_row = x_type in ("fact", "event", "events") or bool(fact_type)
 
+        # name rows are handled separately from fact rows.
         if is_name_row:
             if not gr_val.strip():
                 continue
@@ -369,6 +371,7 @@ def _collect_overview_push_items(model: Any) -> List[Dict[str, Any]]:
 def _collect_note_push_items(
     dbstate: Any, person: Any, session: Any, fsid: str
 ) -> List[Dict[str, Any]]:
+    """Compare Gramps notes to FS notes and build create/update items."""
     _prime_person_cache(session, fsid)
 
     fs_notes = fs_sync_core._load_fs_person_notes(session, fsid)
@@ -456,6 +459,7 @@ def _collect_note_push_items(
 def _collect_source_push_items(
     dbstate: Any, person: Any, session: Any, person_fsid: str
 ) -> List[Dict[str, Any]]:
+    """Collect citations that still need source work on FamilySearch."""
     items: List[Dict[str, Any]] = []
 
     fs_import = fs_import_mod
@@ -540,6 +544,8 @@ def _collect_source_push_items(
                     except Exception:
                         pass
 
+            # person-level source refs can already exist even if the citation still
+            # points at an older merged id locally.
             if scope == "person":
                 if is_attached_to_person is True and sd_state in ("ok", "merged"):
                     continue
@@ -615,6 +621,7 @@ def _collect_source_push_items(
 def _prompt(
     parent: Gtk.Window, items: List[Dict[str, Any]]
 ) -> Tuple[str, List[Dict[str, Any]]]:
+    """Show the sync picker and return the change message + chosen items."""
     dialog = Gtk.Dialog(title=_("Sync to FamilySearch"), transient_for=parent, flags=0)
     dialog.set_modal(True)
     dialog.set_default_size(820, 620)
@@ -831,6 +838,7 @@ def sync_to_familysearch(
             )
             return
 
+        # start with names/facts from the compare view, then add notes/sources/memories.
         compare_model = _make_overview_model()
         compare_fs_to_gramps(
             fs_person,
@@ -900,6 +908,7 @@ def sync_to_familysearch(
                     fsid, chosen_overview, change_message
                 )
 
+            # use concurrency headers when we have them
             person_headers: Dict[str, str] = {}
             if head_resp is not None:
                 response_headers = fs_sync_core._response_headers(head_resp)
@@ -1050,8 +1059,6 @@ def sync_to_familysearch(
 
         if chosen_memories:
             try:
-                from gramps.gen.display.name import displayer as name_displayer
-
                 person_name = str(name_displayer.display(person) or "").strip()
             except Exception:
                 person_name = ""
@@ -1167,6 +1174,7 @@ def sync_to_familysearch(
 def _export_picker_dialog(
     parent: Gtk.Window, db: Any, me: Person, session: Any
 ) -> Optional[Tuple[bool, bool, bool, List[str]]]:
+    """Show export picker for the main person + close relatives."""
     parents, spouses, children, _families = fs_sync_core._collect_relatives(db, me)
 
     dialog = Gtk.Dialog(
@@ -1216,8 +1224,6 @@ def _export_picker_dialog(
 
     def display_label(prefix: str, person_obj: Any) -> Tuple[str, bool]:
         try:
-            from gramps.gen.display.name import displayer as name_displayer
-
             name = str(name_displayer.display(person_obj) or "")
         except Exception:
             name = _("(person)")
@@ -1326,6 +1332,7 @@ def export_basic_people_to_familysearch(
     parent: Any,
     editor: Any = None,
 ) -> None:
+    """create missing FS people and then try to wire up the relationships."""
     try:
         if not (
             getattr(session, "logged", False)
@@ -1385,6 +1392,7 @@ def export_basic_people_to_familysearch(
         created_any = False
         attempted_relationships = False
 
+        # first create or refresh ids, then do relationships after the txn closes.
         with DbTxn(_("FamilySearch: Export basic people"), db) as txn:
             seed(me.handle, txn)
 
