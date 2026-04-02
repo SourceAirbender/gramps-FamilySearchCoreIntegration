@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
@@ -17,6 +18,11 @@
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 #
 
+"""
+source/citation import helpers for FamilySearch data.
+turns FS source descriptions into Gramps repositories, sources, citations, and notes.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -28,38 +34,31 @@ from gramps.gen.lib import (
     Citation,
     Note,
     NoteType,
-    StyledText,
     StyledTextTag,
     StyledTextTagType,
-    Source,
-    SrcAttribute,
-    Repository,
     RepoRef,
+    Repository,
     RepositoryType,
+    Source,
+    SourceMediaType,
+    SrcAttribute,
     Url,
     UrlType,
-    SourceMediaType,
 )
 
-from . import _
-from gramps.gen.fs.import_ import deserializer as deserialize
-
-from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs import tree
+from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.utilities import fs_date_to_gramps_date
+
+from . import _
 
 LOG = logging.getLogger(__name__)
 
 _URL_RE = re.compile(r"https?://[^\s)\]\">]+")
 
 
-# (no db.dbapi)
-
-
 def _yield_handles(db, kind: str) -> Iterator[str]:
-    """
-    Yield handles for a primary object type in a backend-portable way.
-    kind: "repository", "source", ...
-    """
     fn = getattr(db, f"iter_{kind}_handles", None)
     if callable(fn):
         try:
@@ -82,6 +81,7 @@ def _yield_handles(db, kind: str) -> Iterator[str]:
 
 
 def _db_cache_get(db, attr: str) -> dict:
+    """get a dict cache off the db, or create one if needed."""
     try:
         d = getattr(db, attr, None)
         if isinstance(d, dict):
@@ -142,8 +142,8 @@ def _find_source_handle_by_title(db, title: str) -> str | None:
 
 def _canon_fs_web(url: str) -> str:
     """
-    convert any FamilySearch host (beta/api/ident/etc) to www.familysearch.org
-    for the image pull function (no images on beta)
+    convert any FamilySearch host to www.familysearch.org.
+    kept simple because record pages/images should always point at the web host.
     """
     if not url:
         return ""
@@ -165,7 +165,7 @@ def _canon_fs_web(url: str) -> str:
                 )
             )
     except Exception:
-        # keep behavior: ignore parse errors and return original
+        # ignore parse errors and return original
         LOG.debug("Failed to canonicalize FamilySearch URL: %s", url, exc_info=True)
     return u
 
@@ -187,10 +187,8 @@ def _looks_like_record_page(u: str) -> bool:
 
 def _extract_fs_record_url(sd) -> str:
     """
-    try to pull a usable record/source page URL from a GEDCOMX SourceDescription
-    prefers ark/Persistent/Primary identifiers, then URLs in citations, then sd.about.
-
-    returns www.familysearch.org URL when possible
+    try to pull a usable record/source page URL from a SourceDescription.
+    identifiers first, then citation URLs, then sd.about.
     """
     if not sd:
         return ""
@@ -247,6 +245,7 @@ def _extract_fs_record_url(sd) -> str:
 
 
 def _safe_json(resp):
+    """json() wrapper that just returns None on bad responses."""
     try:
         return resp.json()
     except (AttributeError, TypeError, ValueError):
@@ -254,6 +253,7 @@ def _safe_json(resp):
 
 
 def _get_fs_web_base() -> str:
+    """Return the current FS web base, defaulting to prod web."""
     s = getattr(tree, "_fs_session", None)
     base = getattr(s, "fs_url", "") if s else ""
     base = (base or "").strip()
@@ -263,6 +263,7 @@ def _get_fs_web_base() -> str:
 
 
 def _hydrate_source_description(fs_tree, sdid: str) -> None:
+    """Best-effort API hydration for one source description."""
     if not sdid:
         return
     sess = getattr(tree, "_fs_session", None)
@@ -295,7 +296,6 @@ def _hydrate_source_description(fs_tree, sdid: str) -> None:
     try:
         deserialize.deserialize_json(fs_tree, data)
     except Exception:
-        # keep behavior: hydration is best-effort
         LOG.debug(
             "Failed to deserialize hydrated SourceDescription %s", sdid, exc_info=True
         )
@@ -304,7 +304,7 @@ def _hydrate_source_description(fs_tree, sdid: str) -> None:
 
 def fetch_source_dates(fs_tree):
     """
-    Populate SourceDescriptions in fs_tree
+    Populate source descriptions with extra FS date/collection/url data.
     """
     sess = getattr(tree, "_fs_session", None)
     if not sess:
@@ -331,7 +331,7 @@ def fetch_source_dates(fs_tree):
         if not hasattr(sd, "_fs_api_hydrated"):
             sd._fs_api_hydrated = False
 
-        # 1) Try /service/tree/links/source/{id} only once
+        # try the web links endpoint once. it usually has the nice extra bits.
         r = None
         if not sd._fs_links_fetched:
             try:
@@ -436,6 +436,7 @@ def fetch_source_dates(fs_tree):
                     except Exception:
                         LOG.debug("Failed to set notes for %s", sd.id, exc_info=True)
 
+        # if we still do not have a usable about url, from api.
         if (not getattr(sd, "about", "")) and (not sd._fs_api_hydrated):
             _hydrate_source_description(fs_tree, sd.id)
             sd._fs_api_hydrated = True
@@ -457,7 +458,8 @@ def fetch_source_dates(fs_tree):
 
 
 class IntermediateSource:
-    # Helper DTO bridging FS SourceDescription/SourceReference and Gramps Citation/Source.
+    """Small  bridge for FS source data to Gramps source/citation objects."""
+
     id: str | None = None
     repository_name: str | None = None
     source_title: str | None = None
@@ -471,6 +473,7 @@ class IntermediateSource:
     collection_url: str | None = None
 
     def from_fs(self, fs_sd, fs_sr):
+        """Fill this object from an FS source description."""
         self.id = fs_sd.id
         self.repository_name = "FamilySearch"
         self.source_title = "FamilySearch"
@@ -518,7 +521,6 @@ class IntermediateSource:
             lines = fs_citation_value.split("\n")
             for line in lines:
                 if line.startswith(_("Repository")):
-                    # removeprefix exists in newer python; keep compatibility
                     try:
                         self.repository_name = line.removeprefix(
                             _("Repository") + " :"
@@ -571,6 +573,7 @@ class IntermediateSource:
             self.date = fs_sd._date
 
     def from_gramps(self, db, citation):
+        """Fill this object from an existing Gramps citation."""
         self.id = fs_utilities.get_fsftid(citation)
         self.repository_name = None
         self.source_title = None
@@ -627,6 +630,7 @@ class IntermediateSource:
             self.note_text += n.get()
 
     def to_gramps(self, db, txn, obj):
+        """Create or update the matching Gramps repo/source/citation chain."""
         repo_handle = None
         if self.repository_name:
             repo_handle = _find_repository_handle_by_name(db, self.repository_name)
@@ -646,7 +650,7 @@ class IntermediateSource:
                 db.commit_repository(r, txn)
                 repo_handle = r.handle
 
-                # update cache
+                # cache it so the next citation does not rescan the db.
                 try:
                     _db_cache_get(db, "_grampsfs_repo_by_name_cache")[
                         self.repository_name
@@ -685,7 +689,7 @@ class IntermediateSource:
                 src.add_repo_reference(rr)
             db.commit_source(src, txn)
 
-            # update cache
+            # avoid another full scan
             try:
                 _db_cache_get(db, "_grampsfs_source_by_title_cache")[
                     self.source_title
@@ -731,8 +735,6 @@ class IntermediateSource:
                 citation.set_confidence_level(Citation.CONF_VERY_LOW)
 
         if self.date:
-            from gramps.gen.fs.utilities import fs_date_to_gramps_date
-
             citation.date = fs_date_to_gramps_date(self.date)
 
         if src:
@@ -783,7 +785,7 @@ class IntermediateSource:
 
 
 def add_source(db, txn, sd_id, obj, existing_citation_handles):
-    # Given a FS SourceDescription id, create/attach the matching Gramps Citation/Source.
+    """Create/attach the Gramps citation chain for one FS source description id."""
     fs_sd = deserialize.SourceDescription._index.get(sd_id)
     if not fs_sd:
         return
