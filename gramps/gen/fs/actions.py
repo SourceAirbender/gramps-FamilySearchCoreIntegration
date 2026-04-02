@@ -17,6 +17,11 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 
+"""
+helpers for the FamilySearch integration layer.
+some FS modules are still coupled through shared session state and thin wrapper calls.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -25,6 +30,8 @@ from typing import Any
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.errors import HandleError
+from gramps.gen.fs import tree as fs_tree
+from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.lib import Attribute, AttributeType, ChildRef, Family, Person
 
 logger = logging.getLogger(__name__)
@@ -37,6 +44,7 @@ FS_ATTR_HUMAN = "FamilySearch ID"
 
 
 def _dbg(msg: str) -> None:
+    """Log a debug message only when the FS debug env var is switched on."""
     if os.environ.get("GRAMPS_FS_DEBUG", "").strip().lower() in (
         "1",
         "true",
@@ -47,17 +55,16 @@ def _dbg(msg: str) -> None:
 
 
 def _bind_global_session(session) -> None:
-    # many FS code paths still rely on module-global tree._fs_session
-    # kept for windows compat
+    """Mirror the active session onto `tree._fs_session` for shared FS helpers."""
+    # gen.fs uses read tree._fs_session directly
     try:
-        from gramps.gen.fs import tree as fs_tree
-
         fs_tree._fs_session = session
     except Exception:
         pass
 
 
 def _get_fs_id(person) -> str:
+    """Pull the first FamilySearch id we can find from a person's attrs."""
     if not person:
         return ""
     for attr in person.get_attribute_list() or []:
@@ -70,6 +77,7 @@ def _get_fs_id(person) -> str:
 
 
 def _set_fs_id(person, fsid: str) -> None:
+    """replace any legacy FS id attrs w/ one canonical attr."""
     if not person:
         return
 
@@ -92,57 +100,19 @@ def _set_fs_id(person, fsid: str) -> None:
 
 def _platform_json(session, endpoint: str) -> dict:
     """
-    Fetch GEDCOM JSON from a /platform/... endpoint using the Session object.
+    Fetch GEDCOM X JSON from a `/platform/...` endpoint.
+
+    Session already knows how to hit FS endpoints, attach auth,
+    and decode JSON.
     """
-    for name in ("get_jsonurl", "get_json", "get_gedcomx"):
-        fn = getattr(session, name, None)
-        if callable(fn):
-            try:
-                data = fn(endpoint)
-                return (
-                    data
-                    if isinstance(data, dict)
-                    else (data.json() if hasattr(data, "json") else {})
-                )
-            except Exception:
-                pass
-
-    fn = getattr(session, "get_url", None)
-    if callable(fn):
-        try:
-            resp = fn(endpoint, {"Accept": "application/x-gedcomx-v1+json"})
-            if resp and hasattr(resp, "json"):
-                return resp.json() or {}
-        except TypeError:
-            try:
-                resp = fn(endpoint, headers={"Accept": "application/x-gedcomx-v1+json"})
-                if resp and hasattr(resp, "json"):
-                    return resp.json() or {}
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    import requests
-
-    base = (
-        getattr(session, "api_url", "")
-        or getattr(session, "API_URL", "")
-        or "https://apibeta.familysearch.org"
+    data = session.get_jsonurl(
+        endpoint, headers={"Accept": "application/x-gedcomx-v1+json"}
     )
-    base = str(base).rstrip("/")
-    token = getattr(session, "access_token", "") or ""
-    url = base + (endpoint if endpoint.startswith("/") else ("/" + endpoint))
-    headers = {"Accept": "application/x-gedcomx-v1+json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
-    resp = requests.get(url, headers=headers, timeout=30)
-    resp.raise_for_status()
-    return resp.json() or {}
+    return data if isinstance(data, dict) else {}
 
 
 def _fs_display_name(person_data: dict) -> str:
+    """Return the display/full name from FS person payload data."""
     display = (person_data or {}).get("display") or {}
     return (display.get("name") or display.get("fullName") or "").strip()
 
@@ -157,6 +127,7 @@ def _ensure_child_ref(child_handle: str) -> ChildRef:
 
 
 def _family_other_parent_handle(fam: Family, me_handle: str):
+    """Given one parent handle, return the other parent if there is one."""
     father_handle = fam.get_father_handle()
     mother_handle = fam.get_mother_handle()
     if father_handle == me_handle:
@@ -167,6 +138,7 @@ def _family_other_parent_handle(fam: Family, me_handle: str):
 
 
 def _ensure_person_has_family_handle(db, txn, person: Person, fam_handle: str) -> None:
+    """Add a family handle to the person's spouse-family list if missing."""
     fams = list(person.get_family_handle_list() or [])
     if fam_handle not in fams:
         fams.append(fam_handle)
@@ -185,6 +157,7 @@ def _ensure_person_has_parent_family_handle(
 
 
 def _ensure_child_in_family(db, fam: Family, child_handle: str) -> bool:
+    """Append the child ref only when the family does not already point to it."""
     for child_ref in fam.get_child_ref_list() or []:
         try:
             if getattr(child_ref, "ref", None) == child_handle:
@@ -202,6 +175,7 @@ def _ensure_child_in_family(db, fam: Family, child_handle: str) -> bool:
 
 
 def _place_parent_in_family(db, fam: Family, parent_handle: str) -> None:
+    """Drop a parent into the father/mother slot that fits best."""
     try:
         person = db.get_person_from_handle(parent_handle)
         gender = person.get_gender()
@@ -225,6 +199,7 @@ def _place_parent_in_family(db, fam: Family, parent_handle: str) -> None:
             fam.set_father_handle(parent_handle)
         return
 
+    # fallback for unknown gender: first open slot wins.
     if not father_handle:
         fam.set_father_handle(parent_handle)
     elif not mother_handle:
@@ -232,13 +207,16 @@ def _place_parent_in_family(db, fam: Family, parent_handle: str) -> None:
 
 
 def _family_parent_set(fam: Family) -> set[str]:
+    """Return non-empty parent handles for quick set comparison."""
     return set(filter(None, [fam.get_father_handle(), fam.get_mother_handle()]))
 
 
 def _find_existing_family_for_parents(db, parent_handles: set[str]) -> Family | None:
+    """Look for a family that already has exactly this parent pair."""
     if not parent_handles:
         return None
 
+    # this is usually cheaper than scanning every family in the db.
     for parent_handle in parent_handles:
         try:
             person = db.get_person_from_handle(parent_handle)
@@ -267,13 +245,12 @@ def _find_existing_family_for_parents(db, parent_handles: set[str]) -> Family | 
 
 
 def _find_person_by_fsid(db, fsid: str):
+    """Find a person by FS id, using the cache first and a full scan second."""
     fsid = (fsid or "").strip()
     if not fsid:
         return None
 
     try:
-        from gramps.gen.fs import utilities as fs_utilities
-
         idx = getattr(fs_utilities, "FS_INDEX_PEOPLE", {})
         handle = idx.get(fsid)
         if handle:
@@ -284,12 +261,8 @@ def _find_person_by_fsid(db, fsid: str):
     except Exception:
         pass
 
-    try:
-        from gramps.gen.fs import utilities as fs_utilities
-
-        get_fsftid = getattr(fs_utilities, "get_fsftid", None)
-    except Exception:
-        get_fsftid = None
+    # cache miss or stale cache
+    get_fsftid = getattr(fs_utilities, "get_fsftid", None)
 
     for handle in db.get_person_handles():
         person = db.get_person_from_handle(handle)
@@ -306,6 +279,7 @@ def _find_person_by_fsid(db, fsid: str):
 
 
 def _strip_unknowns_inplace(data: Any) -> None:
+    """Remove known FS visibility flags from nested payload data."""
     key = "PersonInfo:visibleToAllWhenUsingFamilySearchApps"
     if isinstance(data, dict):
         data.pop(key, None)
@@ -317,6 +291,7 @@ def _strip_unknowns_inplace(data: Any) -> None:
 
 
 def _resolve_redirected_fsid(session, fsid: str) -> str:
+    """Follow FamilySearch redirect headers until we land on the current id."""
     fsid = (fsid or "").strip()
     if not fsid:
         return fsid
@@ -345,7 +320,7 @@ def _resolve_redirected_fsid(session, fsid: str) -> str:
 
 
 def _ensure_status_schema(db) -> None:
-    # status is stored on Person now, not in a DB table.
+    # status lives on Person now, not in a separate DB table.
     return
 
 
