@@ -19,10 +19,12 @@
 
 from __future__ import annotations
 
+import os
 import logging
 import email.utils
 import time
 
+from gramps.gen.config import config as _cfg
 from gramps.gui.plug import PluginWindows
 from gramps.gui.utils import ProgressMeter
 from gramps.gui.dialog import WarningDialog
@@ -35,6 +37,13 @@ import gramps.gui.fs.person.fsg_sync as FSG_Sync
 from gramps.gen.fs import datab_familysearch
 from gramps.gen.fs.compare import compare_fs_to_gramps
 from gramps.gen.fs import utilities as fs_utilities
+import gramps.gen.fs.person.mixins.cache as cache_mod
+from gramps.gen.fs.person.mixins.cache import CacheMixin, _FsCache
+from gramps.gen.fs.person.mixins.helpers import HelpersMixin
+from gramps.gui.fs.manager import get_session
+from gramps.gui.fs.person.mixins.compare_gtk import CompareGtkMixin
+from gramps.gui.fs.person.mixins.source_import import SourceImportMixin
+from gramps.gui.fs.person.mixins.sources_dialog import SourcesDialogMixin
 
 logger = logging.getLogger(__name__)
 
@@ -68,14 +77,11 @@ class CompareWindow:
         self._open()
 
     def _open(self):
-        # no schema/table  generated
 
         # ensure a session exists + wire it into tree._fs_session
         sess = self.session
         if not sess:
             try:
-                from gramps.gui.fs.manager import get_session
-
                 sess = get_session(self.dbstate, self.uistate)
             except Exception:
                 sess = None
@@ -104,12 +110,6 @@ class CompareWindow:
 
         # person handle
         person_handle = getattr(self.person, "handle", None) or self.person
-
-        from gramps.gui.fs.person.mixins.compare_gtk import CompareGtkMixin
-        from gramps.gen.fs.person.mixins.cache import CacheMixin, _FsCache
-        from gramps.gen.fs.person.mixins.helpers import HelpersMixin
-        from gramps.gui.fs.person.mixins.sources_dialog import SourcesDialogMixin
-        from gramps.gui.fs.person.mixins.source_import import SourceImportMixin
 
         class _UistateProxy:
             """
@@ -176,8 +176,6 @@ class CompareWindow:
             _Shim.CONFIG = FSG_Sync.FSG_Sync.CONFIG
         except Exception:
             try:
-                from gramps.gen.config import config as _cfg
-
                 cm = _cfg.register_manager("FSG_Sync")
                 # register keys we use in SourcesDialogMixin
                 cm.register("preferences.fs_image_download_dir", "")
@@ -195,9 +193,6 @@ class CompareWindow:
 
         # Ensure cache exists (CacheMixin uses self.__class__._cache)
         if not getattr(_Shim, "_cache", None):
-            import os
-            import gramps.gen.fs.person.mixins.cache as cache_mod
-
             base_dir = os.path.dirname(cache_mod.__file__)
             _Shim._cache = _FsCache(base_dir)
 
