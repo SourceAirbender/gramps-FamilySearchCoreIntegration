@@ -21,13 +21,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import os
 from typing import Any, List, Optional, Tuple
 
 from gi.repository import GLib
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.db import DbTxn
-from gramps.gen.lib import Citation, Media, MediaRef, NoteType
+from gramps.gen.lib import Citation, Media, MediaRef, NoteType, Source, SrcAttribute
 from gramps.gen.mime import get_type
 from gramps.gen.utils.file import expand_media_path, relative_path
 from gramps.gui.dialog import WarningDialog
@@ -98,8 +99,6 @@ def _ensure_citation_has_source_and_link(
         src_handle = getattr(cit, "source_handle", None)
 
     if not src_handle:
-        from gramps.gen.lib import Source
-
         src = Source()
         src.set_title(title or "FamilySearch Source")
         if url:
@@ -140,8 +139,6 @@ def _ensure_citation_has_source_and_link(
     if url:
         try:
             if not fs_utilities.get_internet_address(cit):
-                from gramps.gen.lib import SrcAttribute
-
                 a = SrcAttribute()
                 a.set_type("Internet Address")
                 a.set_value(url)
@@ -197,8 +194,6 @@ class SourceImportMixin:
                     continue
 
             if not updated:
-                from gramps.gen.lib import SrcAttribute
-
                 a2 = SrcAttribute()
                 a2.set_type(key)
                 a2.set_value(val)
@@ -501,8 +496,6 @@ class SourceImportMixin:
                 src = self.dbstate.db.get_source_from_handle(sh)
         except Exception:
             src = None
-
-        import os
 
         for p in image_paths:
             if not p:
