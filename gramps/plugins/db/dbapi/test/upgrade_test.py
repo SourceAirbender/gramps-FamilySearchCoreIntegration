@@ -29,6 +29,7 @@ import tempfile
 import types
 import unittest
 
+
 ROOT_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")
 )
@@ -66,15 +67,18 @@ def _ensure_test_resources():
 
 
 os.environ["GRAMPS_RESOURCES"] = _ensure_test_resources()
-os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(prefix="gramps-home-")
+os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(
+    prefix="gramps-home-"
+)
 
 dialog_module = types.ModuleType("gramps.gui.dialog")
-dialog_module.InfoDialog = object
+setattr(dialog_module, "InfoDialog", object)
 sys.modules.setdefault("gramps.gui.dialog", dialog_module)
 
 
 from gramps.gen.db.dbconst import PERSON_KEY
 from gramps.gen.db.upgrade import gramps_upgrade_22
+
 
 DEFAULT_FAMILYSEARCH_SYNC_JSON = {
     "_class": "FamilySearchSync",
