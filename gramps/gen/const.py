@@ -46,9 +46,11 @@ LOG = logging.getLogger(".")
 from .git_revision import get_git_revision
 from .constfunc import (
     get_env_var,
+    get_user_home_dir,
     get_user_cache_dir,
     get_user_config_dir,
     get_user_data_dir,
+    win,
 )
 from ..version import VERSION, VERSION_TUPLE, major_version, DEV_VERSION
 from .utils.resourcepath import ResourcePath
@@ -104,33 +106,28 @@ if "GRAMPSHOME" in os.environ:
     USER_HOME = get_env_var("GRAMPSHOME")
     USER_DATA = os.path.join(USER_HOME, "gramps")
     USER_CONFIG = USER_DATA
-elif "USERPROFILE" in os.environ:
-    USER_HOME = get_env_var("USERPROFILE")
-    if "APPDATA" in os.environ:
-        USER_DATA = os.path.join(get_env_var("APPDATA"), "gramps")
-    else:
-        USER_DATA = os.path.join(USER_HOME, "AppData", "Roaming", "gramps")
-    USER_CONFIG = USER_DATA
-    # Migrate data from AppData\Local to AppData\Roaming on Windows.
-    OLD_HOME = os.path.join(USER_HOME, "AppData", "Local", "gramps")
-    if os.path.exists(OLD_HOME):
-        if os.path.exists(USER_DATA):
-            LOG.warning("Two Gramps application data directories exist.")
-        else:
-            shutil.move(OLD_HOME, USER_DATA)
 else:
-    USER_HOME = get_env_var("HOME")
+    USER_HOME = get_user_home_dir()
     USER_DATA = os.path.join(get_user_data_dir(), "gramps")
     USER_CONFIG = os.path.join(get_user_config_dir(), "gramps")
-    # Copy the database directory into the XDG directory.
-    OLD_HOME = os.path.join(USER_HOME, ".gramps")
-    if os.path.exists(OLD_HOME):
-        if os.path.exists(USER_DATA) or os.path.exists(USER_CONFIG):
-            LOG.warning("Two Gramps application data directories exist.")
-        else:
-            db_dir = os.path.join(OLD_HOME, "grampsdb")
-            if os.path.exists(db_dir):
-                shutil.copytree(db_dir, os.path.join(USER_DATA, "grampsdb"))
+    if win():
+        # Migrate data from AppData\Local to AppData\Roaming on Windows.
+        OLD_HOME = os.path.join(USER_HOME, "AppData", "Local", "gramps")
+        if os.path.exists(OLD_HOME):
+            if os.path.exists(USER_DATA):
+                LOG.warning("Two Gramps application data directories exist.")
+            else:
+                shutil.move(OLD_HOME, USER_DATA)
+    else:
+        # Copy the database directory into the XDG directory.
+        OLD_HOME = os.path.join(USER_HOME, ".gramps")
+        if os.path.exists(OLD_HOME):
+            if os.path.exists(USER_DATA) or os.path.exists(USER_CONFIG):
+                LOG.warning("Two Gramps application data directories exist.")
+            else:
+                db_dir = os.path.join(OLD_HOME, "grampsdb")
+                if os.path.exists(db_dir):
+                    shutil.copytree(db_dir, os.path.join(USER_DATA, "grampsdb"))
 
 USER_CACHE = os.path.join(get_user_cache_dir(), "gramps")
 
