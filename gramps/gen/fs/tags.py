@@ -45,7 +45,7 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.db import DbTxn
 from gramps.gen.lib import Person, Tag
 
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 
 _ = glocale.translation.gettext
 
@@ -356,7 +356,7 @@ def explain_out_of_sync(data: dict) -> List[str]:
 def get_tag_color_ui_note() -> str:
     return _(
         "FamilySearch status tag colors can be customized in Gramps via "
-        "Edit Tags. This add-on only sets default colors when the tags "
+        "Edit ? Tags. This add-on only sets default colors when the tags "
         "are first created and will not override your custom choices."
     )
 

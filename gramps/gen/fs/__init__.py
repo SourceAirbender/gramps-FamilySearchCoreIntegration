@@ -26,10 +26,10 @@ _LAZY_MODULES = {
     "tree": ".tree",
     "session": ".session",
     "constants": ".constants",
-    "datab_familysearch": ".datab_familysearch",
+    "db_familysearch": ".db_familysearch",
     "tags": ".tags",
-    "utilities": ".utilities",
-    "import_": ".import_",
+    "utils": ".utils",
+    "fs_import": ".fs_import",
 }
 
 _LAZY_ATTRS = {
@@ -68,10 +68,10 @@ __all__ = [
     "tree",
     "session",
     "constants",
-    "datab_familysearch",
+    "db_familysearch",
     "tags",
-    "utilities",
-    "import_",
+    "utils",
+    "fs_import",
     "Session",
     "get_active_session",
 ]

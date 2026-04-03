@@ -31,7 +31,7 @@ from typing import Any
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.errors import HandleError
 from gramps.gen.fs import tree as fs_tree
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.lib import Attribute, AttributeType, ChildRef, Family, Person
 
 logger = logging.getLogger(__name__)

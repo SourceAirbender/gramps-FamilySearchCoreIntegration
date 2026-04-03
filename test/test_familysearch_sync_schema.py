@@ -18,6 +18,7 @@
 #
 
 """Integration tests for FamilySearch sync storage and schema upgrade."""
+
 # python3 -m unittest discover -s test -p 'test_familysearch_sync_schema.py' -v
 
 from __future__ import annotations
@@ -30,6 +31,11 @@ import tempfile
 import types
 import unittest
 
+from gramps.gen.db import DbTxn
+from gramps.gen.db.dbconst import PERSON_KEY
+from gramps.gen.fs.db_familysearch import FSStatusDB
+from gramps.gen.lib import Person
+from gramps.plugins.db.dbapi.sqlite import SQLite
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -66,20 +72,11 @@ def _ensure_test_resources():
 
 
 os.environ["GRAMPS_RESOURCES"] = _ensure_test_resources()
-os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(
-    prefix="gramps-home-"
-)
+os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(prefix="gramps-home-")
 
 dialog_module = types.ModuleType("gramps.gui.dialog")
 setattr(dialog_module, "InfoDialog", object)
 sys.modules.setdefault("gramps.gui.dialog", dialog_module)
-
-
-from gramps.gen.db import DbTxn
-from gramps.gen.db.dbconst import PERSON_KEY
-from gramps.gen.fs.datab_familysearch import FSStatusDB
-from gramps.gen.lib import Person
-from gramps.plugins.db.dbapi.sqlite import SQLite
 
 
 DEFAULT_FAMILYSEARCH_SYNC = {
@@ -123,7 +120,9 @@ class _SQLiteIntegrationMixin:
 
 class FamilySearchSyncSQLiteIntegrationTest(_SQLiteIntegrationMixin, unittest.TestCase):
     def test_person_table_has_no_familysearch_sync_column(self):
-        self.assertFalse(self.db.dbapi.column_exists("person", "familysearch_sync_data"))
+        self.assertFalse(
+            self.db.dbapi.column_exists("person", "familysearch_sync_data")
+        )
 
     def test_db_api_round_trip_and_delete_updates_raw_person_json(self):
         person = self._create_person()
@@ -245,7 +244,9 @@ class FamilySearchSyncSQLiteIntegrationTest(_SQLiteIntegrationMixin, unittest.Te
         )
 
 
-class FamilySearchSyncUpgradeIntegrationTest(_SQLiteIntegrationMixin, unittest.TestCase):
+class FamilySearchSyncUpgradeIntegrationTest(
+    _SQLiteIntegrationMixin, unittest.TestCase
+):
     def _remove_familysearch_sync_from_person_json(self, handle):
         with DbTxn("Remove FamilySearch sync from raw JSON", self.db):
             person_data = copy.deepcopy(self.db.get_raw_person_data(handle))
@@ -274,6 +275,8 @@ class FamilySearchSyncUpgradeIntegrationTest(_SQLiteIntegrationMixin, unittest.T
             DEFAULT_FAMILYSEARCH_SYNC,
         )
         self.assertEqual(
-            self.db.get_person_from_handle(person_handle).get_familysearch_sync().to_status_dict(),
+            self.db.get_person_from_handle(person_handle)
+            .get_familysearch_sync()
+            .to_status_dict(),
             {},
         )

@@ -47,16 +47,15 @@ from gramps.gen.lib import (
 )
 
 from gramps.gen.fs import tree
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.fs.fs_import import deserializer as deserialize
-from gramps.gen.fs.utilities import fs_date_to_gramps_date
+from gramps.gen.fs.utils import fs_date_to_gramps_date
 
 from . import _
 
 LOG = logging.getLogger(__name__)
 
 _URL_RE = re.compile(r"https?://[^\s)\]\">]+")
-
 
 
 def _yield_handles(db, kind: str) -> Iterator[str]:
@@ -787,7 +786,7 @@ class IntermediateSource:
 
 def add_source(db, txn, sd_id, obj, existing_citation_handles):
     """Create/attach the Gramps citation chain for one FS source description id."""
-    # `existing_citation_handles` is passed in by callers 
+    # `existing_citation_handles` is passed in by callers
     fs_sd = deserialize.SourceDescription._index.get(sd_id)
     if not fs_sd:
         return

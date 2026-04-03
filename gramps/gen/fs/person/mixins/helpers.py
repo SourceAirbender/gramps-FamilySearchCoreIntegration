@@ -24,7 +24,7 @@ import time
 from typing import Any, TYPE_CHECKING
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.fs.fs_import import deserializer as deserialize
 from gramps.gen.lib import Person
 
@@ -99,7 +99,7 @@ class HelpersMixin:
 
     def _gather_sr_meta(self, fsid: str) -> dict[str, dict[str, Any]]:
         self._ensure_sources_cached(fsid)
-        fs_person = deserialize.Person._index.get(fsid) or deserialize.Person()
+        fs_person = deserialize.Person.index.get(fsid) or deserialize.Person()
 
         meta: dict[str, dict[str, Any]] = {}
 
@@ -164,7 +164,7 @@ class HelpersMixin:
     def _label_for_person_id(self, pid: str) -> str:
         try:
             self._ensure_person_cached(pid, with_relatives=False)
-            person = deserialize.Person._index.get(pid)
+            person = deserialize.Person.index.get(pid)
             if person:
                 name = person.preferred_name()
                 return f"{name.akSurname()}, {name.akGiven()} [{pid}]"

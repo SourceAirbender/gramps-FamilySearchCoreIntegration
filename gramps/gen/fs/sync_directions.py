@@ -40,7 +40,7 @@ from gramps.gen.lib import Attribute, AttributeType, Family, Person
 from gramps.gen.utils.db import get_birth_or_fallback
 from gramps.gen.utils.db import get_death_or_fallback
 
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.fs.fs_import import deserializer as deserialize
 
 _ = glocale.translation.gettext
@@ -884,7 +884,7 @@ def _build_person_payload(
             fact_type = ""
 
             if fact_id:
-                fs_person = deserialize.Person._index.get(fsid)
+                fs_person = deserialize.Person.index.get(fsid)
                 if fs_person and getattr(fs_person, "facts", None):
                     for fact_obj in fs_person.facts:
                         if getattr(fact_obj, "id", None) == fact_id and getattr(

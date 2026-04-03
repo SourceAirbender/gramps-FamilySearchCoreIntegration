@@ -34,9 +34,9 @@ from gramps.gen.db import DbTxn
 
 from gramps.gen.fs import tree
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
-from gramps.gen.fs import datab_familysearch
+from gramps.gen.fs import db_familysearch
 from gramps.gen.fs.compare import compare_fs_to_gramps
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 import gramps.gen.fs.person.mixins.cache as cache_mod
 from gramps.gen.fs.person.mixins.cache import CacheMixin, _FsCache
 from gramps.gen.fs.person.mixins.helpers import HelpersMixin
@@ -77,6 +77,7 @@ class CompareWindow:
         self._open()
 
     def _open(self):
+        # no schema/table  generated
 
         # ensure a session exists + wire it into tree._fs_session
         sess = self.session
@@ -264,7 +265,7 @@ class FSCompareWindow(PluginWindows.ToolManagedWindowBatch):
 
             status_ts = 0
             try:
-                st = datab_familysearch.FSStatusDB(self.db, handle)
+                st = db_familysearch.FSStatusDB(self.db, handle)
                 st.get()
                 status_ts = int(st.status_ts or 0)
             except Exception:

@@ -40,7 +40,7 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gui.dialog import OkDialog, WarningDialog
 
 import gramps.gen.fs.fs_import as fs_import
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.fs.fs_import import deserializer as deserialize
 from gramps.gui.fs import ui as fs_ui
 
@@ -693,7 +693,7 @@ class SourcesDialogMixin:
         deps = cast("_SourcesDialogDeps", self)
 
         deps._ensure_sources_cached(fsid)
-        fs_person = deserialize.Person._index.get(fsid)
+        fs_person = deserialize.Person.index.get(fsid)
         if not fs_person:
             return []
 

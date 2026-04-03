@@ -1014,16 +1014,16 @@ class Relationship(Subject):
                 self.facts = {f for f in facts if getattr(f, "id", None)}
 
         if self.type == "http://gedcomx.org/ParentChild":
-            if self.person2 and self.person2.resourceId in Person._index:
-                Person._index[self.person2.resourceId]._parents.add(self)
-            if self.person1 and self.person1.resourceId in Person._index:
-                Person._index[self.person1.resourceId]._children.add(self)
+            if self.person2 and self.person2.resourceId in Person.index:
+                Person.index[self.person2.resourceId]._parents.add(self)
+            if self.person1 and self.person1.resourceId in Person.index:
+                Person.index[self.person1.resourceId]._children.add(self)
 
         if self.type == "http://gedcomx.org/Couple":
-            if self.person1 and self.person1.resourceId in Person._index:
-                Person._index[self.person1.resourceId]._spouses.add(self)
-            if self.person2 and self.person2.resourceId in Person._index:
-                Person._index[self.person2.resourceId]._spouses.add(self)
+            if self.person1 and self.person1.resourceId in Person.index:
+                Person.index[self.person1.resourceId]._spouses.add(self)
+            if self.person2 and self.person2.resourceId in Person.index:
+                Person.index[self.person2.resourceId]._spouses.add(self)
 
 
 class ChildAndParentsRelationship(Subject):
@@ -1035,12 +1035,12 @@ class ChildAndParentsRelationship(Subject):
     parent2Facts: set[Fact]
 
     def postjson(self, d: Any) -> None:
-        if self.child and self.child.resourceId in Person._index:
-            Person._index[self.child.resourceId]._parentsCP.add(self)
-        if self.parent1 and self.parent1.resourceId in Person._index:
-            Person._index[self.parent1.resourceId]._childrenCP.add(self)
-        if self.parent2 and self.parent2.resourceId in Person._index:
-            Person._index[self.parent2.resourceId]._childrenCP.add(self)
+        if self.child and self.child.resourceId in Person.index:
+            Person.index[self.child.resourceId]._parentsCP.add(self)
+        if self.parent1 and self.parent1.resourceId in Person.index:
+            Person.index[self.parent1.resourceId]._childrenCP.add(self)
+        if self.parent2 and self.parent2.resourceId in Person.index:
+            Person.index[self.parent2.resourceId]._childrenCP.add(self)
 
 
 class Value:
@@ -1062,6 +1062,7 @@ class Field:
 
 class Person(Subject):
     _index: ClassVar[dict[str, "Person"]] = {}
+    index: ClassVar[dict[str, "Person"]] = _index
     private: bool
     living: bool
     gender: Gender

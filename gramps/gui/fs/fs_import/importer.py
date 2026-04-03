@@ -33,10 +33,10 @@ from gramps.gen.fs.fs_import.places import add_place
 from gramps.gen.fs.fs_import.importer import (
     FSToGrampsImporter as CoreFSToGrampsImporter,
 )
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 
 import gramps.gui.fs.person.fsg_sync as FSG_Sync
-from gramps.gui.fs.utilities.index import build_fs_index
+from gramps.gui.fs.utils.index import build_fs_index
 from gramps.gen.fs.compare import compare_fs_to_gramps
 
 

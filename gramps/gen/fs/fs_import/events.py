@@ -26,7 +26,7 @@ from gramps.gen.lib import Event, Attribute
 from . import _
 from .places import get_place_by_id, add_place
 from .notes import add_note
-from gramps.gen.fs.utilities import fs_date_to_gramps_date, get_fsftid
+from gramps.gen.fs.utils import fs_date_to_gramps_date, get_fsftid
 from gramps.gen.fs.constants import GEDCOMX_TO_GRAMPS_FACTS
 
 

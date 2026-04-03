@@ -53,7 +53,7 @@ from gramps.gui.dialog import WarningDialog
 from gramps.gui.listmodel import COLOR, NOSORT, TOGGLE, ListModel
 
 from gramps.gen.fs import sync_directions as fs_sync_core
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.fs.fs_import import deserializer as deserialize
 from gramps.gen.fs.compare import compare_fs_to_gramps
 import gramps.gen.fs.fs_import as fs_import_mod
@@ -827,7 +827,7 @@ def sync_to_familysearch(
         _bind_global_session(session)
         _prime_person_cache(session, fsid, force=True)
 
-        fs_person = deserialize.Person._index.get(fsid)
+        fs_person = deserialize.Person.index.get(fsid)
         if fs_person is None:
             WarningDialog(
                 _(

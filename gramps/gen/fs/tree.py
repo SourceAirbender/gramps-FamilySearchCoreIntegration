@@ -77,7 +77,7 @@ class Tree(deserialize.Gedcomx):
         deserialize.deserialize_json(self, data)
 
         try:
-            fs_person = deserialize.Person._index[fsid]
+            fs_person = deserialize.Person.index[fsid]
         except KeyError:
             return
 
@@ -106,8 +106,8 @@ class Tree(deserialize.Gedcomx):
         loop.run_until_complete(_load_many(loop, fids))
 
         for fid in fids:
-            if fid in deserialize.Person._index:
-                self._persons[fid] = deserialize.Person._index[fid]
+            if fid in deserialize.Person.index:
+                self._persons[fid] = deserialize.Person.index[fid]
 
     def add_parents(self, fids: Set[str]) -> Set[str]:
         rels: Set[str] = set()

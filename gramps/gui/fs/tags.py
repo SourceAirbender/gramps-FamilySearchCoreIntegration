@@ -20,11 +20,10 @@
 
 from __future__ import annotations
 
-Gtk = None
-try:
-    from gi.repository import Gtk
-except Exception:
-    Gtk = None
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk  # noqa: E402
 
 from gramps.gen.fs.tags import (
     TAG_LINKED,
@@ -44,9 +43,6 @@ from gramps.gen.fs.tags import (
 
 
 def build_tag_color_note_widget():
-    if Gtk is None:
-        return None
-
     box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
     try:

@@ -227,7 +227,7 @@ class CacheMixin:
                 except Exception as e:
                     print(f"[FS Cache] deserialize (disk) failed for {fsid}: {e}")
 
-                p = deserialize.Person._index.get(fsid)
+                p = deserialize.Person.index.get(fsid)
                 if p:
                     # mypy dynamic attrs
                     setattr(p, "_etag", disk[1])
@@ -240,7 +240,7 @@ class CacheMixin:
             # If still not present, download and then write to disk cache
             if fsid not in fs_tree._persons:
                 fs_tree.add_persons([fsid])
-                p = deserialize.Person._index.get(fsid)
+                p = deserialize.Person.index.get(fsid)
                 if p:
                     fs_tree._persons[fsid] = p
 
@@ -285,13 +285,13 @@ class CacheMixin:
             fs_tree.add_children({fsid})
             fs_tree.add_parents({fsid})
 
-        return deserialize.Person._index.get(fsid) or deserialize.Person()
+        return deserialize.Person.index.get(fsid) or deserialize.Person()
 
     def _ensure_notes_cached(self, fsid: str) -> None:
         cache = self.__class__._cache
         if cache:
             ce = cache.get_meta(fsid)
-            if ce and ce.loaded_notes and deserialize.Person._index.get(fsid):
+            if ce and ce.loaded_notes and deserialize.Person.index.get(fsid):
                 return
 
         fs_session = self._get_fs_session()
@@ -302,11 +302,11 @@ class CacheMixin:
             _get_json(f"/platform/tree/persons/{fsid}/notes")
 
         # compute spouses if not already present
-        p0 = deserialize.Person._index.get(fsid)
+        p0 = deserialize.Person.index.get(fsid)
         if not (p0 and getattr(p0, "_spouses", None) is not None):
             self.__class__._get_fs_tree().add_spouses({fsid})
 
-        p = deserialize.Person._index.get(fsid)
+        p = deserialize.Person.index.get(fsid)
         if p:
             for rel in getattr(p, "_spouses", []) or []:
                 if _get_json:
@@ -320,7 +320,7 @@ class CacheMixin:
         # loaded this session, dont fetch again
         if cache:
             ce = cache.get_meta(fsid)
-            if ce and ce.loaded_sources and deserialize.Person._index.get(fsid):
+            if ce and ce.loaded_sources and deserialize.Person.index.get(fsid):
                 return
 
         fs_session = self._get_fs_session()
@@ -331,11 +331,11 @@ class CacheMixin:
             _get_json(f"/platform/tree/persons/{fsid}/sources")
 
         # compute spouses if not already present
-        p0 = deserialize.Person._index.get(fsid)
+        p0 = deserialize.Person.index.get(fsid)
         if not (p0 and getattr(p0, "_spouses", None) is not None):
             self.__class__._get_fs_tree().add_spouses({fsid})
 
-        p = deserialize.Person._index.get(fsid)
+        p = deserialize.Person.index.get(fsid)
         if p:
             for rel in getattr(p, "_spouses", []) or []:
                 try:

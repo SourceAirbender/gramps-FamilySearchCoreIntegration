@@ -17,10 +17,8 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 
-# -*- coding: utf-8 -*-
-
 from __future__ import annotations
 
-from gramps.gen.fs.datab_familysearch import FSStatusDB
+from gramps.gen.fs.db_familysearch import FSStatusDB
 
 __all__ = ["FSStatusDB"]

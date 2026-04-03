@@ -21,13 +21,17 @@ from __future__ import annotations
 
 import os
 import logging
+from types import ModuleType
 
 from gramps.gen.config import config as _config
 
+grampsgui: ModuleType | None
 try:
-    from gramps.gui import grampsgui
+    from gramps.gui import grampsgui as _grampsgui
 except Exception:
     grampsgui = None
+else:
+    grampsgui = _grampsgui
 
 from .session import Session, get_active_session
 

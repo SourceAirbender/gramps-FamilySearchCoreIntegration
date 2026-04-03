@@ -23,7 +23,7 @@ import logging
 from gramps.gen.lib import Place, PlaceName, PlaceType, Url, UrlType, PlaceRef
 
 from . import _
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.fs import tree
 from gramps.gen.fs.constants import GEDCOMX_TO_GRAMPS_PLACES
 from gramps.gen.fs.fs_import import deserializer as deserialize

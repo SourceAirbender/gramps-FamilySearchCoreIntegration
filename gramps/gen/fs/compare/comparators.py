@@ -24,7 +24,7 @@ from urllib.parse import unquote
 from typing import List, Optional, Tuple
 
 from gramps.gen.fs.fs_import import deserializer as deserialize
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.fs import tree as fs_tree_mod
 from gramps.gen.fs.constants import GEDCOMX_TO_GRAMPS_FACTS
 
@@ -45,7 +45,7 @@ def _ensure_fs_people(person_ids: set[str]) -> None:
     if not wanted:
         return
 
-    missing = {pid for pid in wanted if pid not in deserialize.Person._index}
+    missing = {pid for pid in wanted if pid not in deserialize.Person.index}
     if not missing:
         return
 
@@ -68,7 +68,7 @@ def _fs_person_opt(fsid: str):
     if not fsid:
         return None
     _ensure_fs_people({fsid})
-    return deserialize.Person._index.get(fsid)
+    return deserialize.Person.index.get(fsid)
 
 
 def _fs_person_or_blank(fsid: str):
@@ -285,7 +285,7 @@ def compare_parents(db, gr_person: Person, fs_person) -> List[Tuple]:
         fs_mother_id = ""
         fs_mother = None
         for fsid in parent_ids:
-            fs2 = deserialize.Person._index.get(fsid) or deserialize.Person()
+            fs2 = deserialize.Person.index.get(fsid) or deserialize.Person()
             if fs2.gender and fs2.gender.type == "http://gedcomx.org/Male":
                 fs_father_id = fsid
                 fs_father = fs2

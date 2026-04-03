@@ -32,7 +32,7 @@ from gramps.gui.listmodel import ListModel, NOSORT, COLOR, TOGGLE
 from gramps.gen.lib import Person
 
 from gramps.gen.fs import tree
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 from gramps.gen.fs.compare import compare_fs_to_gramps
 import gramps.gen.fs.fs_import as fs_import
 from gramps.gui.fs import tags as fs_tags
@@ -741,7 +741,7 @@ class CompareGtkMixin:
     # ------------------ fills ------------------
 
     def _fill_overview(self, model: ListModel, gr: Person, fsid: str):
-        fs_person = deserialize.Person._index.get(fsid) or deserialize.Person()
+        fs_person = deserialize.Person.index.get(fsid) or deserialize.Person()
         try:
             compare_fs_to_gramps(
                 fs_person, gr, self.dbstate.db, model=model, dupdoc=True
@@ -751,7 +751,7 @@ class CompareGtkMixin:
 
     def _fill_notes(self, model: Any, gr: Person, fsid: str):
         self._ensure_notes_cached(fsid)
-        fs_person = deserialize.Person._index.get(fsid) or deserialize.Person()
+        fs_person = deserialize.Person.index.get(fsid) or deserialize.Person()
         if not fs_person:
             return
 
@@ -956,7 +956,7 @@ class CompareGtkMixin:
     def _fill_sources(self, model: Any, gr: Person, fsid: str) -> None:
         self._ensure_sources_cached(fsid)
 
-        fs_person = deserialize.Person._index.get(fsid) or deserialize.Person()
+        fs_person = deserialize.Person.index.get(fsid) or deserialize.Person()
         em = "_"
         fs_placeholder = (
             em if self.__class__.fs_Tree else _("Not connected to FamilySearch")

@@ -28,9 +28,9 @@ from typing import Any, Optional, Tuple
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.lib import EventType, Person
 
-from gramps.gen.fs import datab_familysearch
+from gramps.gen.fs import db_familysearch
 from gramps.gen.fs import tree
-from gramps.gen.fs import utilities as fs_utilities
+from gramps.gen.fs import utils as fs_utilities
 
 from .comparators import (
     compare_fact,
@@ -75,9 +75,9 @@ def compare_fs_to_gramps(
 ):
     """
     stores comparison timestamps/flags on the Person
-    via datab_familysearch.FSStatusDB (JSON attribute blob).
+    via db_familysearch.FSStatusDB (JSON attribute blob).
     """
-    db_state = datab_familysearch.FSStatusDB(db, gr_person.handle)
+    db_state = db_familysearch.FSStatusDB(db, gr_person.handle)
     db_state.get()
 
     # if we already compared after both FS + Gramps changes, skip.

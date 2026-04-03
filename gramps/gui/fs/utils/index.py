@@ -25,8 +25,8 @@ from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.lib import Person
 from gramps.gui.dialog import QuestionDialog2
 
-from gramps.gen.fs.utilities.attributes import get_fsftid
-from gramps.gen.fs.utilities.index import FS_INDEX_PEOPLE, FS_INDEX_PLACES
+from gramps.gen.fs.utils.attributes import get_fsftid
+from gramps.gen.fs.utils.index import FS_INDEX_PEOPLE, FS_INDEX_PLACES
 
 _ = glocale.translation.gettext
 
