@@ -26,10 +26,10 @@ import asyncio
 import email.utils
 import time
 
-from gramps.gen.fs.import_ import deserializer as deserialize
-from gramps.gen.fs.import_.deserializer import deserialize_json, to_string, DateFormal
-from gramps.gen.fs.import_.deserializer import all_annotations, init_class
-from gramps.gen.fs.import_.deserializer import (
+from gramps.gen.fs.fs_import import deserializer as deserialize
+from gramps.gen.fs.fs_import.deserializer import deserialize_json, to_string, DateFormal
+from gramps.gen.fs.fs_import.deserializer import all_annotations, init_class
+from gramps.gen.fs.fs_import.deserializer import (
     deserialize_json,
     serialize_json,
     to_string,

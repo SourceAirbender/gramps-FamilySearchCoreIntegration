@@ -33,9 +33,9 @@ from gramps.gen.mime import get_type
 from gramps.gen.utils.file import expand_media_path, relative_path
 from gramps.gui.dialog import WarningDialog
 
-import gramps.gen.fs.import_ as fs_import
+import gramps.gen.fs.fs_import as fs_import
 from gramps.gen.fs import utilities as fs_utilities
-from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.fs_import import deserializer as deserialize
 
 _ = glocale.translation.gettext
 

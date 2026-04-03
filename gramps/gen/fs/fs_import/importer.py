@@ -33,17 +33,17 @@ from gramps.gen.errors import HandleError
 from . import _
 from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs.utilities import get_fsftid
-from gramps.gen.fs.import_.names import add_names
-from gramps.gen.fs.import_.events import add_event
-from gramps.gen.fs.import_.notes import add_note
-from gramps.gen.fs.import_.sources import add_source
+from gramps.gen.fs.fs_import.names import add_names
+from gramps.gen.fs.fs_import.events import add_event
+from gramps.gen.fs.fs_import.notes import add_note
+from gramps.gen.fs.fs_import.sources import add_source
 
 
 class FSToGrampsImporter:
     """
     Core FamilySearch -> Gramps importer logic.
 
-    GUI/session/progress orchestration lives in gramps.gui.fs.import_.importer.
+    GUI/session/progress orchestration lives in gramps.gui.fs.fs_import.importer.
     """
 
     fs_TreeImp = None

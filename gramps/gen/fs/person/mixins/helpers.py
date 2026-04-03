@@ -25,7 +25,7 @@ from typing import Any, TYPE_CHECKING
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gen.fs import utilities as fs_utilities
-from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.fs_import import deserializer as deserialize
 from gramps.gen.lib import Person
 
 _ = glocale.translation.gettext

@@ -41,7 +41,7 @@ from gramps.gen.utils.db import get_birth_or_fallback
 from gramps.gen.utils.db import get_death_or_fallback
 
 from gramps.gen.fs import utilities as fs_utilities
-from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.fs_import import deserializer as deserialize
 
 _ = glocale.translation.gettext
 

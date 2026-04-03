@@ -39,9 +39,9 @@ except Exception:
 from gramps.gen.const import GRAMPS_LOCALE as glocale
 from gramps.gui.dialog import OkDialog, WarningDialog
 
-import gramps.gen.fs.import_ as fs_import
+import gramps.gen.fs.fs_import as fs_import
 from gramps.gen.fs import utilities as fs_utilities
-from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.fs_import import deserializer as deserialize
 from gramps.gui.fs import ui as fs_ui
 
 _has_img_picker = False

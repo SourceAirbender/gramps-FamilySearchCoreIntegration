@@ -51,16 +51,16 @@ from gramps.gen.fs.actions import (
     _strip_unknowns_inplace,
 )
 from gramps.gen.fs.compare import compare_fs_to_gramps
-from gramps.gen.fs.import_.events import add_event
-from gramps.gen.fs.import_ import deserializer as deserialize
-from gramps.gen.fs.import_.notes import add_note
+from gramps.gen.fs.fs_import.events import add_event
+from gramps.gen.fs.fs_import import deserializer as deserialize
+from gramps.gen.fs.fs_import.notes import add_note
 import gramps.gen.fs.person.mixins.cache as cache_mod
 from gramps.gui.dialog import ErrorDialog, OkDialog
 
 from . import sync_directions
 from . import ui as fs_ui
 from .compare.window import CompareWindow
-from .import_.importer import FSToGrampsImporter
+from .fs_import.importer import FSToGrampsImporter
 from .person import fsg_sync as FSG_Sync
 
 _ = glocale.translation.gettext

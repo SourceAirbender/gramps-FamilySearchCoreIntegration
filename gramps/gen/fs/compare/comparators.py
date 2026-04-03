@@ -23,7 +23,7 @@ import logging
 from urllib.parse import unquote
 from typing import List, Optional, Tuple
 
-from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.fs_import import deserializer as deserialize
 from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs import tree as fs_tree_mod
 from gramps.gen.fs.constants import GEDCOMX_TO_GRAMPS_FACTS

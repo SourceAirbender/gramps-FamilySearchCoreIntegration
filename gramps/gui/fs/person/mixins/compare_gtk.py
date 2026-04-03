@@ -34,9 +34,9 @@ from gramps.gen.lib import Person
 from gramps.gen.fs import tree
 from gramps.gen.fs import utilities as fs_utilities
 from gramps.gen.fs.compare import compare_fs_to_gramps
-import gramps.gen.fs.import_ as fs_import
+import gramps.gen.fs.fs_import as fs_import
 from gramps.gui.fs import tags as fs_tags
-from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.fs_import import deserializer as deserialize
 
 _ = glocale.translation.gettext
 

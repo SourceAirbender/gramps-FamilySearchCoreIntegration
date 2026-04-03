@@ -54,9 +54,9 @@ from gramps.gui.listmodel import COLOR, NOSORT, TOGGLE, ListModel
 
 from gramps.gen.fs import sync_directions as fs_sync_core
 from gramps.gen.fs import utilities as fs_utilities
-from gramps.gen.fs.import_ import deserializer as deserialize
+from gramps.gen.fs.fs_import import deserializer as deserialize
 from gramps.gen.fs.compare import compare_fs_to_gramps
-import gramps.gen.fs.import_ as fs_import_mod
+import gramps.gen.fs.fs_import as fs_import_mod
 import gramps.gui.fs.person.fsg_sync as fsg_sync
 
 _ = glocale.translation.gettext
