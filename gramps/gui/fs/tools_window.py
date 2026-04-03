@@ -18,6 +18,12 @@
 # with this program; if not, see <https://www.gnu.org/licenses/>.
 #
 
+"""
+FamilySearch tools window for the gtk side of the integration.
+it tracks the active Edit Person context, then routes button clicks into the
+existing actions/sync helpers
+"""
+
 from __future__ import annotations
 
 import gc
@@ -29,12 +35,15 @@ from typing import Any, Callable, Optional, cast
 
 from gi.repository import GdkPixbuf, GLib, Gtk
 
-from gramps.gen.const import GRAMPS_LOCALE as glocale
+from gramps.gen.const import DATA_DIR, GRAMPS_LOCALE as glocale
 from gramps.gen.const import IMAGE_DIR as _GRAMPS_IMAGE_DIR
 from gramps.gen.display.name import displayer as name_displayer
 from gramps.gui.dialog import ErrorDialog
+from gramps.gui.editors.editperson import EditPerson
 from gramps.gen.errors import HandleError
 
+from . import actions
+from . import sync_directions as fs_syncdir
 from . import ui as fs_ui
 from .tags import build_tag_color_note_widget
 
@@ -52,7 +61,7 @@ def _dbg(message: str) -> None:
 
 
 def _show_error(parent: Gtk.Window, title: str, message: str) -> None:
-    # If Gramps' dialog path blows up for some reason, still show something.
+    # If Gramps dialog path doesnt load up for some reason, still show something
     try:
         ErrorDialog(title, message, parent=parent)
     except Exception:
@@ -77,6 +86,7 @@ def _person_handle(person: Any) -> Optional[str]:
 
 
 def _person_exists_in_db(dbstate: Any, handle: str) -> bool:
+    """Check that the current person handle really resolves in the db."""
     db = getattr(dbstate, "db", None)
     if db is None or not handle:
         return False
@@ -112,6 +122,8 @@ def _get_editor_window(editor: Any) -> Any:
 
 @dataclass
 class _EditorCtx:
+    """Last known Edit Person context for the tools window singleton."""
+
     dbstate: Any = None
     uistate: Any = None
     track: Any = None
@@ -136,6 +148,7 @@ def notify_from_person_editor(
     person: Any,
     editor: Any = None,
 ) -> None:
+    """Refresh the shared editor context from the active Edit Person window."""
     global _LAST_EDITOR
 
     person_handle = _person_handle(person)
@@ -164,15 +177,10 @@ def notify_from_person_editor(
 
 
 def _install_editperson_hook() -> None:
+    """Hook EditPerson once so the tools window can follow focus/context changes."""
     global _EDITPERSON_HOOK_INSTALLED
 
     if _EDITPERSON_HOOK_INSTALLED:
-        return
-
-    try:
-        from gramps.gui.editors.editperson import EditPerson
-    except Exception as exc:
-        _dbg(f"EditPerson import failed, hook not installed yet: {exc}")
         return
 
     editor_class = cast(Any, EditPerson)
@@ -193,7 +201,7 @@ def _install_editperson_hook() -> None:
         setattr(editor, "_fs_tools_hook_attached", True)
 
         def _fire() -> bool:
-            # This runs from GTK callbacks. Don't let one bad editor state kill the UI loop.
+            # This runs from GTK callbacks
             try:
                 notify_from_person_editor(
                     editor.dbstate,
@@ -225,11 +233,7 @@ def _install_editperson_hook() -> None:
 
 
 def _find_open_editperson_instance() -> Any:
-    try:
-        from gramps.gui.editors.editperson import EditPerson
-    except Exception:
-        return None
-
+    """Best-effort search for a visible Edit Person window to latch onto."""
     app = Gtk.Application.get_default()
     active_window = app.get_active_window() if app is not None else None
     fallback_editor = None
@@ -251,6 +255,7 @@ def _find_open_editperson_instance() -> Any:
 
 
 def close_tools_window() -> None:
+    """Close the singleton tools window if it is open."""
     global _SINGLETON
 
     if _SINGLETON is None:
@@ -263,6 +268,7 @@ def close_tools_window() -> None:
 
 
 def toggle_tools_window(session: Any, dbstate: Any = None, uistate: Any = None) -> None:
+    """Toggle the singleton tools window on/off."""
     global _SINGLETON
 
     _install_editperson_hook()
@@ -291,6 +297,8 @@ def present_tools_window(
 
 
 class FamilySearchToolsWindow:
+    """control window for the main FamilySearch actions"""
+
     _BANNER_MAX_HEIGHT = 120
     _BANNER_MIN_HEIGHT = 64
     _BANNER_SIDE_PAD = 10
@@ -310,6 +318,7 @@ class FamilySearchToolsWindow:
 
         self._install_css()
 
+        # layout is simple on purpose, status row, person actions, imports & utilities
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.window.add(outer)
 
@@ -435,52 +444,36 @@ class FamilySearchToolsWindow:
         self._tick()
 
     def _install_css(self) -> None:
-        css = b"""
-        .fs-tools-window { }
+        """Install the shared gramps.css file for the tools window."""
+        candidate_paths = [
+            self._repo_gramps_css_path(),
+            os.path.join(DATA_DIR, "gramps.css"),
+        ]
+        for css_path in candidate_paths:
+            try:
+                if not os.path.isfile(css_path):
+                    continue
+                with open(css_path, "rb") as handle:
+                    css = handle.read()
+                if fs_ui.install_css_once("fs.tools_window", css):
+                    _dbg(f"Loaded tools CSS from {css_path}")
+                    return
+            except Exception:
+                continue
 
-        .fs-banner {
-            border-radius: 10px;
-            border: 1px solid rgba(0,0,0,0.08);
-            background-color: rgba(0,0,0,0.03);
-        }
-
-        .fs-status-row { padding: 2px; }
-
-        .fs-active-label {
-            opacity: 0.92;
-            font-weight: 600;
-        }
-
-        .fs-section {
-            border-radius: 12px;
-            border: 1px solid rgba(0,0,0,0.10);
-        }
-
-        .fs-section-title {
-            font-weight: 700;
-            letter-spacing: 0.2px;
-        }
-
-        .fs-sec-person {
-            background-color: rgba(0, 120, 170, 0.10);
-            border-color: rgba(0, 120, 170, 0.22);
-        }
-
-        .fs-sec-import {
-            background-color: rgba(46, 125, 50, 0.10);
-            border-color: rgba(46, 125, 50, 0.22);
-        }
-
-        .fs-sec-util {
-            background-color: rgba(80, 80, 80, 0.06);
-            border-color: rgba(0, 0, 0, 0.16);
-        }
-        """
-        fs_ui.install_css_once("fs.tools_window", css)
+    @staticmethod
+    def _repo_gramps_css_path() -> str:
+        """Return this project copy of data/gramps.css before falling back to DATA_DIR."""
+        return os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__), "..", "..", "..", "data", "gramps.css"
+            )
+        )
 
     def _make_section(
         self, title: str, css_class: str
     ) -> tuple[Gtk.Widget, Gtk.FlowBox]:
+        """Build one titled button section."""
         wrapper = Gtk.EventBox()
         wrapper.set_visible_window(True)
 
@@ -526,6 +519,7 @@ class FamilySearchToolsWindow:
         flow.add(child)
 
     def _build_banner(self) -> Optional[Gtk.Widget]:
+        """Build the banner/logo row if the image is available."""
         pixbuf = self._load_logo_pixbuf()
         if pixbuf is None:
             _dbg("FamilySearch logo not found; banner disabled")
@@ -637,6 +631,7 @@ class FamilySearchToolsWindow:
         )
 
     def _editor_person_obj(self) -> Any:
+        # Return the db-backed editor person when possible
         # The DB copy is the one that matters for compare/sync logic.
         person_handle = _LAST_EDITOR.person_handle
         dbstate = _LAST_EDITOR.dbstate
@@ -660,6 +655,7 @@ class FamilySearchToolsWindow:
         return None
 
     def _update_label(self) -> None:
+        """Refresh the label that shows which editor person were on"""
         person = self._editor_person_obj()
         if person is None:
             self.active_label.set_text(_("Editor person: (none)"))
@@ -687,6 +683,7 @@ class FamilySearchToolsWindow:
             )
 
     def _set_action_sensitivity(self, enabled: bool) -> None:
+        """Enable/disable buttons based on connection state and editor readiness."""
         for button in (
             self.btn_link,
             self.btn_cmp,
@@ -705,6 +702,7 @@ class FamilySearchToolsWindow:
         self.btn_clear_cache.set_sensitive(bool(self._fs_connected()))
 
     def _tick(self, *_args: Any) -> bool:
+        """Periodic refresh so the floating window stays in sync with the editor."""
         _install_editperson_hook()
 
         person_handle = _LAST_EDITOR.person_handle
@@ -723,6 +721,7 @@ class FamilySearchToolsWindow:
         return False
 
     def _require_ready(self) -> Any:
+        """Return the active person only when session + editor context are usable."""
         if not self._fs_connected():
             _show_info(self.window, "FamilySearch", "Not connected to FamilySearch.")
             return None
@@ -756,6 +755,7 @@ class FamilySearchToolsWindow:
         return person
 
     def _ctx(self) -> Optional[dict[str, Any]]:
+        """Build the full action context for person-specific actions."""
         person = self._require_ready()
         if person is None:
             return None
@@ -771,6 +771,7 @@ class FamilySearchToolsWindow:
         }
 
     def _ctx_db_only(self) -> Optional[dict[str, Any]]:
+        """Build context for actions that only need db/ui state."""
         if not self._fs_connected():
             _show_info(self.window, "FamilySearch", "Not connected to FamilySearch.")
             return None
@@ -815,6 +816,7 @@ class FamilySearchToolsWindow:
         error_prefix: str,
         ctx: Optional[dict[str, Any]],
     ) -> None:
+        """Call one of the action helpers with the standard editor/session context."""
         if not ctx:
             return
 
@@ -836,25 +838,14 @@ class FamilySearchToolsWindow:
         if not ctx:
             return
 
-        try:
-            from . import actions
+        fn = getattr(actions, "export_basic_to_familysearch", None)
+        if callable(fn):
+            self._call_action(fn, "Export failed", ctx)
+            return
 
-            fn = getattr(actions, "export_basic_to_familysearch", None)
-            if callable(fn):
-                self._call_action(fn, "Export failed", ctx)
-                return
-        except Exception:
-            pass
-
-        try:
-            from . import sync_directions as fs_syncdir
-
-            fn = getattr(fs_syncdir, "export_basic_people_to_familysearch", None)
-            if callable(fn):
-                self._call_action(fn, "Export failed", ctx)
-                return
-        except Exception as exc:
-            _show_error(self.window, "FamilySearch", f"Export failed: {exc}")
+        fn = getattr(fs_syncdir, "export_basic_people_to_familysearch", None)
+        if callable(fn):
+            self._call_action(fn, "Export failed", ctx)
             return
 
         _show_error(
@@ -866,8 +857,6 @@ class FamilySearchToolsWindow:
         if not ctx:
             return
 
-        from . import actions
-
         self._call_action(actions.link_familysearch_id, "Link failed", ctx)
 
     def _on_compare(self, *_args: Any) -> None:
@@ -875,16 +864,12 @@ class FamilySearchToolsWindow:
         if not ctx:
             return
 
-        from . import actions
-
         self._call_action(actions.compare_person, "Compare failed", ctx)
 
     def _on_sync(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
-
-        from . import actions
 
         fn = getattr(actions, "sync_from_familysearch", None)
         if not callable(fn):
@@ -906,27 +891,14 @@ class FamilySearchToolsWindow:
         if not ctx:
             return
 
-        try:
-            from . import actions
+        fn = getattr(actions, "sync_to_familysearch", None)
+        if callable(fn):
+            self._call_action(fn, "Sync to FamilySearch failed", ctx)
+            return
 
-            fn = getattr(actions, "sync_to_familysearch", None)
-            if callable(fn):
-                self._call_action(fn, "Sync to FamilySearch failed", ctx)
-                return
-        except Exception:
-            pass
-
-        try:
-            from . import sync_directions as fs_syncdir
-
-            fn = getattr(fs_syncdir, "sync_to_familysearch", None)
-            if callable(fn):
-                self._call_action(fn, "Sync to FamilySearch failed", ctx)
-                return
-        except Exception as exc:
-            _show_error(
-                self.window, "FamilySearch", f"Sync to FamilySearch failed: {exc}"
-            )
+        fn = getattr(fs_syncdir, "sync_to_familysearch", None)
+        if callable(fn):
+            self._call_action(fn, "Sync to FamilySearch failed", ctx)
             return
 
         _show_error(
@@ -940,16 +912,12 @@ class FamilySearchToolsWindow:
         if not ctx:
             return
 
-        from . import actions
-
         self._call_action(actions.import_parents, "Import parents failed", ctx)
 
     def _on_import_spouse(self, *_args: Any) -> None:
         ctx = self._ctx()
         if not ctx:
             return
-
-        from . import actions
 
         self._call_action(actions.import_spouse, "Import spouse failed", ctx)
 
@@ -958,8 +926,6 @@ class FamilySearchToolsWindow:
         if not ctx:
             return
 
-        from . import actions
-
         self._call_action(actions.import_children, "Import children failed", ctx)
 
     def _on_tags(self, *_args: Any) -> None:
@@ -967,15 +933,11 @@ class FamilySearchToolsWindow:
         if not ctx:
             return
 
-        from . import actions
-
         self._call_action(actions.tags_dialog, "Tags failed", ctx)
 
     def _on_clear_cache(self, *_args: Any) -> None:
         ctx = self._ctx_db_only()
         if not ctx:
             return
-
-        from . import actions
 
         self._call_action(actions.clear_cache, "Clear cache failed", ctx)

@@ -55,6 +55,12 @@ label.error {
 @define-color fs_compare_only_gramps_bg #FFF3BF;
 @define-color fs_compare_only_fs_bg #D0EBFF;
 @define-color fs_compare_critical_bg #FFE3E3;
+@define-color fs_tools_person_bg rgba(0, 120, 170, 0.10);
+@define-color fs_tools_person_border rgba(0, 120, 170, 0.22);
+@define-color fs_tools_import_bg rgba(46, 125, 50, 0.10);
+@define-color fs_tools_import_border rgba(46, 125, 50, 0.22);
+@define-color fs_tools_util_bg rgba(80, 80, 80, 0.06);
+@define-color fs_tools_util_border rgba(0, 0, 0, 0.16);
 
 .fs-compare-window { }
 
@@ -98,5 +104,48 @@ box.fs-compare-legend,
 
 .fs-compare-treeview header button {
   font-weight: 700;
+}
+
+/* FamilySearch - tools window */
+.fs-tools-window { }
+
+.fs-banner {
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background-color: rgba(0,0,0,0.03);
+}
+
+.fs-status-row {
+  padding: 2px;
+}
+
+.fs-active-label {
+  opacity: 0.92;
+  font-weight: 600;
+}
+
+.fs-section {
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.10);
+}
+
+.fs-section-title {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.fs-sec-person {
+  background-color: @fs_tools_person_bg;
+  border-color: @fs_tools_person_border;
+}
+
+.fs-sec-import {
+  background-color: @fs_tools_import_bg;
+  border-color: @fs_tools_import_border;
+}
+
+.fs-sec-util {
+  background-color: @fs_tools_util_bg;
+  border-color: @fs_tools_util_border;
 }
 
