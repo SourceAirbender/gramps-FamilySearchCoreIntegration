@@ -1,143 +1,101 @@
-import json
+#
+# Gramps - a GTK+/GNOME based genealogy program
+#
+# Copyright (C) 2026      Gabriel Rios
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, see <https://www.gnu.org/licenses/>.
+#
+
+"""Integration tests for FamilySearch sync storage and schema upgrade."""
+# python3 -m unittest discover -s test -p 'test_familysearch_sync_schema.py' -v
+
+from __future__ import annotations
+
+import copy
 import os
-import sqlite3
+import shutil
+import sys
 import tempfile
+import types
 import unittest
 
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+
+def _ensure_test_resources():
+    resource_path = os.environ.get("GRAMPS_RESOURCES")
+    if resource_path and os.path.exists(
+        os.path.join(resource_path, "gramps", "authors.xml")
+    ):
+        return resource_path
+
+    build_share = os.path.join(ROOT_DIR, "build", "share")
+    if os.path.exists(os.path.join(build_share, "gramps", "authors.xml")):
+        return build_share
+
+    resource_path = tempfile.mkdtemp(prefix="gramps-resources-")
+    os.makedirs(os.path.join(resource_path, "gramps", "images"), exist_ok=True)
+    os.makedirs(os.path.join(resource_path, "doc", "gramps"), exist_ok=True)
+    os.makedirs(os.path.join(resource_path, "locale"), exist_ok=True)
+
+    shutil.copyfile(
+        os.path.join(ROOT_DIR, "data", "authors.xml"),
+        os.path.join(resource_path, "gramps", "authors.xml"),
+    )
+    shutil.copyfile(
+        os.path.join(ROOT_DIR, "images", "gramps.png"),
+        os.path.join(resource_path, "gramps", "images", "gramps.png"),
+    )
+    shutil.copyfile(
+        os.path.join(ROOT_DIR, "COPYING"),
+        os.path.join(resource_path, "doc", "gramps", "COPYING"),
+    )
+    return resource_path
+
+
+os.environ["GRAMPS_RESOURCES"] = _ensure_test_resources()
+os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(
+    prefix="gramps-home-"
+)
+
+dialog_module = types.ModuleType("gramps.gui.dialog")
+setattr(dialog_module, "InfoDialog", object)
+sys.modules.setdefault("gramps.gui.dialog", dialog_module)
+
+
 from gramps.gen.db import DbTxn
+from gramps.gen.db.dbconst import PERSON_KEY
+from gramps.gen.fs.datab_familysearch import FSStatusDB
 from gramps.gen.lib import Person
-from gramps.gui.fs.datab_familysearch import FSStatusDB
 from gramps.plugins.db.dbapi.sqlite import SQLite
 
 
-class FakeDb:
-    """
-    Tiny fake DB for unit tests of FSStatusDB.
-
-    Only implements the API methods used by FSStatusDB.
-    """
-
-    def __init__(self):
-        self.rows = {}
-
-    def get_familysearch_person_status(self, person_handle, default=None):
-        if person_handle in self.rows:
-            return dict(self.rows[person_handle])
-        return {} if default is None else default
-
-    def set_familysearch_person_status(self, person_handle, status, transaction=None):
-        self.rows[person_handle] = dict(status)
-
-    def delete_familysearch_person_status(self, person_handle, transaction=None):
-        self.rows.pop(person_handle, None)
+DEFAULT_FAMILYSEARCH_SYNC = {
+    "_class": "FamilySearchSync",
+    "fsid": None,
+    "is_root": False,
+    "status_ts": None,
+    "confirmed_ts": None,
+    "gramps_modified_ts": None,
+    "fs_modified_ts": None,
+    "essential_conflict": False,
+    "conflict": False,
+}
 
 
-class FamilySearchSyncPersonModelTest(unittest.TestCase):
-    def test_person_serialize_unserialize_round_trip_with_familysearch_sync(self):
-        person = Person()
-        sync = person.get_familysearch_sync()
-        sync.from_status_dict(
-            {
-                "fsid": "GSVF-SGV",
-                "is_root": True,
-                "status_ts": 123,
-                "confirmed_ts": 456,
-                "gramps_modified_ts": 789,
-                "fs_modified_ts": 999,
-                "essential_conflict": True,
-                "conflict": True,
-            }
-        )
-        person.set_familysearch_sync(sync)
-
-        loaded = Person()
-        loaded.unserialize(person.serialize())
-
-        self.assertEqual(
-            loaded.get_familysearch_sync().to_status_dict(),
-            {
-                "fsid": "GSVF-SGV",
-                "is_root": True,
-                "status_ts": 123,
-                "confirmed_ts": 456,
-                "gramps_modified_ts": 789,
-                "fs_modified_ts": 999,
-                "essential_conflict": True,
-                "conflict": True,
-            },
-        )
-
-    def test_person_unserialize_v21_tuple_defaults_empty_familysearch_sync(self):
-        person = Person()
-
-        # Simulate the old v21 tuple shape without the appended
-        # familysearch_sync field.
-        old_v21_data = person.serialize()[:-1]
-
-        loaded = Person()
-        loaded.unserialize(old_v21_data)
-
-        self.assertEqual(loaded.get_familysearch_sync().to_status_dict(), {})
-
-
-class FSStatusDBUnitTest(unittest.TestCase):
-    def test_commit_and_get_round_trip_with_fake_db(self):
-        db = FakeDb()
-
-        status = FSStatusDB(db, "P1")
-        status.fsid = "GSVF-SGV"
-        status.is_root = True
-        status.status_ts = 123
-        status.confirmed_ts = 456
-        status.gramps_modified_ts = 789
-        status.fs_modified_ts = 999
-        status.essential_conflict = True
-        status.conflict = False
-
-        # Pass a dummy txn so FSStatusDB won't try to open a real DbTxn on FakeDb
-        status.commit(txn=object())
-
-        self.assertEqual(
-            db.rows["P1"],
-            {
-                "fsid": "GSVF-SGV",
-                "is_root": True,
-                "status_ts": 123,
-                "confirmed_ts": 456,
-                "gramps_modified_ts": 789,
-                "fs_modified_ts": 999,
-                "essential_conflict": True,
-            },
-        )
-
-        loaded = FSStatusDB(db)
-        loaded.get("P1")
-
-        self.assertEqual(loaded.p_handle, "P1")
-        self.assertEqual(loaded.fsid, "GSVF-SGV")
-        self.assertTrue(loaded.is_root)
-        self.assertEqual(loaded.status_ts, 123)
-        self.assertEqual(loaded.confirmed_ts, 456)
-        self.assertEqual(loaded.gramps_modified_ts, 789)
-        self.assertEqual(loaded.fs_modified_ts, 999)
-        self.assertTrue(loaded.essential_conflict)
-        self.assertFalse(loaded.conflict)
-
-    def test_empty_commit_deletes_status_row(self):
-        db = FakeDb()
-        db.rows["P1"] = {
-            "fsid": "OLD-ID",
-            "is_root": True,
-            "status_ts": 1,
-        }
-
-        status = FSStatusDB(db, "P1")
-        status.commit(txn=object())
-
-        self.assertNotIn("P1", db.rows)
-
-
-class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
+class _SQLiteIntegrationMixin:
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.dbdir = self.tempdir.name
@@ -151,8 +109,10 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
         finally:
             self.tempdir.cleanup()
 
-    def _sqlite_path(self):
-        return os.path.join(self.dbdir, "sqlite.db")
+    def _open_db(self, *, force_schema_upgrade=False):
+        db = SQLite()
+        db.load(self.dbdir, force_schema_upgrade=force_schema_upgrade)
+        return db
 
     def _create_person(self):
         person = Person()
@@ -160,17 +120,28 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
             self.db.add_person(person, txn)
         return person
 
+
+class FamilySearchSyncSQLiteIntegrationTest(_SQLiteIntegrationMixin, unittest.TestCase):
     def test_person_table_has_no_familysearch_sync_column(self):
-        with sqlite3.connect(self._sqlite_path()) as con:
-            cols = {r[1] for r in con.execute("PRAGMA table_info('person')").fetchall()}
+        self.assertFalse(self.db.dbapi.column_exists("person", "familysearch_sync_data"))
 
-        self.assertNotIn("familysearch_sync_data", cols)
-
-    def test_db_api_round_trip_and_delete(self):
+    def test_db_api_round_trip_and_delete_updates_raw_person_json(self):
         person = self._create_person()
+        status = {
+            "fsid": "ABCD-EFG",
+            "is_root": True,
+            "status_ts": 111,
+            "confirmed_ts": 222,
+            "gramps_modified_ts": 333,
+            "fs_modified_ts": 444,
+            "essential_conflict": True,
+            "conflict": False,
+        }
 
-        self.db.set_familysearch_person_status(
-            person.handle,
+        self.db.set_familysearch_person_status(person.handle, status)
+
+        self.assertEqual(
+            self.db.get_familysearch_person_status(person.handle, {}),
             {
                 "fsid": "ABCD-EFG",
                 "is_root": True,
@@ -179,14 +150,12 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
                 "gramps_modified_ts": 333,
                 "fs_modified_ts": 444,
                 "essential_conflict": True,
-                "conflict": False,
             },
         )
-
-        row = self.db.get_familysearch_person_status(person.handle, {})
         self.assertEqual(
-            row,
+            self.db.get_raw_person_data(person.handle)["familysearch_sync"],
             {
+                "_class": "FamilySearchSync",
                 "fsid": "ABCD-EFG",
                 "is_root": True,
                 "status_ts": 111,
@@ -199,7 +168,12 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
         )
 
         self.db.delete_familysearch_person_status(person.handle)
+
         self.assertEqual(self.db.get_familysearch_person_status(person.handle, {}), {})
+        self.assertEqual(
+            self.db.get_raw_person_data(person.handle)["familysearch_sync"],
+            DEFAULT_FAMILYSEARCH_SYNC,
+        )
 
     def test_person_object_round_trip(self):
         person = self._create_person()
@@ -219,10 +193,9 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
         )
 
         loaded = self.db.get_person_from_handle(person.handle)
-        sync = loaded.get_familysearch_sync()
 
         self.assertEqual(
-            sync.to_status_dict(),
+            loaded.get_familysearch_sync().to_status_dict(),
             {
                 "fsid": "WXYZ-123",
                 "is_root": True,
@@ -252,6 +225,7 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
         loaded = FSStatusDB(self.db)
         loaded.get(person.handle)
 
+        self.assertEqual(loaded.p_handle, person.handle)
         self.assertEqual(loaded.fsid, "WXYZ-123")
         self.assertTrue(loaded.is_root)
         self.assertEqual(loaded.status_ts, 1000)
@@ -265,74 +239,41 @@ class FamilySearchSyncSQLiteIntegrationTest(unittest.TestCase):
         cleared.commit()
 
         self.assertEqual(self.db.get_familysearch_person_status(person.handle, {}), {})
+        self.assertEqual(
+            self.db.get_raw_person_data(person.handle)["familysearch_sync"],
+            DEFAULT_FAMILYSEARCH_SYNC,
+        )
 
 
-class FamilySearchSyncUpgradeIntegrationTest(unittest.TestCase):
-    def _remove_familysearch_sync_from_person_json(self, sqlite_path, handle):
-        with sqlite3.connect(sqlite_path) as con:
-            row = con.execute(
-                "SELECT json_data FROM person WHERE handle = ?",
-                [handle],
-            ).fetchone()
-            self.assertIsNotNone(row)
+class FamilySearchSyncUpgradeIntegrationTest(_SQLiteIntegrationMixin, unittest.TestCase):
+    def _remove_familysearch_sync_from_person_json(self, handle):
+        with DbTxn("Remove FamilySearch sync from raw JSON", self.db):
+            person_data = copy.deepcopy(self.db.get_raw_person_data(handle))
+            person_data.pop("familysearch_sync", None)
+            self.db._commit_raw(person_data, PERSON_KEY)
 
-            data = json.loads(row[0])
-            data.pop("familysearch_sync", None)
+        self.assertNotIn(
+            "familysearch_sync",
+            self.db.get_raw_person_data(handle),
+        )
 
-            con.execute(
-                "UPDATE person SET json_data = ? WHERE handle = ?",
-                [json.dumps(data, separators=(",", ":")), handle],
-            )
-            con.commit()
+    def test_upgrade_from_v21_rewrites_person_json_with_default_familysearch_sync(self):
+        person = self._create_person()
+        person_handle = person.handle
 
-    def test_upgrade_from_v21_rewrites_person_json_with_familysearch_sync(self):
-        with tempfile.TemporaryDirectory() as dbdir:
-            db = SQLite()
-            db.load(dbdir)
+        self._remove_familysearch_sync_from_person_json(person_handle)
+        self.db.set_schema_version(21)
+        self.db.close(update=False)
 
-            person = Person()
-            with DbTxn("Add test person", db) as txn:
-                db.add_person(person, txn)
+        upgraded = self._open_db(force_schema_upgrade=True)
+        self.db = upgraded
 
-            person_handle = person.handle
-            db.close()
-
-            sqlite_path = os.path.join(dbdir, "sqlite.db")
-            self._remove_familysearch_sync_from_person_json(sqlite_path, person_handle)
-
-            with sqlite3.connect(sqlite_path) as con:
-                row = con.execute(
-                    "SELECT json_data FROM person WHERE handle = ?",
-                    [person_handle],
-                ).fetchone()
-                data = json.loads(row[0])
-                self.assertNotIn("familysearch_sync", data)
-
-            downgraded = SQLite()
-            downgraded.load(dbdir)
-            downgraded.set_schema_version(21)
-            downgraded.close(update=False)
-
-            upgraded = SQLite()
-            upgraded.load(dbdir, force_schema_upgrade=True)
-
-            try:
-                self.assertEqual(upgraded.get_schema_version(), 22)
-
-                loaded = upgraded.get_person_from_handle(person_handle)
-                self.assertEqual(loaded.get_familysearch_sync().to_status_dict(), {})
-
-                with sqlite3.connect(sqlite_path) as con:
-                    row = con.execute(
-                        "SELECT json_data FROM person WHERE handle = ?",
-                        [person_handle],
-                    ).fetchone()
-                    data = json.loads(row[0])
-
-                self.assertIn(
-                    "familysearch_sync",
-                    data,
-                    "familysearch_sync was not added back to person JSON by upgrade",
-                )
-            finally:
-                upgraded.close()
+        self.assertEqual(self.db.get_schema_version(), 22)
+        self.assertEqual(
+            self.db.get_raw_person_data(person_handle)["familysearch_sync"],
+            DEFAULT_FAMILYSEARCH_SYNC,
+        )
+        self.assertEqual(
+            self.db.get_person_from_handle(person_handle).get_familysearch_sync().to_status_dict(),
+            {},
+        )

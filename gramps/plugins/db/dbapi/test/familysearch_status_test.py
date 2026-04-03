@@ -18,12 +18,14 @@
 #
 
 """Tests for FamilySearch status storage in DBAPI."""
+# python3 -m unittest gramps.plugins.db.dbapi.test.familysearch_status_test -v
 
 import copy
 import os
 import shutil
 import tempfile
 import unittest
+
 
 ROOT_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")
@@ -62,12 +64,15 @@ def _ensure_test_resources():
 
 
 os.environ["GRAMPS_RESOURCES"] = _ensure_test_resources()
-os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(prefix="gramps-home-")
+os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(
+    prefix="gramps-home-"
+)
 
 
 from gramps.gen.db.dbconst import PERSON_KEY, TXNUPD
 from gramps.gen.errors import HandleError
 from gramps.plugins.db.dbapi.dbapi import DBAPI
+
 
 DEFAULT_FAMILYSEARCH_SYNC = {
     "_class": "FamilySearchSync",
