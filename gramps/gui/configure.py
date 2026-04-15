@@ -7,7 +7,7 @@
 # Copyright (C) 2010,2025  Nick Hall
 # Copyright (C) 2012       Doug Blank <doug.blank@gmail.com>
 # Copyright (C) 2015-      Serge Noiraud
-# Copyright (C) 2025       Gabriel Rios
+# Copyright (C) 2025-2026  Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1083,24 +1083,79 @@ class GrampsPreferences(ConfigureDialog):
         grid.attach(obox, 2, row, 2, 1)
         row += 1
 
-        # App key (no defaults / no hardcoding)
-        self.add_entry(grid, _("App key"), row, "familysearch.app-key", col_attach=1)
-        row += 1
-
-        # Redirect URL (default loopback if empty)
-        default_redirect = "http://127.0.0.1:57938/familysearch-auth"
-        try:
-            cur = config.get("familysearch.redirect")
-        except Exception:
-            cur = ""
-        if not (cur or "").strip():
+        self._fs_direct_mode_enabled = os.environ.get(
+            "GRAMPS_FS_ENABLE_DIRECT", ""
+        ).strip().lower() in ("1", "true", "yes", "on")
+        provider_box = Gtk.ComboBoxText()
+        provider_options = [(_("Foundation middleware"), "foundation")]
+        if self._fs_direct_mode_enabled:
+            provider_options.insert(0, (_("Direct FamilySearch"), "direct"))
+        active_provider = str(config.get("familysearch.auth-provider") or "foundation")
+        if (not self._fs_direct_mode_enabled) and active_provider == "direct":
+            active_provider = "foundation"
             try:
-                config.set("familysearch.redirect", default_redirect)
+                config.set("familysearch.auth-provider", "foundation")
             except Exception:
                 pass
+        active_provider_index = 0
+        for index, (label_text, provider_value) in enumerate(provider_options):
+            provider_box.append_text(label_text)
+            if active_provider == provider_value:
+                active_provider_index = index
+        provider_box.set_active(active_provider_index)
+        provider_box.connect("changed", self._auth_provider_changed)
+        lwidget = BasicLabel(_("%s: ") % _("Auth provider"))
+        grid.attach(lwidget, 1, row, 1, 1)
+        grid.attach(provider_box, 2, row, 2, 1)
+        row += 1
+
+        if self._fs_direct_mode_enabled:
+            # App key (no defaults / no hardcoding)
+            self.add_entry(
+                grid,
+                _("App key (direct mode only)"),
+                row,
+                "familysearch.app-key",
+                col_attach=1,
+            )
+            row += 1
+
+            # Redirect URL (default loopback if empty)
+            default_redirect = "http://127.0.0.1:57938/familysearch-auth"
+            try:
+                cur = config.get("familysearch.redirect")
+            except Exception:
+                cur = ""
+            if not (cur or "").strip():
+                try:
+                    config.set("familysearch.redirect", default_redirect)
+                except Exception:
+                    pass
+
+            self.add_entry(
+                grid,
+                _("Redirect URL (direct mode only)"),
+                row,
+                "familysearch.redirect",
+                col_attach=1,
+            )
+            row += 1
 
         self.add_entry(
-            grid, _("Redirect URL"), row, "familysearch.redirect", col_attach=1
+            grid,
+            _("Middleware base URL"),
+            row,
+            "familysearch.middleware.base-url",
+            col_attach=1,
+        )
+        row += 1
+
+        self.add_entry(
+            grid,
+            _("Middleware access code (issued secret)"),
+            row,
+            "familysearch.middleware.access-code",
+            col_attach=1,
         )
         row += 1
 
@@ -1108,6 +1163,14 @@ class GrampsPreferences(ConfigureDialog):
 
     def _server_changed(self, obj):
         config.set("familysearch.server", obj.get_active())
+
+    def _auth_provider_changed(self, obj):
+        options = ["foundation"]
+        if getattr(self, "_fs_direct_mode_enabled", False):
+            options.insert(0, "direct")
+        active = obj.get_active()
+        if 0 <= active < len(options):
+            config.set("familysearch.auth-provider", options[active])
 
     def _build_name_format_model(self, active):
         """

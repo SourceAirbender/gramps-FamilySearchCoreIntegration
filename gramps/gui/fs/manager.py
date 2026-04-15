@@ -40,6 +40,15 @@ logger = logging.getLogger(__name__)
 _SESSION = None
 
 
+def _direct_mode_enabled() -> bool:
+    return os.environ.get("GRAMPS_FS_ENABLE_DIRECT", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def _discover_from_grampsgui():
     try:
         return getattr(grampsgui, "dbstate", None), getattr(grampsgui, "uistate", None)
@@ -94,6 +103,17 @@ def get_session(dbstate=None, uistate=None):
 
     app_key = (_cfg_get(config, "familysearch.app-key", "") or "").strip()
     redirect = (_cfg_get(config, "familysearch.redirect", "") or "").strip()
+    auth_provider = (
+        (_cfg_get(config, "familysearch.auth-provider", "foundation") or "foundation")
+        .strip()
+        .lower()
+    )
+    foundation_base_url = (
+        _cfg_get(config, "familysearch.middleware.base-url", "") or ""
+    ).strip()
+    foundation_access_code = (
+        _cfg_get(config, "familysearch.middleware.access-code", "") or ""
+    ).strip()
     server_raw = _cfg_get(config, "familysearch.server", 0)
 
     try:
@@ -105,18 +125,41 @@ def get_session(dbstate=None, uistate=None):
     env_app_key = os.environ.get("GRAMPS_FS_APP_KEY", "").strip()
     env_redirect = os.environ.get("GRAMPS_FS_REDIRECT", "").strip()
     env_server = os.environ.get("GRAMPS_FS_SERVER", "").strip()
+    env_auth_provider = os.environ.get("GRAMPS_FS_AUTH_PROVIDER", "").strip().lower()
+    env_foundation_base_url = os.environ.get(
+        "GRAMPS_FS_FOUNDATION_BASE_URL", ""
+    ).strip()
+    env_foundation_access_code = os.environ.get(
+        "GRAMPS_FS_FOUNDATION_ACCESS_CODE", ""
+    ).strip()
 
     if env_app_key:
         app_key = env_app_key
     if env_redirect:
         redirect = env_redirect
+    if env_auth_provider:
+        auth_provider = env_auth_provider
+    if env_foundation_base_url:
+        foundation_base_url = env_foundation_base_url
+    if env_foundation_access_code:
+        foundation_access_code = env_foundation_access_code
     if env_server:
         try:
             server = int(env_server)
         except Exception:
             logger.debug("Invalid GRAMPS_FS_SERVER=%r; using %r", env_server, server)
 
-    if not app_key or not redirect:
+    if auth_provider == "direct" and not _direct_mode_enabled():
+        auth_provider = "foundation"
+        try:
+            config.set("familysearch.auth-provider", "foundation")
+        except Exception:
+            pass
+
+    if auth_provider == "foundation":
+        if not foundation_base_url or not foundation_access_code:
+            return None
+    elif not app_key or not redirect:
         return None
 
     sess = Session(server=server, app_key=app_key, redirect=redirect)

@@ -251,6 +251,56 @@ def _resolve_active_source_description(session: Any, sdid: str) -> Tuple[str, st
     return resolved or original, "unknown"
 
 
+def _request_url(session: Any, endpoint: str) -> str:
+    endpoint = endpoint if endpoint.startswith("/") else ("/" + endpoint)
+    using_foundation = False
+    using_foundation_fn = getattr(session, "_using_foundation_middleware", None)
+    if callable(using_foundation_fn):
+        try:
+            using_foundation = bool(using_foundation_fn())
+        except Exception:
+            using_foundation = False
+
+    if using_foundation:
+        foundation_proxy_fn = getattr(session, "_foundation_proxy_url", None)
+        if callable(foundation_proxy_fn):
+            try:
+                return str(foundation_proxy_fn(endpoint))
+            except Exception:
+                pass
+        foundation_base = str(
+            getattr(session, "foundation_base_url", "")
+            or getattr(session, "FOUNDATION_BASE_URL", "")
+            or ""
+        ).rstrip("/")
+        if foundation_base:
+            return foundation_base + "/v1/fs/proxy" + endpoint
+
+    base = (
+        getattr(session, "api_url", "")
+        or getattr(session, "API_URL", "")
+        or "https://api.familysearch.org"
+    )
+    return str(base).rstrip("/") + endpoint
+
+
+def _request_bearer_token(session: Any) -> str:
+    using_foundation = False
+    using_foundation_fn = getattr(session, "_using_foundation_middleware", None)
+    if callable(using_foundation_fn):
+        try:
+            using_foundation = bool(using_foundation_fn())
+        except Exception:
+            using_foundation = False
+    if using_foundation:
+        return str(
+            getattr(session, "foundation_session_token", "")
+            or getattr(session, "access_token", "")
+            or ""
+        ).strip()
+    return str(getattr(session, "access_token", "") or "").strip()
+
+
 def _session_post_binary(
     session: Any, endpoint: str, data: bytes, headers: Dict[str, str]
 ) -> Any:
@@ -283,13 +333,8 @@ def _session_post_binary(
             pass
 
     # plain requests
-    base = (
-        getattr(session, "api_url", "")
-        or getattr(session, "API_URL", "")
-        or "https://api.familysearch.org"
-    )
-    url = str(base).rstrip("/") + endpoint
-    token = getattr(session, "access_token", "") or ""
+    url = _request_url(session, endpoint)
+    token = _request_bearer_token(session)
 
     final_headers = dict(headers)
     if (
@@ -570,13 +615,8 @@ def _session_get_json(session: Any, endpoint: str) -> Optional[dict]:
             pass
 
     # build the request directly if all else fails
-    base = (
-        getattr(session, "api_url", "")
-        or getattr(session, "API_URL", "")
-        or "https://api.familysearch.org"
-    )
-    token = getattr(session, "access_token", "") or ""
-    url = str(base).rstrip("/") + endpoint
+    token = _request_bearer_token(session)
+    url = _request_url(session, endpoint)
 
     headers = {"Accept": "application/x-gedcomx-v1+json"}
     if token:
@@ -624,13 +664,8 @@ def _session_post_json(
             pass
 
     # regular requests
-    base = (
-        getattr(session, "api_url", "")
-        or getattr(session, "API_URL", "")
-        or "https://api.familysearch.org"
-    )
-    token = getattr(session, "access_token", "") or ""
-    url = str(base).rstrip("/") + endpoint
+    token = _request_bearer_token(session)
+    url = _request_url(session, endpoint)
 
     if token and "Authorization" not in final_headers:
         final_headers["Authorization"] = f"Bearer {token}"

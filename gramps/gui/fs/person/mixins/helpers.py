@@ -35,7 +35,7 @@ class AuthMixin:
     def ensure_session(cls, caller=None, verbosity=5) -> bool:
         """
         Ensure a shared session exists.
-        Returns True if a session exists
+        Returns True if a session exists (logged-in or not).
         """
         try:
             sess = get_session(
@@ -82,8 +82,12 @@ class AuthMixin:
                 OkDialog(_("Already logged in to FamilySearch."))
             else:
                 code = sess.authorize()
-                sess.get_token(code)
-                OkDialog(_("Logged in to FamilySearch."))
+                if code and sess.get_token(code):
+                    OkDialog(_("Logged in to FamilySearch."))
+                else:
+                    raise RuntimeError(
+                        getattr(sess, "_status_detail", "") or _("Login failed.")
+                    )
         except Exception as e:
             WarningDialog(_("Login failed:\n{err}").format(err=str(e)))
 

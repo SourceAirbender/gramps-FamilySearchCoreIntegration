@@ -346,15 +346,29 @@ class Session(fs_session_core.Session):
             self._set_status("ERROR", "Manual login cancelled")
             return ""
 
-        return fs_session_core._extract_code_from_text(text)
+        params = fs_session_core._extract_redirect_params_from_text(text)
+        if (
+            text.startswith("http://") or text.startswith("https://")
+        ) and not self._validate_oauth_state(params):
+            return ""
+        if "error" in params or "error_description" in params:
+            err = params.get("error", "")
+            desc = params.get("error_description", "")
+            self._set_status("ERROR", f"{err} {desc}".strip())
+            return ""
+
+        return (params.get("code", "") or "").strip()
 
     def _close_auth_window(self) -> None:
         win_ = getattr(self, "_auth_win", None)
         if win_ is not None:
             try:
+                setattr(self, "_closing_auth_window", True)
                 win_.destroy()
             except Exception:
                 pass
+            finally:
+                setattr(self, "_closing_auth_window", False)
         setattr(self, "_auth_win", None)
 
     def _open_auth_ui(
@@ -365,6 +379,7 @@ class Session(fs_session_core.Session):
             return False
         if win():
             return False
+        setattr(self, "_auth_ui_cancelled", False)
 
         win_ = Gtk.Window(title="FamilySearch Login")
         win_.set_default_size(920, 920)
@@ -373,6 +388,27 @@ class Session(fs_session_core.Session):
         outer.pack_start(self.get_status_widget(), False, False, 0)
 
         web = WebKit2.WebView()
+        try:
+            settings = web.get_settings()
+        except Exception:
+            settings = None
+        if settings is not None:
+            try:
+                settings.set_property("enable-smooth-scrolling", False)
+            except Exception:
+                pass
+            try:
+                settings.set_property("enable-webgl", False)
+            except Exception:
+                pass
+            try:
+                if hasattr(WebKit2, "HardwareAccelerationPolicy"):
+                    settings.set_property(
+                        "hardware-acceleration-policy",
+                        WebKit2.HardwareAccelerationPolicy.NEVER,
+                    )
+            except Exception:
+                pass
         sc = Gtk.ScrolledWindow()
         sc.add(web)
         outer.pack_start(sc, True, True, 0)
@@ -444,7 +480,8 @@ class Session(fs_session_core.Session):
                 req = nav.get_request()
                 uri = req.get_uri() or ""
                 fs_session_core._dbg(
-                    f"auth ui: policy uri={fs_session_core._safe(uri, 500)}"
+                    "auth ui: policy uri="
+                    f"{fs_session_core._safe_url_for_log(uri, 500)}"
                 )
                 if capture_code and self.redirect and uri.startswith(self.redirect):
                     fs_session_core._dbg(
@@ -470,7 +507,8 @@ class Session(fs_session_core.Session):
                 if load_event == WebKit2.LoadEvent.COMMITTED:
                     uri = view.get_uri() or ""
                     fs_session_core._dbg(
-                        f"auth ui: committed uri={fs_session_core._safe(uri, 500)}"
+                        "auth ui: committed uri="
+                        f"{fs_session_core._safe_url_for_log(uri, 500)}"
                     )
             except Exception:
                 pass
@@ -480,6 +518,8 @@ class Session(fs_session_core.Session):
 
         def _on_destroy(*_a):
             try:
+                if not getattr(self, "_closing_auth_window", False):
+                    setattr(self, "_auth_ui_cancelled", True)
                 if getattr(self, "_auth_win", None) is win_:
                     setattr(self, "_auth_win", None)
             except Exception:
