@@ -5,6 +5,7 @@
 # Copyright (C) 2010            Michiel D. Nauta
 # Copyright (C) 2010,2017,2024  Nick Hall
 # Copyright (C) 2011            Tim G L Lyons
+# Copyright (C) 2026            Gabriel Rios
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -46,6 +47,8 @@ from .personref import PersonRef
 from .primaryobj import PrimaryObject
 from .tagbase import TagBase
 from .urlbase import UrlBase
+from .fs.familysearchsync import FamilySearchSync
+from .fs.familysearchsyncbase import FamilySearchSyncBase
 
 _ = glocale.translation.gettext
 
@@ -64,6 +67,7 @@ class Person(
     AddressBase,
     UrlBase,
     LdsOrdBase,
+    FamilySearchSyncBase,
     PrimaryObject,
 ):
     """
@@ -104,6 +108,7 @@ class Person(
         AddressBase.__init__(self)
         UrlBase.__init__(self)
         LdsOrdBase.__init__(self)
+        FamilySearchSyncBase.__init__(self)
         self.primary_name = Name()
         self.family_list = []
         self.parent_family_list = []
@@ -165,6 +170,7 @@ class Person(
             TagBase.serialize(self),  # 18
             self.private,  # 19
             [pr.serialize() for pr in self.person_ref_list],  # 20
+            FamilySearchSyncBase.serialize(self),  # 21
         )
 
     @classmethod
@@ -270,6 +276,7 @@ class Person(
                     "items": PersonRef.get_schema(),
                     "title": _("Person references"),
                 },
+                "familysearch_sync": FamilySearchSync.get_schema(),
             },
         }
 
@@ -304,6 +311,7 @@ class Person(
             tag_list,  # 18
             self.private,  # 19
             person_ref_list,  # 20
+            familysearch_sync,  # 21
         ) = data
 
         self.primary_name = Name()
@@ -319,6 +327,7 @@ class Person(
         CitationBase.unserialize(self, citation_list)
         NoteBase.unserialize(self, note_list)
         TagBase.unserialize(self, tag_list)
+        FamilySearchSyncBase.unserialize(self, familysearch_sync)
         return self
 
     def get_object_state(self):
@@ -329,6 +338,7 @@ class Person(
         """
         attr_dict = super().get_object_state()
         attr_dict["gender"] = self.__gender
+        attr_dict["familysearch_sync"] = self.get_familysearch_sync()
         return attr_dict
 
     def set_object_state(self, attr_dict):
@@ -339,7 +349,13 @@ class Person(
         We override this method to handle the `gender` property.
         """
         self.__gender = attr_dict.pop("gender")
+        self.familysearch_sync = FamilySearchSync()
         super().set_object_state(attr_dict)
+
+        if not hasattr(self, "familysearch_sync") or self.familysearch_sync is None:
+            self.familysearch_sync = FamilySearchSync()
+        elif not isinstance(self.familysearch_sync, FamilySearchSync):
+            self.familysearch_sync = FamilySearchSync(self.familysearch_sync)
 
     def _has_handle_reference(self, classname, handle):
         """
