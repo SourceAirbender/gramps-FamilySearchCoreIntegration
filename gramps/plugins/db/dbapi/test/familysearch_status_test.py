@@ -227,7 +227,10 @@ class FamilySearchStatusDbApiTest(unittest.TestCase):
 
         DBAPI.delete_familysearch_person_status(db, "person-1", txn)
 
-        self.assertIsNone(db.people["person-1"]["familysearch_sync"])
+        self.assertEqual(
+            db.people["person-1"]["familysearch_sync"],
+            DEFAULT_FAMILYSEARCH_SYNC,
+        )
         self.assertEqual(len(db.commits), 1)
         self.assertEqual(db.commits[0][1], PERSON_KEY)
         self.assertEqual(len(txn.entries), 1)

@@ -350,9 +350,6 @@ class Person(
         self.__gender = attr_dict.pop("gender")
         super().set_object_state(attr_dict)
 
-        if not isinstance(self.familysearch_sync, FamilySearchSync):
-            self.familysearch_sync = FamilySearchSync(self.familysearch_sync)
-
     def _has_handle_reference(self, classname, handle):
         """
         Return True if the object has reference to a given handle of given
