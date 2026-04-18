@@ -57,10 +57,7 @@ def _dbg(msg: str) -> None:
 def _bind_global_session(session) -> None:
     """Mirror the active session onto `tree._fs_session` for shared FS helpers."""
     # gen.fs uses read tree._fs_session directly
-    try:
-        fs_tree._fs_session = session
-    except Exception:
-        pass
+    fs_tree._fs_session = session
 
 
 def _get_fs_id(person) -> str:
@@ -83,11 +80,12 @@ def _set_fs_id(person, fsid: str) -> None:
 
     fsid = (fsid or "").strip()
 
-    attrs = []
-    for attr in person.get_attribute_list() or []:
-        if str(attr.get_type()) in (FS_ATTR_CANON, FS_ATTR_OLD, FS_ATTR_HUMAN):
-            continue
-        attrs.append(attr)
+    attrs = person.get_attribute_list() or []
+    attrs[:] = [
+        attr
+        for attr in attrs
+        if str(attr.get_type()) not in (FS_ATTR_CANON, FS_ATTR_OLD, FS_ATTR_HUMAN)
+    ]
 
     if fsid:
         attr = Attribute()
@@ -168,7 +166,10 @@ def _ensure_child_in_family(db, fam: Family, child_handle: str) -> bool:
             ):
                 return False
         except Exception:
-            pass
+            logger.debug(
+                "Failed to inspect child reference while checking family children",
+                exc_info=True,
+            )
 
     fam.add_child_ref(_ensure_child_ref(child_handle))
     return True
@@ -179,7 +180,14 @@ def _place_parent_in_family(db, fam: Family, parent_handle: str) -> None:
     try:
         person = db.get_person_from_handle(parent_handle)
         gender = person.get_gender()
+    except HandleError:
+        gender = Person.UNKNOWN
     except Exception:
+        logger.debug(
+            "Failed to determine parent gender for handle=%s",
+            parent_handle,
+            exc_info=True,
+        )
         gender = Person.UNKNOWN
 
     father_handle = fam.get_father_handle()
@@ -223,6 +231,11 @@ def _find_existing_family_for_parents(db, parent_handles: set[str]) -> Family | 
         except HandleError:
             continue
         except Exception:
+            logger.debug(
+                "Failed to load parent person for handle=%s",
+                parent_handle,
+                exc_info=True,
+            )
             continue
 
         if not person:
@@ -236,6 +249,11 @@ def _find_existing_family_for_parents(db, parent_handles: set[str]) -> Family | 
             except HandleError:
                 fam = None
             except Exception:
+                logger.debug(
+                    "Failed to load family for handle=%s",
+                    fam_handle,
+                    exc_info=True,
+                )
                 fam = None
 
             if fam and _family_parent_set(fam) == parent_handles:
@@ -250,16 +268,19 @@ def _find_person_by_fsid(db, fsid: str):
     if not fsid:
         return None
 
-    try:
-        idx = getattr(fs_utilities, "FS_INDEX_PEOPLE", {})
-        handle = idx.get(fsid)
-        if handle:
-            try:
-                return db.get_person_from_handle(handle)
-            except HandleError:
-                idx.pop(fsid, None)
-    except Exception:
-        pass
+    idx = getattr(fs_utilities, "FS_INDEX_PEOPLE", {})
+    handle = idx.get(fsid) if hasattr(idx, "get") else None
+    if handle:
+        try:
+            return db.get_person_from_handle(handle)
+        except HandleError:
+            idx.pop(fsid, None)
+        except Exception:
+            logger.debug(
+                "Failed to load cached FamilySearch person for fsid=%s",
+                fsid,
+                exc_info=True,
+            )
 
     # cache miss or stale cache
     get_fsftid = getattr(fs_utilities, "get_fsftid", None)
@@ -271,6 +292,11 @@ def _find_person_by_fsid(db, fsid: str):
         try:
             pid = get_fsftid(person) if callable(get_fsftid) else ""
         except Exception:
+            logger.debug(
+                "Failed to read FamilySearch ID while scanning person handle=%s",
+                handle,
+                exc_info=True,
+            )
             pid = ""
         if pid == fsid:
             return person
@@ -314,7 +340,11 @@ def _resolve_redirected_fsid(session, fsid: str) -> str:
             path = f"/platform/tree/persons/{fsid}"
             resp = head(path)
     except Exception:
-        pass
+        logger.debug(
+            "Failed to resolve redirected FamilySearch ID for fsid=%s",
+            fsid,
+            exc_info=True,
+        )
 
     return fsid
 

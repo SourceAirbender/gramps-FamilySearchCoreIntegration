@@ -142,6 +142,8 @@ def _require_ready_person(dbstate, parent, person):
 
 def link_familysearch_id(dbstate, uistate, track, person, session, parent, editor=None):
     _bind_global_session(session)
+    edit_person = getattr(editor, "obj", None) if editor is not None else None
+    target_person = edit_person or person
 
     dlg = Gtk.Dialog(title=_("Link FamilySearch ID"), transient_for=parent, modal=True)
     fs_ui.set_headerbar(dlg, _("Link FamilySearch ID"))
@@ -157,16 +159,17 @@ def link_familysearch_id(dbstate, uistate, track, person, session, parent, edito
     box.pack_start(lbl, False, False, 0)
 
     entry = Gtk.Entry()
-    entry.set_text(_get_fs_id(person))
+    entry.set_text(_get_fs_id(target_person))
     box.pack_start(entry, False, False, 0)
 
     dlg.show_all()
     resp = dlg.run()
     if resp == Gtk.ResponseType.OK:
-        _set_fs_id(person, entry.get_text())
+        _set_fs_id(target_person, entry.get_text())
 
         if editor is not None and hasattr(editor, "attr_list"):
             try:
+                editor.attr_list.data = target_person.get_attribute_list()
                 editor.attr_list.rebuild_callback()
             except Exception:
                 pass

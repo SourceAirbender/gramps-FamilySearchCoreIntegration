@@ -133,7 +133,9 @@ from gramps.gui.editors import (
 from gramps.gen.db.exceptions import DbWriteFailure
 from gramps.gen.filters import reload_custom_filters
 from .managedwindow import ManagedWindow
+from .fs.manager import get_session
 from .fs.session import Session
+from .fs.tools_window import toggle_tools_window
 
 # -------------------------------------------------------------------------
 #
@@ -346,7 +348,7 @@ class ViewManager(CLIManager):
             fs_btn.set_tooltip_text(_("FamilySearch tools"))
             fs_btn.connect("clicked", self._on_fs_status_clicked)
         except Exception:
-            pass
+            LOG.warning("Failed to connect FamilySearch status button", exc_info=True)
 
         # Create history objects
         for nav_type in (
@@ -394,24 +396,19 @@ class ViewManager(CLIManager):
         Toggle the FamilySearch Tools window.
         Only works after login (token present).
         """
-        from gramps.gui.fs.manager import get_session
-        from gramps.gui.fs.tools_window import toggle_tools_window
-
         sess = get_session(dbstate=self.dbstate, uistate=self.uistate)
         if not sess or not (
             getattr(sess, "access_token", None) or getattr(sess, "connected", False)
         ):
             # You said: only after login. So we just show info.
             try:
-                from gramps.gui.dialog import ErrorDialog
-
                 ErrorDialog(
                     _("FamilySearch"),
                     _("Not logged in to FamilySearch."),
                     parent=self.uistate.window,
                 )
             except Exception:
-                pass
+                LOG.warning("Failed to show FamilySearch login dialog", exc_info=True)
             return
 
         toggle_tools_window(sess)
