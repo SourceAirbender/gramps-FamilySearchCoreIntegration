@@ -688,7 +688,7 @@ class CompareGtkMixin:
 
     def _make_overview_tree_model(self):
         titles = [
-            (_(""), 1, 18, COLOR),  # color pill column
+            (" ", 1, 18, COLOR),  # color pill column
             (_("Property"), 2, 180),
             (_("Gramps date"), 3, 115),
             (_("Gramps value"), 4, 420),
@@ -709,7 +709,7 @@ class CompareGtkMixin:
     def _make_notes_tree(self):
         treeview = Gtk.TreeView()
         titles = [
-            (_(""), 1, 18, COLOR),
+            (" ", 1, 18, COLOR),
             (_("Scope"), 2, 110),
             (_("Title"), 3, 220),
             (_("Gramps"), 4, 460),
@@ -722,7 +722,7 @@ class CompareGtkMixin:
     def _make_sources_tree(self):
         treeview = Gtk.TreeView()
         titles = [
-            (_(""), 1, 18, COLOR),
+            (" ", 1, 18, COLOR),
             (_("Kind"), 2, 90),
             (_("Gramps date"), 3, 110),
             (_("Gramps title"), 4, 260),

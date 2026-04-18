@@ -234,7 +234,7 @@ class SourcesDialogMixin:
 
         # color indicator column
         color_cell = Gtk.CellRendererText()
-        color_col = Gtk.TreeViewColumn(_(""), color_cell)
+        color_col = Gtk.TreeViewColumn(" ", color_cell)
 
         def _color_cell_data_func(_col, cell, model, itr, _data=None):
             token = model.get_value(itr, 1) or ""

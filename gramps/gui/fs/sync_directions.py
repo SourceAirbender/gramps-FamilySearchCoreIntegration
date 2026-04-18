@@ -270,7 +270,7 @@ def _make_overview_model() -> ListModel:
     """Build the temporary compare model used for the overview prompt."""
     treeview = Gtk.TreeView()
     titles = [
-        (_(""), 1, 18, COLOR),
+        (" ", 1, 18, COLOR),
         (_("Property"), 2, 180),
         (_("Gramps date"), 3, 115),
         (_("Gramps value"), 4, 420),
