@@ -1,7 +1,7 @@
 #
 # Gramps - a GTK+/GNOME based genealogy program
 #
-# Copyright (C) 2020-2016 Gramps Development Team
+# Copyright (C) 2020-2026 Gramps Development Team
 # Copyright (C) 2020      Paul Culley
 # Copyright (C) 2024      Doug Blank
 # Copyright (C) 2026      Gabriel Rios
@@ -38,7 +38,7 @@ import logging
 # ------------------------------------------------------------------------
 from gramps.cli.clidbman import NAME_FILE
 from gramps.gen.db.dbconst import CLASS_TO_KEY_MAP
-from gramps.gen.lib import EventType, NameOriginType, Tag, MarkerType
+from gramps.gen.lib import EventType, FamilySearchSync, NameOriginType, Tag, MarkerType
 from gramps.gen.utils.file import create_checksum
 from gramps.gen.utils.id import create_id
 from gramps.gui.dialog import InfoDialog
@@ -66,17 +66,7 @@ def _default_familysearch_sync_json_22():
     """
     Return the raw v22 FamilySearch sync JSON structure for Person records.
     """
-    return {
-        "_class": "FamilySearchSync",
-        "fsid": None,
-        "is_root": False,
-        "status_ts": None,
-        "confirmed_ts": None,
-        "gramps_modified_ts": None,
-        "fs_modified_ts": None,
-        "essential_conflict": False,
-        "conflict": False,
-    }
+    return FamilySearchSync().serialize()
 
 
 def _upgrade_person_json_22(person_data):

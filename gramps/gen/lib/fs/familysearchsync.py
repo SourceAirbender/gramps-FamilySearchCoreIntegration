@@ -28,23 +28,6 @@ from ..secondaryobj import SecondaryObject
 _ = glocale.translation.gettext
 
 
-def _as_int(value):
-    if value is None or value == "":
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
-
-
-def _as_bool(value):
-    if value is None:
-        return False
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
-
-
 class FamilySearchSync(SecondaryObject):
     """
     Secondary object storing FamilySearch sync state for a primary object.
@@ -66,18 +49,19 @@ class FamilySearchSync(SecondaryObject):
 
     def serialize(self):
         """
-        Convert the object to persistent tuple data.
+        Convert the object to persistent dict data.
         """
-        return (
-            self.fsid,
-            self.is_root,
-            self.status_ts,
-            self.confirmed_ts,
-            self.gramps_modified_ts,
-            self.fs_modified_ts,
-            self.essential_conflict,
-            self.conflict,
-        )
+        return {
+            "_class": self.__class__.__name__,
+            "fsid": self.fsid,
+            "is_root": self.is_root,
+            "status_ts": self.status_ts,
+            "confirmed_ts": self.confirmed_ts,
+            "gramps_modified_ts": self.gramps_modified_ts,
+            "fs_modified_ts": self.fs_modified_ts,
+            "essential_conflict": self.essential_conflict,
+            "conflict": self.conflict,
+        }
 
     @classmethod
     def get_schema(cls):
@@ -117,35 +101,11 @@ class FamilySearchSync(SecondaryObject):
 
     def unserialize(self, data):
         """
-        Convert persistent tuple/dict data into this object.
+        Convert persistent dict data into this object.
         """
-        if isinstance(data, dict):
-            return self.from_status_dict(data)
-
-        if not data:
-            self.__init__()
-            return self
-
-        (
-            self.fsid,
-            self.is_root,
-            self.status_ts,
-            self.confirmed_ts,
-            self.gramps_modified_ts,
-            self.fs_modified_ts,
-            self.essential_conflict,
-            self.conflict,
-        ) = data
-
-        self.fsid = str(self.fsid).strip() if self.fsid else None
-        self.is_root = _as_bool(self.is_root)
-        self.status_ts = _as_int(self.status_ts)
-        self.confirmed_ts = _as_int(self.confirmed_ts)
-        self.gramps_modified_ts = _as_int(self.gramps_modified_ts)
-        self.fs_modified_ts = _as_int(self.fs_modified_ts)
-        self.essential_conflict = _as_bool(self.essential_conflict)
-        self.conflict = _as_bool(self.conflict)
-        return self
+        if not isinstance(data, dict):
+            raise TypeError("FamilySearchSync data must be a dict")
+        return self.from_status_dict(data)
 
     def get_text_data_list(self):
         """
@@ -188,7 +148,7 @@ class FamilySearchSync(SecondaryObject):
             if fsid:
                 data["fsid"] = fsid
 
-        if self.is_root:
+        if self.is_root is True:
             data["is_root"] = True
 
         for key, value in (
@@ -197,14 +157,13 @@ class FamilySearchSync(SecondaryObject):
             ("gramps_modified_ts", self.gramps_modified_ts),
             ("fs_modified_ts", self.fs_modified_ts),
         ):
-            ivalue = _as_int(value)
-            if ivalue is not None and ivalue > 0:
-                data[key] = ivalue
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                data[key] = value
 
-        if self.essential_conflict:
+        if self.essential_conflict is True:
             data["essential_conflict"] = True
 
-        if self.conflict:
+        if self.conflict is True:
             data["conflict"] = True
 
         return data
@@ -226,12 +185,13 @@ class FamilySearchSync(SecondaryObject):
             return self
 
         fsid = data.get("fsid")
-        self.fsid = str(fsid).strip() if fsid else None
-        self.is_root = _as_bool(data.get("is_root"))
-        self.status_ts = _as_int(data.get("status_ts"))
-        self.confirmed_ts = _as_int(data.get("confirmed_ts"))
-        self.gramps_modified_ts = _as_int(data.get("gramps_modified_ts"))
-        self.fs_modified_ts = _as_int(data.get("fs_modified_ts"))
-        self.essential_conflict = _as_bool(data.get("essential_conflict"))
-        self.conflict = _as_bool(data.get("conflict"))
+        self.fsid = fsid.strip() if isinstance(fsid, str) else None
+        self.fsid = self.fsid or None
+        self.is_root = data.get("is_root") or False
+        self.status_ts = data.get("status_ts")
+        self.confirmed_ts = data.get("confirmed_ts")
+        self.gramps_modified_ts = data.get("gramps_modified_ts")
+        self.fs_modified_ts = data.get("fs_modified_ts")
+        self.essential_conflict = data.get("essential_conflict") or False
+        self.conflict = data.get("conflict") or False
         return self

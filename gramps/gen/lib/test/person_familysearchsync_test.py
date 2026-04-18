@@ -23,6 +23,8 @@ import os
 import shutil
 import tempfile
 import unittest
+from gramps.gen.lib import Person
+from gramps.gen.lib.json_utils import data_to_object, object_to_data, remove_object
 
 ROOT_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
@@ -63,14 +65,10 @@ def _ensure_test_resources():
 os.environ["GRAMPS_RESOURCES"] = _ensure_test_resources()
 os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(prefix="gramps-home-")
 
-from gramps.gen.lib import Person
-from gramps.gen.lib.json_utils import data_to_object, object_to_data, remove_object
-
 
 class PersonFamilySearchSyncJsonTest(unittest.TestCase):
-    def test_person_defaults_missing_familysearch_sync_in_json_state(self):
+    def test_person_restores_familysearch_sync_from_json_state(self):
         person_data = remove_object(object_to_data(Person()))
-        person_data.pop("familysearch_sync")
 
         person = data_to_object(person_data)
         sync = person.get_familysearch_sync()
@@ -78,7 +76,17 @@ class PersonFamilySearchSyncJsonTest(unittest.TestCase):
         self.assertIsInstance(person, Person)
         self.assertEqual(
             sync.serialize(),
-            (None, False, None, None, None, None, False, False),
+            {
+                "_class": "FamilySearchSync",
+                "fsid": None,
+                "is_root": False,
+                "status_ts": None,
+                "confirmed_ts": None,
+                "gramps_modified_ts": None,
+                "fs_modified_ts": None,
+                "essential_conflict": False,
+                "conflict": False,
+            },
         )
         self.assertFalse(person.has_familysearch_sync_data())
 
