@@ -112,6 +112,11 @@ class FakeDbApiStatusStore:
         self.commits.append((copy.deepcopy(data), obj_key))
         self.people[data["handle"]] = copy.deepcopy(data)
 
+    def _commit_familysearch_person_raw(self, handle, old_data, new_data, transaction):
+        DBAPI._commit_familysearch_person_raw(
+            self, handle, old_data, new_data, transaction
+        )
+
 
 class FamilySearchStatusDbApiTest(unittest.TestCase):
     def test_get_familysearch_person_status_reads_raw_json(self):
@@ -124,13 +129,13 @@ class FamilySearchStatusDbApiTest(unittest.TestCase):
                     "familysearch_sync": {
                         "_class": "FamilySearchSync",
                         "fsid": " FS-123 ",
-                        "is_root": "true",
-                        "status_ts": "10",
+                        "is_root": True,
+                        "status_ts": 10,
                         "confirmed_ts": 0,
                         "gramps_modified_ts": None,
-                        "fs_modified_ts": "",
+                        "fs_modified_ts": None,
                         "essential_conflict": False,
-                        "conflict": "yes",
+                        "conflict": True,
                     },
                 }
             }
@@ -166,13 +171,13 @@ class FamilySearchStatusDbApiTest(unittest.TestCase):
             "person-1",
             {
                 "fsid": " FS-123 ",
-                "is_root": "1",
-                "status_ts": "10",
-                "confirmed_ts": "",
+                "is_root": True,
+                "status_ts": 10,
+                "confirmed_ts": None,
                 "gramps_modified_ts": None,
-                "fs_modified_ts": "15",
-                "essential_conflict": "true",
-                "conflict": 0,
+                "fs_modified_ts": 15,
+                "essential_conflict": True,
+                "conflict": False,
             },
             txn,
         )
@@ -197,7 +202,7 @@ class FamilySearchStatusDbApiTest(unittest.TestCase):
         self.assertEqual(txn.entries[0][0], PERSON_KEY)
         self.assertEqual(txn.entries[0][1], TXNUPD)
 
-    def test_delete_familysearch_person_status_writes_default_raw_json(self):
+    def test_delete_familysearch_person_status_clears_raw_json(self):
         db = FakeDbApiStatusStore(
             {
                 "person-1": {
@@ -222,10 +227,7 @@ class FamilySearchStatusDbApiTest(unittest.TestCase):
 
         DBAPI.delete_familysearch_person_status(db, "person-1", txn)
 
-        self.assertEqual(
-            db.people["person-1"]["familysearch_sync"],
-            DEFAULT_FAMILYSEARCH_SYNC,
-        )
+        self.assertIsNone(db.people["person-1"]["familysearch_sync"])
         self.assertEqual(len(db.commits), 1)
         self.assertEqual(db.commits[0][1], PERSON_KEY)
         self.assertEqual(len(txn.entries), 1)

@@ -53,6 +53,7 @@ from gramps.gen.lib import (
     Citation,
     Event,
     Family,
+    FamilySearchSync,
     Media,
     Note,
     Person,
@@ -74,38 +75,10 @@ _LOG = logging.getLogger(DBLOGNAME)
 _ = glocale.translation.gettext
 
 
-def _as_int(value):
-    if value is None or value == "":
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
-
-
-def _as_bool(value):
-    if value is None:
-        return False
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
-
-
-def _default_familysearch_sync_data():
-    return {
-        "_class": "FamilySearchSync",
-        "fsid": None,
-        "is_root": False,
-        "status_ts": None,
-        "confirmed_ts": None,
-        "gramps_modified_ts": None,
-        "fs_modified_ts": None,
-        "essential_conflict": False,
-        "conflict": False,
-    }
-
-
 def _familysearch_status_from_raw_person_data(person_data):
+    """
+    Return compact FamilySearch status data from raw Person JSON data.
+    """
     if not isinstance(person_data, dict):
         return {}
 
@@ -113,70 +86,14 @@ def _familysearch_status_from_raw_person_data(person_data):
     if not isinstance(sync_data, dict):
         return {}
 
-    data = {}
-
-    fsid = sync_data.get("fsid")
-    if fsid:
-        fsid = str(fsid).strip()
-        if fsid:
-            data["fsid"] = fsid
-
-    if _as_bool(sync_data.get("is_root")):
-        data["is_root"] = True
-
-    for key in (
-        "status_ts",
-        "confirmed_ts",
-        "gramps_modified_ts",
-        "fs_modified_ts",
-    ):
-        value = _as_int(sync_data.get(key))
-        if value is not None and value > 0:
-            data[key] = value
-
-    if _as_bool(sync_data.get("essential_conflict")):
-        data["essential_conflict"] = True
-
-    if _as_bool(sync_data.get("conflict")):
-        data["conflict"] = True
-
-    return data
+    return FamilySearchSync(sync_data).to_status_dict()
 
 
 def _familysearch_sync_data_from_status(status):
-    data = _default_familysearch_sync_data()
-
-    fsid = status.get("fsid")
-    if fsid:
-        fsid = str(fsid).strip()
-        data["fsid"] = fsid if fsid else None
-
-    data["is_root"] = _as_bool(status.get("is_root"))
-
-    for key in (
-        "status_ts",
-        "confirmed_ts",
-        "gramps_modified_ts",
-        "fs_modified_ts",
-    ):
-        data[key] = _as_int(status.get(key))
-
-    data["essential_conflict"] = _as_bool(status.get("essential_conflict"))
-    data["conflict"] = _as_bool(status.get("conflict"))
-
-    return data
-
-
-def _commit_familysearch_person_raw(self, handle, old_data, new_data, transaction):
-    self._commit_raw(new_data, PERSON_KEY)
-    if not transaction.batch:
-        transaction.add(
-            PERSON_KEY,
-            TXNUPD,
-            handle,
-            old_data,
-            copy.deepcopy(new_data),
-        )
+    """
+    Return raw FamilySearch sync JSON data from compact status data.
+    """
+    return FamilySearchSync(status).serialize()
 
 
 # -------------------------------------------------------------------------
@@ -847,6 +764,20 @@ class DBAPI(DbGeneric):
                 [handle, self.serializer.data_to_string(data)],
             )
 
+    def _commit_familysearch_person_raw(self, handle, old_data, new_data, transaction):
+        """
+        Commit raw Person JSON after updating FamilySearch sync status.
+        """
+        self._commit_raw(new_data, PERSON_KEY)
+        if not transaction.batch:
+            transaction.add(
+                PERSON_KEY,
+                TXNUPD,
+                handle,
+                old_data,
+                copy.deepcopy(new_data),
+            )
+
     def _update_backlinks(self, obj, transaction):
         if not transaction.batch:
             # Find existing references
@@ -1365,19 +1296,19 @@ class DBAPI(DbGeneric):
         person_data["familysearch_sync"] = _familysearch_sync_data_from_status(status)
 
         if transaction is not None:
-            _commit_familysearch_person_raw(
-                self, person_handle, old_data, person_data, transaction
+            self._commit_familysearch_person_raw(
+                person_handle, old_data, person_data, transaction
             )
             return
 
         with DbTxn(_("FamilySearch: status update"), self) as txn:
-            _commit_familysearch_person_raw(
-                self, person_handle, old_data, person_data, txn
+            self._commit_familysearch_person_raw(
+                person_handle, old_data, person_data, txn
             )
 
     def delete_familysearch_person_status(self, person_handle, transaction=None):
         """
-        Remove FamilySearch sync status for the given Person handle.
+        Clear FamilySearch sync status for the given Person handle.
         """
         try:
             person_data = self.get_raw_person_data(person_handle)
@@ -1388,15 +1319,15 @@ class DBAPI(DbGeneric):
             return
 
         old_data = copy.deepcopy(person_data)
-        person_data["familysearch_sync"] = _default_familysearch_sync_data()
+        person_data["familysearch_sync"] = None
 
         if transaction is not None:
-            _commit_familysearch_person_raw(
-                self, person_handle, old_data, person_data, transaction
+            self._commit_familysearch_person_raw(
+                person_handle, old_data, person_data, transaction
             )
             return
 
         with DbTxn(_("FamilySearch: status update"), self) as txn:
-            _commit_familysearch_person_raw(
-                self, person_handle, old_data, person_data, txn
+            self._commit_familysearch_person_raw(
+                person_handle, old_data, person_data, txn
             )

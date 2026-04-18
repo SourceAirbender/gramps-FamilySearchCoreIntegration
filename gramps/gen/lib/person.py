@@ -170,7 +170,7 @@ class Person(
             TagBase.serialize(self),  # 18
             self.private,  # 19
             [pr.serialize() for pr in self.person_ref_list],  # 20
-            FamilySearchSyncBase.serialize(self),  # 21
+            self.familysearch_sync.serialize(),  # 21
         )
 
     @classmethod
@@ -327,7 +327,7 @@ class Person(
         CitationBase.unserialize(self, citation_list)
         NoteBase.unserialize(self, note_list)
         TagBase.unserialize(self, tag_list)
-        FamilySearchSyncBase.unserialize(self, familysearch_sync)
+        self.set_familysearch_sync(familysearch_sync)
         return self
 
     def get_object_state(self):
@@ -338,7 +338,6 @@ class Person(
         """
         attr_dict = super().get_object_state()
         attr_dict["gender"] = self.__gender
-        attr_dict["familysearch_sync"] = self.get_familysearch_sync()
         return attr_dict
 
     def set_object_state(self, attr_dict):
@@ -349,12 +348,9 @@ class Person(
         We override this method to handle the `gender` property.
         """
         self.__gender = attr_dict.pop("gender")
-        self.familysearch_sync = FamilySearchSync()
         super().set_object_state(attr_dict)
 
-        if not hasattr(self, "familysearch_sync") or self.familysearch_sync is None:
-            self.familysearch_sync = FamilySearchSync()
-        elif not isinstance(self.familysearch_sync, FamilySearchSync):
+        if not isinstance(self.familysearch_sync, FamilySearchSync):
             self.familysearch_sync = FamilySearchSync(self.familysearch_sync)
 
     def _has_handle_reference(self, classname, handle):
@@ -533,6 +529,7 @@ class Person(
             + self.event_ref_list
             + add_list
             + self.person_ref_list
+            + [self.familysearch_sync]
         )
 
     def get_citation_child_list(self):
