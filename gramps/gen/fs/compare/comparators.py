@@ -317,10 +317,14 @@ def _find_best_fs_fact_match(
     for fs_fact in fs_facts:
         if _fs_fact_gramps_tag(fs_fact) != gr_tag:
             continue
-        if fallback is None:
-            fallback = fs_fact
         if _fs_fact_date(fs_fact) == gr_date:
             return fs_fact
+        # When gr_date is non-empty prefer a dated fact as fallback so that a
+        # date-bearing FS fact is not displaced by a dateless one.
+        if fallback is None or (
+            gr_date and _fs_fact_date(fs_fact) and not _fs_fact_date(fallback)
+        ):
+            fallback = fs_fact
     return fallback
 
 
@@ -675,10 +679,10 @@ def compare_spouse_notes(db, gr_person: Person, fs_person) -> List[Tuple]:
         # keep this ALWAYS str (never None) so mypy is happy
         if couple.person1 and couple.person1.resourceId == fsid:
             fs_spouse_id = couple.person2.resourceId
-        elif couple.person1:
-            fs_spouse_id = couple.person1.resourceId
+        elif couple.person2 and couple.person2.resourceId == fsid:
+            fs_spouse_id = couple.person1.resourceId if couple.person1 else ""
         else:
-            fs_spouse_id = ""
+            continue
 
         fs_spouse_opt = _fs_person_opt(fs_spouse_id)
 
@@ -1040,10 +1044,10 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
         # keep ALWAYS str
         if couple.person1 and couple.person1.resourceId == fsid:
             fs_spouse_id = couple.person2.resourceId
-        elif couple.person1:
-            fs_spouse_id = couple.person1.resourceId
+        elif couple.person2 and couple.person2.resourceId == fsid:
+            fs_spouse_id = couple.person1.resourceId if couple.person1 else ""
         else:
-            fs_spouse_id = ""
+            continue
         fs_spouse_ids.discard(fs_spouse_id)
 
         fs_spouse_opt = _fs_person_opt(fs_spouse_id)

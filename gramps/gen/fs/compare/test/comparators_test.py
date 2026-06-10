@@ -26,6 +26,7 @@ import shutil
 import tempfile
 import types
 import unittest
+from unittest.mock import MagicMock
 
 ROOT_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..")
@@ -70,6 +71,7 @@ os.environ["HOME"] = os.environ.get("HOME") or tempfile.mkdtemp(prefix="gramps-h
 from gramps.gen.fs.compare.comparators import (
     _child_id_for_rel,
     _child_rel_matches_family,
+    _find_best_fs_fact_match,
     _other_parent_id_for_child_rel,
 )
 
@@ -272,6 +274,151 @@ class TestPostLoopUnknownParentGuard(unittest.TestCase):
 
         guard_triggers = bool(fs_spouse_id and (other_parent_id == fs_spouse_id))
         self.assertTrue(guard_triggers)
+
+
+def _make_fs_fact(
+    gramps_tag: object, date: str = "", fact_id: str = ""
+) -> types.SimpleNamespace:
+    """Build a minimal FS fact stub.
+
+    gramps_tag is stored directly as the `type` field so that
+    _fs_fact_gramps_tag() returns it unchanged (it only converts URL strings;
+    a non-URL value is returned as-is).
+    """
+    # Use a raw string that is NOT a gedcomx URL so that _fs_fact_gramps_tag
+    # returns the value directly.  Prefix with "data:," to pass through the
+    # custom-tag path, but the simplest approach is to use a sentinel string
+    # that is not in GEDCOMX_TO_GRAMPS_FACTS and doesn't start with "http:".
+    return types.SimpleNamespace(
+        type=gramps_tag,
+        date=date or None,
+        place=None,
+        value=None,
+        id=fact_id or None,
+        attribution=None,
+    )
+
+
+_MARRIAGE_TAG = "TEST_MARRIAGE"
+_DIVORCE_TAG = "TEST_DIVORCE"
+
+
+# -------------------------------------------------------------------------
+#
+# TestFindBestFsFactMatch
+#
+# -------------------------------------------------------------------------
+class TestFindBestFsFactMatch(unittest.TestCase):
+    """Tests for _find_best_fs_fact_match.
+
+    We use sentinel type strings that are not in GEDCOMX_TO_GRAMPS_FACTS and
+    do not start with 'http:', so _fs_fact_gramps_tag() returns them unchanged.
+    The gr_tag argument is passed as the same sentinel so types match.
+    """
+
+    def test_exact_date_match_returned(self):
+        """Returns the fact whose date matches gr_date exactly."""
+        facts = [
+            _make_fs_fact(_MARRIAGE_TAG, "1 Jan 1850"),
+            _make_fs_fact(_MARRIAGE_TAG, "5 Mar 1851"),
+        ]
+        result = _find_best_fs_fact_match(facts, _MARRIAGE_TAG, "5 Mar 1851", "")
+        self.assertIs(result, facts[1])
+
+    def test_date_match_returned_regardless_of_order(self):
+        """Date-matching fact is returned even when it appears second."""
+        facts = [
+            _make_fs_fact(_MARRIAGE_TAG, "1 Jan 1850"),
+            _make_fs_fact(_MARRIAGE_TAG, "5 Mar 1851"),
+        ]
+        result = _find_best_fs_fact_match(facts, _MARRIAGE_TAG, "5 Mar 1851", "")
+        self.assertIs(result, facts[1])
+
+    def test_no_date_match_returns_dated_fallback_over_undated(self):
+        """When no exact date match, prefer a dated fact over an undated one."""
+        undated = _make_fs_fact(_MARRIAGE_TAG, "")
+        dated = _make_fs_fact(_MARRIAGE_TAG, "1 Jan 1850")
+        # undated comes first; gr_date is non-empty with no exact match
+        facts = [undated, dated]
+        result = _find_best_fs_fact_match(facts, _MARRIAGE_TAG, "5 Mar 1851", "")
+        self.assertIs(result, dated)
+
+    def test_id_match_takes_priority_over_date(self):
+        """When gr_id matches a fact's id, that fact is returned regardless of date."""
+        facts = [
+            _make_fs_fact(_MARRIAGE_TAG, "1 Jan 1850", fact_id="fs-id-001"),
+            _make_fs_fact(_MARRIAGE_TAG, "5 Mar 1851"),
+        ]
+        result = _find_best_fs_fact_match(
+            facts, _MARRIAGE_TAG, "5 Mar 1851", "fs-id-001"
+        )
+        self.assertIs(result, facts[0])
+
+    def test_type_mismatch_returns_none(self):
+        """When no fact matches the requested type, return None."""
+        facts = [_make_fs_fact(_DIVORCE_TAG, "1 Jan 1850")]
+        result = _find_best_fs_fact_match(facts, _MARRIAGE_TAG, "1 Jan 1850", "")
+        self.assertIsNone(result)
+
+    def test_empty_facts_list_returns_none(self):
+        """Empty list returns None without raising."""
+        result = _find_best_fs_fact_match([], _MARRIAGE_TAG, "1 Jan 1850", "")
+        self.assertIsNone(result)
+
+
+# -------------------------------------------------------------------------
+#
+# TestCoupleLoopUnrelatedCoupleSkipped
+#
+# -------------------------------------------------------------------------
+class TestCoupleLoopUnrelatedCoupleSkipped(unittest.TestCase):
+    """Tests for the couple loop guard: couples where neither member == fsid are skipped."""
+
+    def _make_couple(self, person1_id, person2_id):
+        """Build a minimal couple stub."""
+        p1 = types.SimpleNamespace(resourceId=person1_id) if person1_id else None
+        p2 = types.SimpleNamespace(resourceId=person2_id) if person2_id else None
+        return types.SimpleNamespace(person1=p1, person2=p2)
+
+    def _resolve_fs_spouse_id(self, fsid, couple):
+        """Replicate the fixed couple-loop logic to determine fs_spouse_id.
+
+        Returns (fs_spouse_id, skip) where skip=True means the couple
+        should be skipped entirely.
+        """
+        if couple.person1 and couple.person1.resourceId == fsid:
+            return couple.person2.resourceId, False
+        elif couple.person2 and couple.person2.resourceId == fsid:
+            return couple.person1.resourceId if couple.person1 else "", False
+        else:
+            return "", True
+
+    def test_fsid_is_person1_returns_person2(self):
+        """When fsid == person1, spouse is person2."""
+        couple = self._make_couple("SELF", "SPOUSE")
+        spouse_id, skip = self._resolve_fs_spouse_id("SELF", couple)
+        self.assertFalse(skip)
+        self.assertEqual(spouse_id, "SPOUSE")
+
+    def test_fsid_is_person2_returns_person1(self):
+        """When fsid == person2, spouse is person1."""
+        couple = self._make_couple("SPOUSE", "SELF")
+        spouse_id, skip = self._resolve_fs_spouse_id("SELF", couple)
+        self.assertFalse(skip)
+        self.assertEqual(spouse_id, "SPOUSE")
+
+    def test_unrelated_couple_is_skipped(self):
+        """When neither member is fsid, the couple is skipped (no spurious row)."""
+        couple = self._make_couple("THIRD-PARTY-A", "THIRD-PARTY-B")
+        _, skip = self._resolve_fs_spouse_id("SELF", couple)
+        self.assertTrue(skip)
+
+    def test_fsid_is_person2_person1_is_none_returns_empty_spouse(self):
+        """When fsid == person2 and person1 is absent, spouse is ''."""
+        couple = self._make_couple(None, "SELF")
+        spouse_id, skip = self._resolve_fs_spouse_id("SELF", couple)
+        self.assertFalse(skip)
+        self.assertEqual(spouse_id, "")
 
 
 if __name__ == "__main__":

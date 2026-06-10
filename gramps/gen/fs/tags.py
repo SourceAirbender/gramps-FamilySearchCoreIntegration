@@ -46,6 +46,7 @@ from gramps.gen.db import DbTxn
 from gramps.gen.lib import Person, Tag
 
 from gramps.gen.fs import utils as fs_utilities
+from gramps.gen.fs.actions import FS_ATTR_CANON, FS_ATTR_OLD, FS_ATTR_HUMAN
 
 _ = glocale.translation.gettext
 
@@ -162,11 +163,15 @@ def _extract_fsftid(person: Person) -> Optional[str]:
 
     for attr in person.get_attribute_list() or []:
         try:
-            atype = attr.get_type().get_string().strip().upper()
+            atype = str(attr.get_type()).strip().upper()
         except Exception:
             continue
 
-        if atype in {"_FSFTID", "FSFTID", "FSID", "FS_FTID", "_FS_FTID"}:
+        if atype in {
+            FS_ATTR_CANON.upper(),
+            FS_ATTR_OLD.upper(),
+            FS_ATTR_HUMAN.upper(),
+        }:
             val = str(attr.get_value() or "").strip()
             if val:
                 return val

@@ -20,6 +20,7 @@
 
 from __future__ import annotations
 
+import calendar
 import email.utils
 import json
 import logging
@@ -262,7 +263,16 @@ class CacheMixin:
             if r:
                 etag = r.headers.get("Etag")
                 lm = r.headers.get("Last-Modified")
-                last_mod = int(time.mktime(email.utils.parsedate(lm))) if lm else None
+                if lm:
+                    try:
+                        parsed = email.utils.parsedate(lm)
+                        last_mod = (
+                            calendar.timegm(parsed) if parsed is not None else None
+                        )
+                    except Exception:
+                        last_mod = None
+                else:
+                    last_mod = None
 
         ce = cache.get_meta(fsid) if cache else None
         up_to_date = (

@@ -229,5 +229,100 @@ class TestAddPersons(unittest.TestCase):
         # (the important guarantee is that the call didn't raise)
 
 
+# -------------------------------------------------------------------------
+#
+# TestLastModifiedTimezone
+#
+# -------------------------------------------------------------------------
+class TestLastModifiedTimezone(unittest.TestCase):
+    """Tests that Last-Modified timestamps are parsed as UTC (not local time).
+
+    HTTP Last-Modified is always UTC; using time.mktime() instead of
+    calendar.timegm() would produce a wrong timestamp on non-UTC machines.
+    """
+
+    def setUp(self):
+        self.tree = Tree()
+        tree_mod._fs_session = None
+        deserialize.Person.index.clear()
+
+    def tearDown(self):
+        tree_mod._fs_session = None
+        deserialize.Person.index.clear()
+
+    def test_add_person_last_modified_parsed_as_utc(self):
+        """Last-Modified header is converted to a UTC Unix timestamp."""
+        import calendar
+        import email.utils
+
+        # Thu, 01 Jan 2026 00:00:00 GMT == 1767225600 UTC
+        gmt_header = "Thu, 01 Jan 2026 00:00:00 GMT"
+        expected_ts = calendar.timegm(email.utils.parsedate(gmt_header))
+
+        mock_session = MagicMock()
+        mock_response = MagicMock()
+        mock_response.headers = {"Last-Modified": gmt_header}
+        mock_response.json.return_value = {"persons": [{"id": "FS-UTC-001"}]}
+        mock_session.get_url.return_value = mock_response
+
+        mock_person = MagicMock(spec=deserialize.Person)
+        deserialize.Person.index["FS-UTC-001"] = mock_person
+        tree_mod._fs_session = mock_session
+
+        with patch("gramps.gen.fs.tree.deserialize.deserialize_json"):
+            self.tree.add_person("FS-UTC-001")
+
+        self.assertEqual(mock_person._last_modified, expected_ts)
+
+    def test_add_person_malformed_last_modified_does_not_raise(self):
+        """A malformed Last-Modified header is silently ignored."""
+        mock_session = MagicMock()
+        mock_response = MagicMock()
+        mock_response.headers = {"Last-Modified": "not-a-date"}
+        mock_response.json.return_value = {"persons": [{"id": "FS-UTC-002"}]}
+        mock_session.get_url.return_value = mock_response
+
+        mock_person = MagicMock(spec=deserialize.Person)
+        deserialize.Person.index["FS-UTC-002"] = mock_person
+        tree_mod._fs_session = mock_session
+
+        with patch("gramps.gen.fs.tree.deserialize.deserialize_json"):
+            # Must not raise
+            self.tree.add_person("FS-UTC-002")
+
+    def test_add_persons_does_not_overwrite_existing_etag(self):
+        """add_persons does not clobber _etag/_last_modified for already-present persons."""
+        # Pre-populate _persons with a fresh person object
+        existing_person = MagicMock(spec=deserialize.Person)
+        existing_person._etag = "v2-fresh"
+        self.tree._persons["FS-NOOVER-001"] = existing_person
+
+        # Put a stale person in the global index (simulating a prior deserialization)
+        stale_person = MagicMock(spec=deserialize.Person)
+        stale_person._etag = "v1-stale"
+        deserialize.Person.index["FS-NOOVER-001"] = stale_person
+
+        # Call add_persons with the same fid — it should skip fetching but also
+        # must not overwrite the existing _persons entry from the index loop.
+        with patch.object(self.tree, "_fetch_raw") as mock_fetch:
+            self.tree.add_persons(["FS-NOOVER-001"])
+
+        mock_fetch.assert_not_called()
+        # The fresh person must not have been replaced by the stale one
+        self.assertIs(self.tree._persons["FS-NOOVER-001"], existing_person)
+        self.assertEqual(self.tree._persons["FS-NOOVER-001"]._etag, "v2-fresh")
+
+    def test_add_persons_fetch_exception_is_logged_not_raised(self):
+        """An exception in a concurrent fetch is logged via LOG.warning, not raised."""
+        with patch("gramps.gen.fs.tree.LOG") as mock_log:
+            with patch.object(
+                self.tree, "_fetch_raw", side_effect=RuntimeError("auth expired")
+            ):
+                # Must not raise
+                self.tree.add_persons(["FS-LOG-001"])
+
+        mock_log.warning.assert_called()
+
+
 if __name__ == "__main__":
     unittest.main()

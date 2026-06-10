@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterable, Set
+import calendar
 import email.utils
 import logging
 import time
@@ -89,9 +90,9 @@ class Tree(deserialize.Gedcomx):
 
         if "Last-Modified" in r.headers:
             try:
-                fs_person._last_modified = int(
-                    time.mktime(email.utils.parsedate(r.headers["Last-Modified"]))
-                )
+                parsed = email.utils.parsedate(r.headers["Last-Modified"])
+                if parsed is not None:
+                    fs_person._last_modified = calendar.timegm(parsed)
             except Exception:
                 pass
         if "Etag" in r.headers:
@@ -120,7 +121,11 @@ class Tree(deserialize.Gedcomx):
                         if r is not None and data is not None:
                             raw_results[fsid] = (r, data)
                     except Exception:
-                        pass
+                        LOG.warning(
+                            "Failed to fetch FamilySearch person %s",
+                            futures[future],
+                            exc_info=True,
+                        )
 
             for fid in to_fetch:
                 if fid not in raw_results:
@@ -133,11 +138,9 @@ class Tree(deserialize.Gedcomx):
                     continue
                 if "Last-Modified" in r.headers:
                     try:
-                        fs_person._last_modified = int(
-                            time.mktime(
-                                email.utils.parsedate(r.headers["Last-Modified"])
-                            )
-                        )
+                        parsed = email.utils.parsedate(r.headers["Last-Modified"])
+                        if parsed is not None:
+                            fs_person._last_modified = calendar.timegm(parsed)
                     except Exception:
                         pass
                 if "Etag" in r.headers:
@@ -145,7 +148,7 @@ class Tree(deserialize.Gedcomx):
                 self._persons[fid] = fs_person
 
         for fid in requested_fids:
-            if fid in deserialize.Person.index:
+            if fid not in self._persons and fid in deserialize.Person.index:
                 self._persons[fid] = deserialize.Person.index[fid]
 
     def add_parents(self, fids: Set[str]) -> Set[str]:

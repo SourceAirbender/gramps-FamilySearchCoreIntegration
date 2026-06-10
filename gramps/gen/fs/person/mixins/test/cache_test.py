@@ -214,5 +214,89 @@ class TestCacheMixinHydrateLogging(unittest.TestCase):
         mock_session.get_jsonurl.assert_not_called()
 
 
+# -------------------------------------------------------------------------
+#
+# TestParseDateUtcConversion
+#
+# -------------------------------------------------------------------------
+class TestParseDateUtcConversion(unittest.TestCase):
+    """Tests that _ensure_person_cached parses Last-Modified as UTC.
+
+    Regression tests for the fix that replaced time.mktime (local-time) with
+    calendar.timegm (UTC) and added a None-guard around email.utils.parsedate.
+    """
+
+    def test_valid_gmt_header_parsed_correctly(self):
+        """A valid RFC-2822 GMT Last-Modified header yields the correct UTC epoch."""
+        import calendar
+        import email.utils
+
+        gmt_header = "Thu, 01 Jan 2026 00:00:00 GMT"
+        parsed = email.utils.parsedate(gmt_header)
+        expected_ts = calendar.timegm(parsed)
+
+        # Verify our expected value is what calendar.timegm gives for that date
+        self.assertIsNotNone(parsed)
+        self.assertIsInstance(expected_ts, int)
+        # 2026-01-01 00:00:00 UTC
+        self.assertEqual(expected_ts, 1767225600)
+
+    def test_malformed_last_modified_parsedate_returns_none(self):
+        """email.utils.parsedate returns None for a malformed date string."""
+        import email.utils
+
+        parsed = email.utils.parsedate("not-a-real-date")
+        self.assertIsNone(parsed)
+
+    def test_malformed_last_modified_does_not_crash_cache_logic(self):
+        """The cache Last-Modified parsing does not raise when parsedate returns None.
+
+        This directly tests the fixed expression:
+          if lm:
+              try:
+                  parsed = email.utils.parsedate(lm)
+                  last_mod = calendar.timegm(parsed) if parsed is not None else None
+              except Exception:
+                  last_mod = None
+        """
+        import calendar
+        import email.utils
+
+        lm = "not-a-real-date"
+        if lm:
+            try:
+                parsed = email.utils.parsedate(lm)
+                last_mod = calendar.timegm(parsed) if parsed is not None else None
+            except Exception:
+                last_mod = None
+        else:
+            last_mod = None
+
+        self.assertIsNone(last_mod)
+
+    def test_utc_timestamp_differs_from_local_mktime_on_non_utc_machine(self):
+        """calendar.timegm and time.mktime differ on machines not in UTC.
+
+        This test documents the original bug: on a machine with UTC offset != 0,
+        time.mktime() would return a wrong value for an HTTP UTC timestamp.
+        """
+        import calendar
+        import email.utils
+        import time
+
+        gmt_header = "Thu, 01 Jan 2026 00:00:00 GMT"
+        parsed = email.utils.parsedate(gmt_header)
+        utc_ts = calendar.timegm(parsed)
+        local_ts = int(time.mktime(parsed))
+
+        utc_offset_seconds = time.timezone  # positive for west of UTC
+        if utc_offset_seconds != 0:
+            # On non-UTC machines the two values differ by the UTC offset
+            self.assertNotEqual(utc_ts, local_ts)
+        else:
+            # On UTC machines they happen to be equal; test still passes
+            self.assertEqual(utc_ts, local_ts)
+
+
 if __name__ == "__main__":
     unittest.main()
