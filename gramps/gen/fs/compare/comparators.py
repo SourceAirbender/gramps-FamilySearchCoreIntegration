@@ -1201,11 +1201,11 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
     return res
 
 
-def compare_other_facts(db, person: Person, fs_person) -> List[list]:
+def compare_other_facts(db, person: Person, fs_person) -> List[Tuple]:
     # compare non-core facts
     gr_facts = person.event_ref_list
     fs_facts = fs_person.facts.copy()
-    res: List[list] = []
+    res: List[Tuple] = []
 
     for gr_ref in gr_facts:
         if int(gr_ref.get_role()) != EventRoleType.PRIMARY:
