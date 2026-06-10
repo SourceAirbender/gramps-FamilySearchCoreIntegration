@@ -319,7 +319,7 @@ class FamilySearchToolsWindow:
 
         self._install_css()
 
-        # layout is simple on purpose: status row, then grouped actions in tabs
+        # layout is simple on purpose: name + link row, then grouped actions in tabs
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.window.add(outer)
 
@@ -327,24 +327,21 @@ class FamilySearchToolsWindow:
         if banner is not None:
             outer.pack_start(banner, False, False, 0)
 
-        status_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        status_row.get_style_context().add_class("fs-status-row")
-        outer.pack_start(status_row, False, False, 0)
-
-        status_widget = None
-        get_status_widget = getattr(self.session, "get_status_widget", None)
-        if callable(get_status_widget):
-            status_widget = get_status_widget()
-
-        if status_widget is not None:
-            status_widget.set_halign(Gtk.Align.START)
-            status_row.pack_start(status_widget, False, False, 0)
+        name_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        name_row.get_style_context().add_class("fs-name-row")
+        outer.pack_start(name_row, False, False, 0)
 
         self.active_label = Gtk.Label(label=_("Editor person: (none)"))
         self.active_label.set_xalign(0.0)
         self.active_label.set_ellipsize(3)
         self.active_label.get_style_context().add_class("fs-active-label")
-        status_row.pack_start(self.active_label, True, True, 0)
+        name_row.pack_start(self.active_label, True, True, 0)
+
+        self.btn_link = Gtk.Button(label=_("Link FamilySearch ID"))
+        link_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        link_row.get_style_context().add_class("fs-link-row")
+        link_row.pack_start(self.btn_link, False, False, 0)
+        outer.pack_start(link_row, False, False, 0)
 
         outer.pack_start(
             Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
@@ -368,36 +365,8 @@ class FamilySearchToolsWindow:
         tab_bulk.set_border_width(2)
         notebook.append_page(tab_bulk, Gtk.Label(label=_("Bulk Actions")))
 
-        sec_person, box_person = self._make_section(
-            _("Person actions"), "fs-sec-person"
-        )
+        sec_person = self._build_person_actions_section()
         tab_single.pack_start(sec_person, False, False, 0)
-
-        self.btn_link = Gtk.Button(label=_("Link FamilySearch ID"))
-        self.btn_cmp = Gtk.Button(label=_("Compare"))
-        self.btn_sync = Gtk.Button(label=_("Sync from FamilySearch"))
-        self.btn_sync.get_style_context().add_class("suggested-action")
-
-        self.btn_sync_to = Gtk.Button(label=_("Sync to FamilySearch..."))
-        self.btn_sync_to.set_tooltip_text(
-            _("Overwrite selected FamilySearch fields with Gramps values (no deletes).")
-        )
-
-        self.btn_export_basic = Gtk.Button(label=_("Export to FamilySearch"))
-        self.btn_export_basic.set_tooltip_text(
-            _(
-                "Create missing people on FamilySearch and link relationships (name + birth/death)."
-            )
-        )
-
-        for button in (
-            self.btn_link,
-            self.btn_cmp,
-            self.btn_sync,
-            self.btn_sync_to,
-            self.btn_export_basic,
-        ):
-            self._add_btn(box_person, button)
 
         sec_import, box_import = self._make_section(
             _("Import relatives"), "fs-sec-import"
@@ -443,6 +412,25 @@ class FamilySearchToolsWindow:
             util_inner = sec_bulk_util.get_child()
             if isinstance(util_inner, Gtk.Box):
                 util_inner.pack_start(note, False, False, 0)
+
+        outer.pack_start(
+            Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL),
+            False,
+            False,
+            0,
+        )
+
+        bottom_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        bottom_bar.get_style_context().add_class("fs-bottom-statusbar")
+        outer.pack_start(bottom_bar, False, False, 0)
+
+        status_widget = None
+        get_status_widget = getattr(self.session, "get_status_widget", None)
+        if callable(get_status_widget):
+            status_widget = get_status_widget()
+        if status_widget is not None:
+            status_widget.set_halign(Gtk.Align.START)
+            bottom_bar.pack_start(status_widget, False, False, 0)
 
         self.btn_link.connect("clicked", self._on_link)
         self.btn_cmp.connect("clicked", self._on_compare)
@@ -511,6 +499,60 @@ class FamilySearchToolsWindow:
         return os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", filename)
         )
+
+    def _build_person_actions_section(self) -> Gtk.Widget:
+        """Build the Person actions section with explicit three-row button layout."""
+        wrapper = Gtk.EventBox()
+        wrapper.set_visible_window(True)
+        style = wrapper.get_style_context()
+        style.add_class("fs-section")
+        style.add_class("fs-sec-person")
+
+        inner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        inner.set_border_width(10)
+        wrapper.add(inner)
+
+        lbl = Gtk.Label()
+        lbl.set_markup(
+            "<span size='large'><b>"
+            + GLib.markup_escape_text(_("Person actions"))
+            + "</b></span>"
+        )
+        lbl.set_xalign(0.0)
+        lbl.get_style_context().add_class("fs-section-title")
+        inner.pack_start(lbl, False, False, 0)
+        inner.pack_start(
+            Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 0
+        )
+
+        self.btn_cmp = Gtk.Button(label=_("Compare"))
+        row1 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row1.pack_start(self.btn_cmp, True, True, 0)
+        inner.pack_start(row1, False, False, 0)
+
+        self.btn_sync = Gtk.Button(label=_("Sync from FamilySearch"))
+        self.btn_sync.get_style_context().add_class("suggested-action")
+        self.btn_sync_to = Gtk.Button(label=_("Sync to FamilySearch..."))
+        self.btn_sync_to.set_tooltip_text(
+            _("Overwrite selected FamilySearch fields with Gramps values (no deletes).")
+        )
+        row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row2.pack_start(self.btn_sync, True, True, 0)
+        row2.pack_start(self.btn_sync_to, True, True, 0)
+        inner.pack_start(row2, False, False, 0)
+
+        self.btn_export_basic = Gtk.Button(label=_("Export to FamilySearch"))
+        self.btn_export_basic.set_tooltip_text(
+            _(
+                "Create missing people on FamilySearch and link relationships"
+                " (name + birth/death)."
+            )
+        )
+        row3 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row3.pack_start(self.btn_export_basic, True, True, 0)
+        inner.pack_start(row3, False, False, 0)
+
+        return wrapper
 
     def _make_section(
         self, title: str, css_class: str

@@ -202,8 +202,17 @@ box.fs-compare-legend,
   background-color: rgba(0,0,0,0.03);
 }
 
-.fs-status-row {
-  padding: 2px;
+.fs-name-row {
+  padding: 2px 2px 0 2px;
+}
+
+.fs-link-row {
+  padding: 0 2px 2px 2px;
+}
+
+.fs-bottom-statusbar {
+  padding: 4px 2px;
+  opacity: 0.80;
 }
 
 .fs-active-label {
