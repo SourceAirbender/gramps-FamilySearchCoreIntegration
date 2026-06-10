@@ -547,7 +547,6 @@ class FamilySearchToolsWindow:
         inner.pack_start(row1, False, False, 0)
 
         self.btn_sync = Gtk.Button(label=_("Sync from FamilySearch"))
-        self.btn_sync.get_style_context().add_class("suggested-action")
         self.btn_sync_to = Gtk.Button(label=_("Sync to FamilySearch..."))
         self.btn_sync_to.set_tooltip_text(
             _("Overwrite selected FamilySearch fields with Gramps values (no deletes).")
