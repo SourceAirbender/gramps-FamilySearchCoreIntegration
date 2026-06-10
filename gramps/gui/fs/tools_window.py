@@ -176,6 +176,19 @@ def notify_from_person_editor(
     _dbg(f"notify_from_person_editor: handle={person_handle}")
 
 
+def _on_editor_destroyed(editor_wr: "weakref.ReferenceType[Any]") -> None:
+    """Clear the shared editor context when the tracked editor window is destroyed."""
+    global _LAST_EDITOR
+    editor = editor_wr()
+    current = _LAST_EDITOR.editor_obj()
+    if current is not None and editor is not None and current is not editor:
+        return
+    _LAST_EDITOR = _EditorCtx()
+    if _SINGLETON is not None and _SINGLETON.is_alive():
+        GLib.idle_add(_SINGLETON._on_editor_ctx_changed)
+    _dbg("Editor closed — cleared editor context")
+
+
 def _install_editperson_hook() -> None:
     """Hook EditPerson once so the tools window can follow focus/context changes."""
     global _EDITPERSON_HOOK_INSTALLED
@@ -221,6 +234,8 @@ def _install_editperson_hook() -> None:
         if window is not None:
             window.connect("focus-in-event", lambda *_args: _fire())
             window.connect("map-event", lambda *_args: _fire())
+            editor_wr: weakref.ReferenceType[Any] = weakref.ref(editor)
+            window.connect("destroy", lambda *_args: _on_editor_destroyed(editor_wr))
 
     def wrapped_post_init(editor: Any, *args: Any, **kwargs: Any) -> Any:
         result = original_post_init(editor, *args, **kwargs)
