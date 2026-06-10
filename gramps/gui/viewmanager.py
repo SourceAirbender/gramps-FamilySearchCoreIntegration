@@ -134,7 +134,7 @@ from gramps.gui.editors import (
 from gramps.gen.db.exceptions import DbWriteFailure
 from gramps.gen.filters import reload_custom_filters
 from .managedwindow import ManagedWindow
-from .fs.manager import get_session
+from .fs.manager import get_session, needs_access_code
 from .fs.tools_window import close_tools_window, toggle_tools_window
 
 # -------------------------------------------------------------------------
@@ -431,37 +431,7 @@ class ViewManager(CLIManager):
         """
         Return whether foundation middleware is missing its access code.
         """
-        auth_provider = os.environ.get("GRAMPS_FS_AUTH_PROVIDER", "").strip().lower()
-        if not auth_provider:
-            try:
-                auth_provider = (
-                    (config.get("familysearch.auth-provider") or "foundation")
-                    .strip()
-                    .lower()
-                )
-            except Exception:
-                auth_provider = "foundation"
-
-        direct_mode = os.environ.get("GRAMPS_FS_ENABLE_DIRECT", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-            "on",
-        )
-        if auth_provider == "direct" and not direct_mode:
-            auth_provider = "foundation"
-        if auth_provider != "foundation":
-            return False
-
-        env_access_code = os.environ.get("GRAMPS_FS_FOUNDATION_ACCESS_CODE", "").strip()
-        if env_access_code:
-            return False
-
-        try:
-            access_code = config.get("familysearch.middleware.access-code") or ""
-        except Exception:
-            access_code = ""
-        return not str(access_code).strip()
+        return needs_access_code()
 
     def _show_preferences_panel(self, panel_name: str | None = None) -> None:
         """
@@ -1428,6 +1398,7 @@ class ViewManager(CLIManager):
         """
         Called after a database is closed to do GUI stuff.
         """
+        self._fs_empty_tree_import_prompted = False
         self.undo_history_close()
         self.uistate.window.set_title("%s - Gramps" % _("No Family Tree"))
         self.uistate.clear_filter_results()

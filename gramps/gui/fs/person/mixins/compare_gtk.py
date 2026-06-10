@@ -566,30 +566,29 @@ class CompareGtkMixin:
 
     def _merge_row_from_compare(self, section: str, row: Any) -> _FSMergeRow:
         """
-        Convert an existing compare tuple into a merge preview row.
+        Convert a CompareRow into a merge preview row.
         """
-        data = list(row) + [""] * 13
-        status = str(data[0] or "")
-        kind = str(data[8] or "")
-        gramps_text = self._merge_value_text(data[2], data[3])
-        fs_text = self._merge_value_text(data[4], data[5])
+        status = str(row.status or "")
+        kind = str(row.kind or "")
+        gramps_text = self._merge_value_text(row.gr_date, row.gr_value)
+        fs_text = self._merge_value_text(row.fs_date, row.fs_value)
         selectable = self._merge_row_selectable(status, kind, fs_text)
         selected = selectable and status == "yellow3"
         return _FSMergeRow(
             status=status,
             section=section,
-            field=str(data[1] or "").strip(),
-            gramps_date=str(data[2] or ""),
-            gramps_value=str(data[3] or ""),
-            fs_date=str(data[4] or ""),
-            fs_value=str(data[5] or ""),
+            field=str(row.field or "").strip(),
+            gramps_date=str(row.gr_date or ""),
+            gramps_value=str(row.gr_value or ""),
+            fs_date=str(row.fs_date or ""),
+            fs_value=str(row.fs_value or ""),
             selected=selected,
             selectable=selectable,
             kind=kind,
-            gr_handle=str(data[9] or ""),
-            fs_id=str(data[10] or ""),
-            gr_extra=str(data[11] or ""),
-            fs_extra=str(data[12] or ""),
+            gr_handle=str(row.gr_handle or ""),
+            fs_id=str(row.fs_id or ""),
+            gr_extra=str(row.gr_extra or ""),
+            fs_extra=str(row.fs_extra or ""),
         )
 
     def _collect_merge_rows(self, gr: Person, fsid: str) -> list[_FSMergeRow]:
@@ -1666,7 +1665,8 @@ class CompareGtkMixin:
                     )
                     failed += 1
 
-            db.commit_person(gr, txn)
+            if changed:
+                db.commit_person(gr, txn)
 
         if changed and not failed:
             OkDialog(
