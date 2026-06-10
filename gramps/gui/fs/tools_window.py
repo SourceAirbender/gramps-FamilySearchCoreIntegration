@@ -38,9 +38,10 @@ from gi.repository import GdkPixbuf, GLib, Gtk
 from gramps.gen.const import DATA_DIR, GRAMPS_LOCALE as glocale
 from gramps.gen.const import IMAGE_DIR as _GRAMPS_IMAGE_DIR
 from gramps.gen.display.name import displayer as name_displayer
+from gramps.gen.errors import HandleError
+from gramps.gen.fs.actions import _get_fs_id
 from gramps.gui.dialog import ErrorDialog
 from gramps.gui.editors.editperson import EditPerson
-from gramps.gen.errors import HandleError
 
 from . import actions
 from . import sync_directions as fs_syncdir
@@ -753,6 +754,16 @@ class FamilySearchToolsWindow:
 
         return None
 
+    def _live_person_obj(self) -> Any:
+        """Return the live in-memory person from the editor (not the DB copy)."""
+        person = _LAST_EDITOR.person_obj()
+        if person is not None:
+            return person
+        editor = _LAST_EDITOR.editor_obj()
+        if editor is not None:
+            return getattr(editor, "obj", None)
+        return None
+
     def _update_label(self) -> None:
         """Refresh the label that shows which editor person were on"""
         person = self._editor_person_obj()
@@ -781,10 +792,9 @@ class FamilySearchToolsWindow:
                 _("Editor person: %(name)s") % {"name": display_name}
             )
 
-    def _set_action_sensitivity(self, enabled: bool) -> None:
+    def _set_action_sensitivity(self, enabled: bool, has_fsid: bool = True) -> None:
         """Enable/disable buttons based on connection state and editor readiness."""
-        for button in (
-            self.btn_link,
+        other_buttons = (
             self.btn_cmp,
             self.btn_sync,
             self.btn_sync_to,
@@ -793,8 +803,22 @@ class FamilySearchToolsWindow:
             self.btn_imp_spo,
             self.btn_imp_chi,
             self.btn_bulk_import,
-        ):
-            button.set_sensitive(enabled)
+        )
+
+        if enabled and not has_fsid:
+            self.btn_link.set_sensitive(True)
+            self.btn_link.set_label(_("Add FamilySearch ID"))
+            for button in other_buttons:
+                button.set_sensitive(False)
+        else:
+            self.btn_link.set_sensitive(enabled)
+            self.btn_link.set_label(
+                _("Edit FamilySearch ID")
+                if (enabled and has_fsid)
+                else _("Link FamilySearch ID")
+            )
+            for button in other_buttons:
+                button.set_sensitive(enabled)
 
         self.btn_tags.set_sensitive(
             bool(self._fs_connected() and _LAST_EDITOR.dbstate is not None)
@@ -812,8 +836,11 @@ class FamilySearchToolsWindow:
             and _person_exists_in_db(_LAST_EDITOR.dbstate, person_handle)
         )
 
+        editing = bool(self._fs_connected() and db_ready)
+        has_fsid = bool(_get_fs_id(self._live_person_obj())) if editing else True
+
         self._update_label()
-        self._set_action_sensitivity(bool(self._fs_connected() and db_ready))
+        self._set_action_sensitivity(editing, has_fsid)
         return True
 
     def _on_editor_ctx_changed(self) -> bool:
