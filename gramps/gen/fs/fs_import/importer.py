@@ -239,7 +239,7 @@ class FSToGrampsImporter:
                     cpr.parent1,
                     cpr.parent2,
                 )
-                if missing:
+                if missing and not (father_h or mother_h):
                     LOG.warning(
                         "Skipping root parent link with unresolved FS parent(s): %s",
                         sorted(missing),
@@ -372,7 +372,7 @@ class FSToGrampsImporter:
             fs_cpr.parent2,
         )
 
-        if missing:
+        if missing and not (father_h or mother_h):
             LOG.warning(
                 "Skipping child relationship with unresolved FS parent(s): %s",
                 sorted(missing),
@@ -433,7 +433,7 @@ class FSToGrampsImporter:
             fs_fam.person2,
         )
 
-        if missing:
+        if missing and not (father_h or mother_h):
             LOG.warning(
                 "Skipping couple relationship with unresolved FS person(s): %s",
                 sorted(missing),
@@ -550,3 +550,4 @@ class FSToGrampsImporter:
             )
 
         self.dbstate.db.commit_family(family, self.txn)
+        

@@ -113,7 +113,7 @@ def _spouse_ids_from_children(fs_person) -> set[str]:
     return spouse_ids
 
 
-def _other_parent_id_for_child_rel(fsid: str, rel) -> str | None:
+def _other_parent_id_for_child_rel(fsid: str, rel: object) -> str | None:
     """
     Return the other parent id for a child relationship involving fsid.
     """
@@ -124,6 +124,24 @@ def _other_parent_id_for_child_rel(fsid: str, rel) -> str | None:
     if parent2 == fsid:
         return parent1 or ""
     return None
+
+
+def _child_id_for_rel(rel: object) -> str:
+    """
+    Return the child id for a child-and-parents relationship.
+    """
+    return str(getattr(getattr(rel, "child", None), "resourceId", "") or "")
+
+
+def _child_rel_matches_family(
+    fsid: str, rel: object, child_fsid: str, spouse_fsid: str
+) -> bool:
+    """
+    Return True when a FamilySearch child relationship matches this local family.
+    """
+    if not child_fsid or _child_id_for_rel(rel) != child_fsid:
+        return False
+    return _other_parent_id_for_child_rel(fsid, rel) == (spouse_fsid or "")
 
 
 def _child_other_parent_ids_for_family(db, family, fs_person) -> set[str]:
@@ -929,15 +947,24 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
                 fs_child_id = ""
                 fs_child_other_parent_id = None
                 for triple in list(fs_children):
-                    other_parent_id = _other_parent_id_for_child_rel(fsid, triple)
-                    if (
-                        other_parent_id is not None
-                        and triple.child.resourceId == child_fsid
+                    if _child_rel_matches_family(
+                        fsid, triple, child_fsid, fs_spouse_id
                     ):
                         fs_child_id = child_fsid
-                        fs_child_other_parent_id = other_parent_id
+                        fs_child_other_parent_id = fs_spouse_id or ""
                         fs_children.remove(triple)
                         break
+
+                if not fs_child_id:
+                    for triple in list(fs_children):
+                        other_parent_id = _other_parent_id_for_child_rel(fsid, triple)
+                        if (
+                            other_parent_id is not None
+                            and _child_id_for_rel(triple) == child_fsid
+                        ):
+                            fs_child_id = child_fsid
+                            fs_child_other_parent_id = other_parent_id
+                            break
 
                 color = "yellow"
                 if fs_child_id != "" and fs_child_id == child_fsid:
@@ -978,8 +1005,10 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
 
             to_remove = set()
             for triple in fs_children:
-                if _other_parent_id_for_child_rel(fsid, triple) == fs_spouse_id:
-                    fs_child_id = triple.child.resourceId
+                if fs_spouse_id and (
+                    _other_parent_id_for_child_rel(fsid, triple) == fs_spouse_id
+                ):
+                    fs_child_id = _child_id_for_rel(triple)
                     color = "yellow3"
 
                     fs_child_opt = _fs_person_opt(fs_child_id)
@@ -1063,8 +1092,10 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
 
         to_remove = set()
         for triple in fs_children:
-            if _other_parent_id_for_child_rel(fsid, triple) == fs_spouse_id:
-                fs_child_id = triple.child.resourceId
+            if fs_spouse_id and (
+                _other_parent_id_for_child_rel(fsid, triple) == fs_spouse_id
+            ):
+                fs_child_id = _child_id_for_rel(triple)
 
                 fs_child_opt = _fs_person_opt(fs_child_id)
 
@@ -1133,8 +1164,10 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
 
         to_remove = set()
         for triple in fs_children:
-            if _other_parent_id_for_child_rel(fsid, triple) == fs_spouse_id:
-                fs_child_id = triple.child.resourceId
+            if fs_spouse_id and (
+                _other_parent_id_for_child_rel(fsid, triple) == fs_spouse_id
+            ):
+                fs_child_id = _child_id_for_rel(triple)
                 fs_child_opt = _fs_person_opt(fs_child_id)
                 fs_child_for_name = (
                     fs_child_opt if fs_child_opt is not None else deserialize.Person()
@@ -1168,7 +1201,7 @@ def compare_spouses(db, gr_person: Person, fs_person) -> List[Tuple]:
             fs_children.remove(triple)
 
     for triple in fs_children:
-        fs_child_id = triple.child.resourceId
+        fs_child_id = _child_id_for_rel(triple)
 
         fs_child_opt = _fs_person_opt(fs_child_id)
 
