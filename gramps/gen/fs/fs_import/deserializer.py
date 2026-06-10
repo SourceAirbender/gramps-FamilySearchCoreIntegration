@@ -1079,6 +1079,8 @@ class Person(Subject):
     _spouses: set[Relationship]
     _childrenCP: set[ChildAndParentsRelationship]
     _parentsCP: set[ChildAndParentsRelationship]
+    _last_modified: int | None
+    _etag: str | None
 
     def preferred_name(self):
         for n in self.names or []:

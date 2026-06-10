@@ -865,6 +865,7 @@ def _empty_tree_start_person_dialog(
         status_label.set_text(_("Searching FamilySearch..."))
 
         def _do_search() -> None:
+            outcome: list[_FamilySearchSearchResult] | Exception
             try:
                 outcome = _search_familysearch_people(session, raw_query)
             except Exception as exc:
