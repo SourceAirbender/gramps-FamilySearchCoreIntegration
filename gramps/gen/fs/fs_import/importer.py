@@ -33,6 +33,7 @@ from gramps.gen.lib import (
 from gramps.gen.errors import HandleError
 
 from gramps.gen.fs import utils as fs_utilities
+from gramps.gen.fs.actions import FS_ATTR_CANON
 from gramps.gen.fs.utils import get_fsftid
 from gramps.gen.fs.fs_import import deserializer as deserialize
 from gramps.gen.fs.fs_import.names import add_names
@@ -306,7 +307,11 @@ class FSToGrampsImporter:
                         gr_handle = person.handle
                         break
             except Exception:
-                pass
+                LOG.debug(
+                    "Failed to scan local persons for FamilySearch id %s",
+                    fsid,
+                    exc_info=True,
+                )
 
         # create if still not found
         if gr_person is None:
@@ -507,7 +512,7 @@ class FSToGrampsImporter:
             family.set_mother_handle(mother_h)
 
             attr = Attribute()
-            attr.set_type("_FSFTID")
+            attr.set_type(FS_ATTR_CANON)
             attr.set_value(fs_fam.id)
             family.add_attribute(attr)
 

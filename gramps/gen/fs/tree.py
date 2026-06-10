@@ -27,8 +27,6 @@ import logging
 import time
 
 from gramps.gen.fs.fs_import import deserializer as deserialize
-
-LOG = logging.getLogger(__name__)
 from gramps.gen.fs.fs_import.deserializer import deserialize_json, to_string, DateFormal
 from gramps.gen.fs.fs_import.deserializer import all_annotations, init_class
 from gramps.gen.fs.fs_import.deserializer import (
@@ -39,6 +37,8 @@ from gramps.gen.fs.fs_import.deserializer import (
 )
 
 from .constants import MAX_PERSONS
+
+LOG = logging.getLogger(__name__)
 
 _fs_session = None
 
