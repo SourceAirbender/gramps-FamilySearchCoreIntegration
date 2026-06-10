@@ -401,6 +401,10 @@ class ViewManager(CLIManager):
             return
 
         sess = get_session(dbstate=self.dbstate, uistate=self.uistate)
+        if not sess and self._familysearch_needs_access_code():
+            self._show_preferences_panel(GrampsPreferences.PANEL_INTEGRATIONS)
+            return
+
         if not sess or not (
             getattr(sess, "access_token", None) or getattr(sess, "connected", False)
         ):
@@ -422,6 +426,64 @@ class ViewManager(CLIManager):
             return
 
         toggle_tools_window(sess)
+
+    def _familysearch_needs_access_code(self) -> bool:
+        """
+        Return whether foundation middleware is missing its access code.
+        """
+        auth_provider = os.environ.get("GRAMPS_FS_AUTH_PROVIDER", "").strip().lower()
+        if not auth_provider:
+            try:
+                auth_provider = (
+                    (config.get("familysearch.auth-provider") or "foundation")
+                    .strip()
+                    .lower()
+                )
+            except Exception:
+                auth_provider = "foundation"
+
+        direct_mode = os.environ.get("GRAMPS_FS_ENABLE_DIRECT", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        if auth_provider == "direct" and not direct_mode:
+            auth_provider = "foundation"
+        if auth_provider != "foundation":
+            return False
+
+        env_access_code = os.environ.get("GRAMPS_FS_FOUNDATION_ACCESS_CODE", "").strip()
+        if env_access_code:
+            return False
+
+        try:
+            access_code = config.get("familysearch.middleware.access-code") or ""
+        except Exception:
+            access_code = ""
+        return not str(access_code).strip()
+
+    def _show_preferences_panel(self, panel_name: str | None = None) -> None:
+        """
+        Open preferences and optionally select a panel.
+        """
+        try:
+            gwm = getattr(getattr(self, "uistate", None), "gwm", None)
+            preferences = None
+            if gwm is not None:
+                preferences = gwm.get_item_from_id(id(GrampsPreferences))
+            if preferences is not None:
+                if panel_name and hasattr(preferences, "select_panel"):
+                    preferences.select_panel(panel_name)
+                preferences._present()
+                return
+        except Exception:
+            LOG.warning("Failed to select open preferences panel", exc_info=True)
+
+        try:
+            GrampsPreferences(self.uistate, self.dbstate, initial_panel=panel_name)
+        except WindowActiveError:
+            return
 
     def _familysearch_enabled(self):
         """
@@ -923,14 +985,11 @@ class ViewManager(CLIManager):
         self.appactions = ActionGroup("AppActions", self._app_actionlist, "app")
         self.uimanager.insert_action_group(self.appactions, gio_group=self.app)
 
-    def preferences_activate(self, *obj):
+    def preferences_activate(self, *obj, initial_panel: str | None = None) -> None:
         """
         Open the preferences dialog.
         """
-        try:
-            GrampsPreferences(self.uistate, self.dbstate)
-        except WindowActiveError:
-            return
+        self._show_preferences_panel(initial_panel)
 
     def load_css(self):
         provider = Gtk.CssProvider()

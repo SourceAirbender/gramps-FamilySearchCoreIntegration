@@ -189,10 +189,11 @@ def _install_editperson_hook() -> None:
         _EDITPERSON_HOOK_INSTALLED = True
         return
 
-    original_post_init = getattr(editor_class, "_post_init", None)
-    if not callable(original_post_init):
+    original_post_init_obj = getattr(editor_class, "_post_init", None)
+    if not callable(original_post_init_obj):
         _dbg("EditPerson._post_init is not callable; skipping hook install")
         return
+    original_post_init = cast(Callable[..., Any], original_post_init_obj)
 
     def _attach_editor_hook(editor: Any) -> None:
         if getattr(editor, "_fs_tools_hook_attached", False):
