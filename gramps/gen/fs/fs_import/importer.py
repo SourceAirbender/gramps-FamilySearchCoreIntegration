@@ -550,4 +550,3 @@ class FSToGrampsImporter:
             )
 
         self.dbstate.db.commit_family(family, self.txn)
-        
