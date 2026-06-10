@@ -356,8 +356,9 @@ def explain_out_of_sync(data: dict) -> List[str]:
 def get_tag_color_ui_note() -> str:
     return _(
         "FamilySearch status tag colors can be customized in Gramps via "
-        "Edit Tags. This add-on only sets default colors when the tags "
-        "are first created and will not override your custom choices."
+        "Edit > Tag > Organize Tags. This integration only sets default "
+        "colors when the tags are first created and will not override your "
+        "custom choices."
     )
 
 
