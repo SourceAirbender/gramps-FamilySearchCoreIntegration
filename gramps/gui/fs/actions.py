@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode, urlparse
@@ -28,7 +29,7 @@ from urllib.parse import urlencode, urlparse
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk  # noqa: F401 (Gdk used in some UI flows)
+from gi.repository import GLib, Gtk, Gdk  # noqa: F401 (Gdk used in some UI flows)
 
 from gramps.gen.config import config
 from gramps.gen.const import GRAMPS_LOCALE as glocale
@@ -843,8 +844,11 @@ def _empty_tree_start_person_dialog(
         if _familysearch_id_from_text(id_entry.get_text()):
             dlg.response(Gtk.ResponseType.OK)
 
+    dlg_alive = [True]
+    dlg.connect("destroy", lambda *_: dlg_alive.__setitem__(0, False))
+
     def cb_search(*_args: Any) -> None:
-        """Search FamilySearch and populate the result list."""
+        """Search FamilySearch on a worker thread and populate the result list."""
         raw_query = (search_entry.get_text() or "").strip()
         direct_fsid = _familysearch_id_from_text(raw_query)
         if direct_fsid:
@@ -859,28 +863,37 @@ def _empty_tree_start_person_dialog(
         store.clear()
         search_button.set_sensitive(False)
         status_label.set_text(_("Searching FamilySearch..."))
-        while Gtk.events_pending():
-            Gtk.main_iteration()
 
-        try:
-            results = _search_familysearch_people(session, raw_query)
-        except Exception as err:
-            status_label.set_text(_("Search failed: %(error)s") % {"error": str(err)})
+        def _do_search() -> None:
+            try:
+                outcome = _search_familysearch_people(session, raw_query)
+            except Exception as exc:
+                outcome = exc
+            GLib.idle_add(_on_search_done, outcome)
+
+        def _on_search_done(outcome: Any) -> bool:
+            if not dlg_alive[0]:
+                return False
+            if isinstance(outcome, Exception):
+                status_label.set_text(
+                    _("Search failed: %(error)s") % {"error": str(outcome)}
+                )
+                search_button.set_sensitive(True)
+                return False
+            results = outcome
+            for result in results:
+                store.append([result.fsid, result.name, result.life])
+            if results:
+                selection.select_path(0)
+                status_label.set_text(
+                    _("Search results: %(count)d") % {"count": len(results)}
+                )
+            else:
+                status_label.set_text(_("No FamilySearch people found."))
             search_button.set_sensitive(True)
-            return
+            return False
 
-        for result in results:
-            store.append([result.fsid, result.name, result.life])
-
-        if results:
-            selection.select_path(0)
-            status_label.set_text(
-                _("Search results: %(count)d") % {"count": len(results)}
-            )
-        else:
-            status_label.set_text(_("No FamilySearch people found."))
-
-        search_button.set_sensitive(True)
+        threading.Thread(target=_do_search, daemon=True).start()
 
     id_entry.connect("changed", cb_id_changed)
     selection.connect("changed", cb_selection_changed)

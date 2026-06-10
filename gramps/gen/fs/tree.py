@@ -20,11 +20,15 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterable, Set
 import email.utils
+import logging
 import time
 
 from gramps.gen.fs.fs_import import deserializer as deserialize
+
+LOG = logging.getLogger(__name__)
 from gramps.gen.fs.fs_import.deserializer import deserialize_json, to_string, DateFormal
 from gramps.gen.fs.fs_import.deserializer import all_annotations, init_class
 from gramps.gen.fs.fs_import.deserializer import (
@@ -49,27 +53,31 @@ class Tree(deserialize.Gedcomx):
         self._sources = dict()
         self._notes = []
 
-    def add_person(self, fsid: str) -> None:
-        global _fs_session
-        if not _fs_session:
-            return
+    def _fetch_raw(self, fsid: str):
+        """
+        Fetch the raw HTTP response for a single FamilySearch person without deserializing.
 
+        Returns (fsid, response, data) where data is the parsed JSON or None on failure.
+        """
+        if not _fs_session:
+            return fsid, None, None
         url = f"/platform/tree/persons/{fsid}"
         r = _fs_session.get_url(url)
         if not r:
-            return
-
+            return fsid, None, None
         try:
             data = r.json()
-        except Exception as e:
-            print("WARNING: corrupted response from %s, error: %s" % (url, e))
-            try:
-                print(r.content)
-            except Exception:
-                pass
+        except Exception as exc:
+            LOG.warning("Corrupted response from %s: %s", url, exc)
             data = None
+        return fsid, r, data
 
-        if not data:
+    def add_person(self, fsid: str) -> None:
+        """
+        Fetch and deserialize a single FamilySearch person into this tree.
+        """
+        fsid, r, data = self._fetch_raw(fsid)
+        if not r or not data:
             return
 
         deserialize.deserialize_json(self, data)
@@ -92,11 +100,49 @@ class Tree(deserialize.Gedcomx):
         self._persons[fsid] = fs_person
 
     def add_persons(self, fids: Iterable[str]) -> None:
+        """
+        Add multiple FamilySearch persons, fetching HTTP responses concurrently
+        and deserializing sequentially to avoid shared-state races.
+        """
         requested_fids = list(fids)
+        to_fetch = [fid for fid in requested_fids if fid not in self._persons]
 
-        for fid in requested_fids:
-            if fid not in self._persons:
-                self.add_person(fid)
+        if to_fetch:
+            raw_results: dict[str, tuple] = {}
+            max_workers = min(8, len(to_fetch))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(self._fetch_raw, fid): fid for fid in to_fetch
+                }
+                for future in as_completed(futures):
+                    try:
+                        fsid, r, data = future.result()
+                        if r is not None and data is not None:
+                            raw_results[fsid] = (r, data)
+                    except Exception:
+                        pass
+
+            for fid in to_fetch:
+                if fid not in raw_results:
+                    continue
+                r, data = raw_results[fid]
+                deserialize.deserialize_json(self, data)
+                try:
+                    fs_person = deserialize.Person.index[fid]
+                except KeyError:
+                    continue
+                if "Last-Modified" in r.headers:
+                    try:
+                        fs_person._last_modified = int(
+                            time.mktime(
+                                email.utils.parsedate(r.headers["Last-Modified"])
+                            )
+                        )
+                    except Exception:
+                        pass
+                if "Etag" in r.headers:
+                    fs_person._etag = r.headers["Etag"]
+                self._persons[fid] = fs_person
 
         for fid in requested_fids:
             if fid in deserialize.Person.index:

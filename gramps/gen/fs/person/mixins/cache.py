@@ -22,11 +22,14 @@ from __future__ import annotations
 
 import email.utils
 import json
+import logging
 import os
 import time
 from typing import Any, Callable, ClassVar, Optional, Tuple
 
 from gramps.gen.const import GRAMPS_LOCALE as glocale
+
+LOG = logging.getLogger(__name__)
 
 from gramps.gen.fs import tree
 from gramps.gen.fs.fs_import import deserializer as deserialize
@@ -106,7 +109,7 @@ class _FsCache:
                 os.fsync(f.fileno())
             os.replace(tmp_path, path)
         except Exception as e:
-            print(f"[FS Cache] failed to write {fsid}: {e}")
+            LOG.warning("FS Cache: failed to write %s: %s", fsid, e)
             try:
                 if os.path.exists(tmp_path):
                     os.remove(tmp_path)
@@ -147,7 +150,7 @@ class _FsCache:
                 except Exception:
                     pass
         except Exception as e:
-            print(f"[FS Cache] failed to clear cache dir {self.base_dir}: {e}")
+            LOG.warning("FS Cache: failed to clear cache dir %s: %s", self.base_dir, e)
 
 
 class CacheMixin:
@@ -215,7 +218,9 @@ class CacheMixin:
             try:
                 payload = get_json(f"/platform/tree/persons/{fsid}/{endpoint}")
             except Exception as exc:
-                print(f"[FS Cache] failed to fetch {endpoint} for {fsid}: {exc}")
+                LOG.warning(
+                    "FS Cache: failed to fetch %s for %s: %s", endpoint, fsid, exc
+                )
                 continue
 
             if not isinstance(payload, dict) or not payload:
@@ -224,7 +229,12 @@ class CacheMixin:
             try:
                 deserialize.deserialize_json(fs_tree, payload)
             except Exception as exc:
-                print(f"[FS Cache] failed to deserialize {endpoint} for {fsid}: {exc}")
+                LOG.warning(
+                    "FS Cache: failed to deserialize %s for %s: %s",
+                    endpoint,
+                    fsid,
+                    exc,
+                )
 
         person = deserialize.Person.index.get(fsid)
         if person is not None:
@@ -276,7 +286,9 @@ class CacheMixin:
                     # disk[0] := {"persons":[ <person json> ]}
                     deserialize.deserialize_json(fs_tree, disk[0])
                 except Exception as e:
-                    print(f"[FS Cache] deserialize (disk) failed for {fsid}: {e}")
+                    LOG.warning(
+                        "FS Cache: deserialize (disk) failed for %s: %s", fsid, e
+                    )
 
                 p = deserialize.Person.index.get(fsid)
                 if p:
@@ -329,7 +341,9 @@ class CacheMixin:
                                 getattr(p, "_last_modified", None),
                             )
                         except Exception as e:
-                            print(f"[FS Cache] serialize/write failed for {fsid}: {e}")
+                            LOG.warning(
+                                "FS Cache: serialize/write failed for %s: %s", fsid, e
+                            )
 
         if with_relatives:
             self._hydrate_relative_payloads(fsid, fs_tree, fs_session)

@@ -21,9 +21,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 import os
 import re
 from typing import Any, ClassVar, Optional, TYPE_CHECKING
+
+LOG = logging.getLogger(__name__)
 
 from gi.repository import Gtk, Gdk, GdkPixbuf, GLib
 
@@ -177,16 +180,17 @@ class CompareGtkMixin:
         cache = cls._CSS_DEFINE_CACHE
         if cache is None:
             cache = {}
-            css_path = os.path.join(DATA_DIR, "gramps.css")
-            try:
-                with open(css_path, "r", encoding="utf-8") as handle:
-                    css_text = handle.read()
-                for name, value in re.findall(
-                    r"@define-color\s+([A-Za-z0-9_]+)\s+([^;]+);", css_text
-                ):
-                    cache[name.strip()] = value.strip()
-            except Exception:
-                cache = {}
+            for css_file in ("gramps.css", "familysearch.css"):
+                css_path = os.path.join(DATA_DIR, css_file)
+                try:
+                    with open(css_path, "r", encoding="utf-8") as handle:
+                        css_text = handle.read()
+                    for name, value in re.findall(
+                        r"@define-color\s+([A-Za-z0-9_]+)\s+([^;]+);", css_text
+                    ):
+                        cache[name.strip()] = value.strip()
+                except Exception:
+                    pass
             cls._CSS_DEFINE_CACHE = cache
 
         return cache.get(color_name, "")
@@ -224,17 +228,27 @@ class CompareGtkMixin:
         if self.__class__._CSS_INSTALLED:
             return
 
-        try:
-            provider = Gtk.CssProvider()
-            provider.load_from_path(os.path.join(DATA_DIR, "gramps.css"))
-            screen = Gdk.Screen.get_default()
-            if screen is not None:
+        screen = Gdk.Screen.get_default()
+        if screen is None:
+            return
+
+        installed = False
+        for css_file in ("gramps.css", "familysearch.css"):
+            css_path = os.path.join(DATA_DIR, css_file)
+            if not os.path.isfile(css_path):
+                continue
+            try:
+                provider = Gtk.CssProvider()
+                provider.load_from_path(css_path)
                 Gtk.StyleContext.add_provider_for_screen(
                     screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
                 )
-                self.__class__._CSS_INSTALLED = True
-        except Exception:
-            return
+                installed = True
+            except Exception:
+                pass
+
+        if installed:
+            self.__class__._CSS_INSTALLED = True
 
     def _wrap_scroller(self, child: Gtk.Widget, min_h: int = 420) -> Gtk.Widget:
         sw = Gtk.ScrolledWindow()
@@ -1062,7 +1076,6 @@ class CompareGtkMixin:
                         return scaled
             except Exception:
                 pass
-        self.__class__._FS_PHOTO_CACHE[cache_key] = None
         return None
 
     def _photo_widget(self, pixbuf: Any, gender: int | None = None) -> Gtk.Widget:
@@ -1626,6 +1639,7 @@ class CompareGtkMixin:
             importer.noreimport = True
             importer.fs_TreeImp = self.__class__.fs_Tree
 
+            failed = 0
             for row in rows:
                 try:
                     if row.kind == "gender":
@@ -1647,14 +1661,25 @@ class CompareGtkMixin:
                             self._merge_relative_row(importer, gr, fs_person, row)
                         )
                 except Exception:
-                    continue
+                    LOG.warning(
+                        "Failed to apply merge row kind=%r", row.kind, exc_info=True
+                    )
+                    failed += 1
 
             db.commit_person(gr, txn)
 
-        if changed:
+        if changed and not failed:
             OkDialog(
                 _("FamilySearch Compare/Merge"),
                 _("{count} item(s) copied into Gramps.").format(count=changed),
+                parent=parent,
+            )
+        elif changed and failed:
+            OkDialog(
+                _("FamilySearch Compare/Merge"),
+                _(
+                    "{count} item(s) copied into Gramps; {failed} row(s) could not be applied."
+                ).format(count=changed, failed=failed),
                 parent=parent,
             )
         else:

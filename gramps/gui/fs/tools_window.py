@@ -475,30 +475,41 @@ class FamilySearchToolsWindow:
         self._tick()
 
     def _install_css(self) -> None:
-        """Install the shared gramps.css file for the tools window."""
-        candidate_paths = [
-            self._repo_gramps_css_path(),
-            os.path.join(DATA_DIR, "gramps.css"),
-        ]
-        for css_path in candidate_paths:
-            try:
-                if not os.path.isfile(css_path):
+        """Install gramps.css and familysearch.css for the tools window."""
+        for name, key, repo_path in (
+            (
+                "gramps.css",
+                "fs.tools_window.gramps",
+                self._repo_css_path("gramps.css"),
+            ),
+            (
+                "familysearch.css",
+                "fs.tools_window.fs",
+                self._repo_css_path("familysearch.css"),
+            ),
+        ):
+            for css_path in (repo_path, os.path.join(DATA_DIR, name)):
+                try:
+                    if not os.path.isfile(css_path):
+                        continue
+                    with open(css_path, "rb") as handle:
+                        css = handle.read()
+                    if fs_ui.install_css_once(key, css):
+                        _dbg(f"Loaded tools CSS from {css_path}")
+                        break
+                except Exception:
                     continue
-                with open(css_path, "rb") as handle:
-                    css = handle.read()
-                if fs_ui.install_css_once("fs.tools_window", css):
-                    _dbg(f"Loaded tools CSS from {css_path}")
-                    return
-            except Exception:
-                continue
 
     @staticmethod
     def _repo_gramps_css_path() -> str:
         """Return this project copy of data/gramps.css before falling back to DATA_DIR."""
+        return FamilySearchToolsWindow._repo_css_path("gramps.css")
+
+    @staticmethod
+    def _repo_css_path(filename: str) -> str:
+        """Return the repo source copy of a data/ CSS file."""
         return os.path.abspath(
-            os.path.join(
-                os.path.dirname(__file__), "..", "..", "..", "data", "gramps.css"
-            )
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", filename)
         )
 
     def _make_section(

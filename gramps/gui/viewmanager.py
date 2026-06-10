@@ -506,14 +506,13 @@ class ViewManager(CLIManager):
         except Exception:
             LOG.warning("Failed to update FamilySearch status button", exc_info=True)
 
-        if hasattr(self, "familysearchgroup"):
-            self.uimanager.set_actions_visible(self.familysearchgroup, enabled)
-            self.uimanager.set_actions_sensitive(self.familysearchgroup, visible)
-
         if not visible:
             close_tools_window()
 
         if hasattr(self, "uimanager"):
+            if hasattr(self, "familysearchgroup"):
+                self.uimanager.set_actions_visible(self.familysearchgroup, enabled)
+                self.uimanager.set_actions_sensitive(self.familysearchgroup, visible)
             self.uimanager.update_menu()
 
     def __setup_navigator(self):
@@ -992,11 +991,17 @@ class ViewManager(CLIManager):
         self._show_preferences_panel(initial_panel)
 
     def load_css(self):
-        provider = Gtk.CssProvider()
-        provider.load_from_path(os.path.join(DATA_DIR, "gramps.css"))
-        Gtk.StyleContext.add_provider_for_screen(
-            self.window.get_screen(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        )
+        for css_file in ("gramps.css", "familysearch.css"):
+            css_path = os.path.join(DATA_DIR, css_file)
+            if not os.path.isfile(css_path):
+                continue
+            provider = Gtk.CssProvider()
+            provider.load_from_path(css_path)
+            Gtk.StyleContext.add_provider_for_screen(
+                self.window.get_screen(),
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
 
     def reset_font(self):
         """
